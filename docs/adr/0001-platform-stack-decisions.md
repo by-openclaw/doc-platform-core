@@ -4,7 +4,7 @@
 **Status:** Accepted  
 **Scope:** BY-SYSTEMS internal DevOps PoC platform (Tier 1 base + Tier 2 optional modules)  
 **Authors:** BY-SYSTEMS platform team  
-**Related docs:** `docs/stack.md`, `docs/naming-convention.md`, `docs/brainstorm-2026-03-25.md`
+**Related docs:** `docs/stack.md`, `docs/naming-convention.md`, `docs/archive/brainstorm-2026-03-25.md`
 
 ---
 
@@ -397,5 +397,5 @@ Full details in `docs/naming-convention.md`. Key rules:
 
 - `docs/stack.md` — full tool inventory with license and deployment options
 - `docs/naming-convention.md` — complete naming rules across all domains
-- `docs/brainstorm-2026-03-25.md` — session notes and locked decisions
+- `docs/archive/brainstorm-2026-03-25.md` — session notes and locked decisions (archived)
 - RTBF CMDB audit (2024) — prior art reference architecture

@@ -346,5 +346,5 @@ Phase 1 (Foundation)
 
 - `docs/stack.md` — full technology inventory
 - `docs/naming-convention.md` — naming rules for repos, services, devices, FQDNs
-- `docs/brainstorm-2026-03-25.md` — session notes, decisions made, org structure
+- `docs/archive/brainstorm-2026-03-25.md` — session notes, decisions made, org structure (archived)
 - `docs/adr/0001-platform-stack-decisions.md` — _(pending)_ tool choice rationale
