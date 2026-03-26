@@ -29,9 +29,12 @@ Before creating or editing any files, agents **must** read:
 ├── assets/                # Diagrams, images, and static assets
 ├── docs/
 │   ├── adr/               # Architecture Decision Records (0001-*.md)
+│   ├── archive/           # Archived session notes and superseded docs
 │   ├── templates/         # Document templates (*.tpl.md)
 │   ├── architecture.md    # Platform architecture overview
+│   ├── idempotency-strategy.md  # Idempotency patterns and free plan notes
 │   ├── naming-convention.md  # Naming standards (READ BEFORE CREATING FILES)
+│   ├── netbox.md          # NetBox deep-dive (CMDB/IPAM/DCIM source of truth)
 │   ├── stack.md           # Full platform stack reference
 │   ├── roadmap.md         # Platform roadmap
 │   └── raid.md            # Risks, Assumptions, Issues, Dependencies

@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-26
+
+### Added
+- `docs/netbox.md` — NetBox deep-dive: CMDB/IPAM/DCIM source of truth, object model, platform integrations, idempotent usage strategies, naming conventions for devices/prefixes/VLANs/racks/tenants/sites
+- `docs/idempotency-strategy.md` — idempotency patterns per tool (Terraform, Ansible, GitLab CI, Vault, Prometheus, etc.), GitOps principles, free plan features and limitations for all stack components
+- `docs/archive/` — archive directory for superseded documents
+
+### Changed
+- `CLAUDE.md` — updated repo layout to include new files and archive directory
+- `README.md` — updated contents table with new documentation files
+- `docs/roadmap.md` — updated brainstorm reference to archived path
+- `docs/adr/0001-platform-stack-decisions.md` — updated brainstorm reference to archived path
+
+### Moved
+- `docs/brainstorm-2026-03-25.md` → `docs/archive/brainstorm-2026-03-25.md` — session notes archived; all decisions formalized in `stack.md`, `naming-convention.md`, and `adr/0001`
+
 ## [0.1.0] - 2026-03-26
 
 ### Added
