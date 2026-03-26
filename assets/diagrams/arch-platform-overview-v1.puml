@@ -1,0 +1,118 @@
+@startuml platform-overview
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName monospace
+skinparam linetype ortho
+
+title BY-SYSTEMS Platform — Overview
+
+together {
+  package "Edge & Network" {
+    [pfSense CE] as pf
+    [WireGuard / NetBird] as vpn
+    [Traefik v3] as traefik
+    [Bind 9 (internal DNS)] as dns
+    [step-ca (internal CA)] as ca
+  }
+}
+
+together {
+  package "Identity & Access" {
+    [Authentik (SSO)] as authentik
+    [HashiCorp Vault OSS] as vault
+    [Vaultwarden] as vaultwarden
+    [Teleport CE (bastion)] as teleport
+    [Apache Guacamole] as guacamole
+  }
+}
+
+together {
+  package "Compute" {
+    [Proxmox VE] as proxmox
+    [k3s (Kubernetes)] as k3s
+  }
+}
+
+together {
+  package "CI/CD & Registries" {
+    [GitLab CE] as gitlab
+    [GitLab Runner] as runner
+    [Kaniko (image builder)] as kaniko
+    [GitLab Container Registry] as gcr
+    [GitLab Package Registry] as gpr
+    [Nexus OSS (proxy/cache)] as nexus
+  }
+}
+
+together {
+  package "Data & CMDB" {
+    [PostgreSQL (Patroni)] as pg
+    [Redis (Sentinel)] as redis
+    [MinIO (S3)] as minio
+    [NetBox (IPAM/CMDB)] as netbox
+    [Neo4J (dependency graph)] as neo4j
+  }
+}
+
+together {
+  package "Observability" {
+    [Prometheus] as prom
+    [Grafana] as grafana
+    [Loki] as loki
+    [Zabbix] as zabbix
+    [OpenTelemetry Collector] as otel
+  }
+}
+
+together {
+  package "Security" {
+    [Wazuh (SIEM/XDR)] as wazuh
+    [Falco (runtime)] as falco
+    [Trivy (scan)] as trivy
+    [Gitleaks] as gitleaks
+    [Presidio (PII redact)] as presidio
+  }
+}
+
+together {
+  package "Shared Storage & Collab" {
+    [Nextcloud] as nextcloud
+    [Mailcow (non-prod)] as mailcow
+  }
+}
+
+pf --> traefik : route
+traefik --> authentik : SSO
+traefik --> gitlab
+traefik --> vault
+traefik --> netbox
+traefik --> grafana
+traefik --> teleport
+authentik --> gitlab : OIDC
+authentik --> vault : OIDC
+authentik --> teleport : OIDC
+authentik --> guacamole : OIDC
+authentik --> nextcloud : OIDC
+proxmox --> k3s : VMs/LXC
+gitlab --> runner : triggers
+runner --> kaniko : build
+kaniko --> gcr : push image
+runner --> gpr : publish package
+runner --> nexus : resolve deps
+nexus ..> gpr : internal pkg fallback
+gitlab --> pg
+vault --> pg
+netbox --> pg
+authentik --> pg
+gitlab --> redis
+gitlab --> minio : artifacts/LFS
+prom --> grafana
+loki --> grafana
+otel --> prom
+otel --> loki
+wazuh --> grafana
+trivy --> gitlab : scan results
+gitleaks --> gitlab : scan results
+falco --> wazuh : alerts
+
+@enduml
