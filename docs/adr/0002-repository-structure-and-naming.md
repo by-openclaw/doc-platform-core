@@ -8,7 +8,7 @@
 
 ## Context
 
-BY-SYSTEMS is building an internal DevOps PoC platform. We need a consistent, scalable repository structure that:
+ORG is building an internal DevOps PoC platform. We need a consistent, scalable repository structure that:
 - Mirrors folder structure across repos (config, scripts, runbooks, security, log)
 - Handles tool upgrades including breaking API changes
 - Separates documentation, platform setup, and application services clearly

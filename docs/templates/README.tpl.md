@@ -1,7 +1,7 @@
 # `{{REPO_NAME}}`
 
 > **Scope:** `{{SCOPE}}` | **Component:** `{{COMPONENT}}` | **Status:** `{{STATUS}}`  
-> **GitLab:** `by-systems/{{SCOPE}}/{{REPO_NAME}}` | **License:** `{{LICENSE}}`
+> **GitLab:** `org/{{SCOPE}}/{{REPO_NAME}}` | **License:** `{{LICENSE}}`
 
 <!-- One or two sentences. What does this repo do and why does it exist? -->
 {{SHORT_DESCRIPTION}}
@@ -25,7 +25,7 @@
 
 ## Overview
 
-<!-- Expand the short description. What problem does this solve? Who uses it? How does it fit into the BY-SYSTEMS platform? -->
+<!-- Expand the short description. What problem does this solve? Who uses it? How does it fit into the ORG platform? -->
 
 {{FULL_DESCRIPTION}}
 
@@ -56,7 +56,7 @@ Optional (for local dev):
 ### Clone
 
 ```bash
-git clone git@gitlab.by-systems.internal:by-systems/{{SCOPE}}/{{REPO_NAME}}.git
+git clone git@gitlab.org.internal:org/{{SCOPE}}/{{REPO_NAME}}.git
 cd {{REPO_NAME}}
 ```
 
@@ -122,7 +122,7 @@ Pipeline defined in `.gitlab-ci.yml`.
 | `deploy` | _(project-specific)_ | Deploy to target environment |
 | `release` | release-please | Semver tagging + CHANGELOG |
 
-Container image: `registry.by-systems.internal/{{SCOPE}}/{{COMPONENT}}:{tag}`
+Container image: `registry.org.internal/{{SCOPE}}/{{COMPONENT}}:{tag}`
 
 ---
 
@@ -130,11 +130,11 @@ Container image: `registry.by-systems.internal/{{SCOPE}}/{{COMPONENT}}:{tag}`
 
 | Environment | Branch | FQDN | Notes |
 |---|---|---|---|
-| `dev` | `feat/*`, `fix/*` | `{{COMPONENT}}.dev.by-systems.internal` | Auto-deploy on push |
-| `staging` | `main` | `{{COMPONENT}}.staging.by-systems.internal` | Auto-deploy on merge |
-| `prod` | `v*` tag | `{{COMPONENT}}.by-systems.internal` | Manual gate |
+| `dev` | `feat/*`, `fix/*` | `{{COMPONENT}}.dev.org.internal` | Auto-deploy on push |
+| `staging` | `main` | `{{COMPONENT}}.staging.org.internal` | Auto-deploy on merge |
+| `prod` | `v*` tag | `{{COMPONENT}}.org.internal` | Manual gate |
 
-All services use Traefik as reverse proxy and internal TLS via `step-ca` (`*.by-systems.internal`).
+All services use Traefik as reverse proxy and internal TLS via `step-ca` (`*.org.internal`).
 
 ---
 
@@ -174,7 +174,7 @@ ADRs: [`docs/adr/`](docs/adr/)
 [Client] → [Traefik TLS] → [{{COMPONENT}}] → [PostgreSQL / Vault / NetBox]
 ```
 
-Related services in NetBox: `https://netbox.by-systems.internal/dcim/services/?name={{COMPONENT}}`
+Related services in NetBox: `https://netbox.org.internal/dcim/services/?name={{COMPONENT}}`
 
 ---
 
@@ -183,4 +183,4 @@ Related services in NetBox: `https://netbox.by-systems.internal/dcim/services/?n
 `{{LICENSE}}` — see [LICENSE](LICENSE)
 
 <!-- For internal / proprietary repos: -->
-<!-- © BY-SYSTEMS. All rights reserved. Internal use only. -->
+<!-- © ORG. All rights reserved. Internal use only. -->

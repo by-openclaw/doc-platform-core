@@ -3,7 +3,7 @@
 > **Scope:** `doc` | **Component:** `platform` | **Status:** `Draft — PoC phase`
 > **Org:** `by-openclaw/doc-platform-core` | **License:** `CC BY-SA 4.0`
 
-Platform documentation for the BY-SYSTEMS internal DevOps PoC — stack decisions, architecture, naming conventions, ADRs, roadmap, and RAID log.
+Platform documentation for the ORG internal DevOps PoC — stack decisions, architecture, naming conventions, ADRs, roadmap, and RAID log.
 
 ---
 

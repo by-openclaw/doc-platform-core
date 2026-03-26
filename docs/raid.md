@@ -1,4 +1,4 @@
-# BY-SYSTEMS Platform — RAID Log
+# ORG Platform — RAID Log
 
 **Last updated:** 2026-03-25
 **Status:** Active — PoC phase
@@ -45,7 +45,7 @@
 | A-09 | HashiCorp Vault OSS is sufficient (no Vault Enterprise needed) | Namespace isolation, HSM, and some enterprise features unavailable | Accepted for PoC; re-evaluate at prod |
 | A-10 | One PostgreSQL cluster (Patroni) can host all platform services (GitLab, Vault, Authentik, NetBox, Zabbix) | Resource contention; requires DB separation | Monitor per-DB resource usage; separate clusters if needed |
 | A-11 | Mailcow on `example.com` (RFC 2606) is sufficient for non-prod email testing | May need real domain for some tests | Validated: RFC 2606 reserved, no external leak risk |
-| A-12 | BY-SYSTEMS team has Ansible and Terraform skills for Phase 1 IaC | Phase 1 delayed | Skills assessment before start |
+| A-12 | ORG team has Ansible and Terraform skills for Phase 1 IaC | Phase 1 delayed | Skills assessment before start |
 | A-13 | Nexus OSS (Apache 2.0) remains free for all required formats | Forced migration to paid tier | Monitor Sonatype licensing changes; Nexus pinned to current OSS version |
 | A-14 | Customer production mail (Exchange/Google) will be available for SMTP relay config | Platform notification emails fail in prod | Collect SMTP relay credentials during customer onboarding |
 
@@ -58,7 +58,7 @@
 | I-01 | OpenClaw Anthropic token was OpenClaw shared pool (not MAX plan) — caused overload errors | High | 2026-03-25 | Re-ran `openclaw models auth setup-token --provider anthropic` — new token tied to MAX plan. Old API key removed from config and revoked. | ✅ Resolved |
 | I-02 | Discord WebSocket instability (code 1006, 520) — intermittent reconnects | Low | 2026-03-25 | Discord-side transient issue. Gateway auto-recovered. Monitor for recurrence. | ✅ Resolved (monitoring) |
 | I-03 | `openclaw gateway restart` kills agent mid-command (self-restart) | Low | 2026-03-25 | Workaround: use `systemctl --user restart openclaw-gateway.service` from terminal. | ⚠️ Workaround |
-| I-04 | `ANTHROPIC_API_KEY` (sk-ant-api03) was stored in session history JSONL | Medium | 2026-03-25 | Key revoked on Anthropic console. Session log is local-only. Config files cleaned. | ✅ Resolved |
+| I-04 | `ANTHROPIC_API_KEY` ([REDACTED]) was stored in session history JSONL | Medium | 2026-03-25 | Key revoked on Anthropic console. Session log is local-only. Config files cleaned. | ✅ Resolved |
 | I-05 | Template files used `.md.template` extension — not rendered by editors | Low | 2026-03-25 | Renamed all templates to `.tpl.md`. Convention documented in naming-convention.md §5. | ✅ Resolved |
 | I-06 | Verdaccio and Athens identified as gaps — npm/Go proxy only, not multi-format | Medium | 2026-03-25 | Replaced by Nexus OSS in stack decision. ADR and roadmap updated. | ✅ Resolved |
 

@@ -1,4 +1,4 @@
-# BY-SYSTEMS Platform — NetBox (Source of Truth)
+# ORG Platform — NetBox (Source of Truth)
 **Last updated:** 2026-03-26
 **Status:** Active
 **Scope:** IPAM / DCIM / CMDB
@@ -11,7 +11,7 @@
 
 ## 1. What NetBox Does
 
-NetBox serves three core roles in the BY-SYSTEMS platform:
+NetBox serves three core roles in the ORG platform:
 
 | Role | Scope | Examples |
 |---|---|---|
@@ -30,7 +30,7 @@ NetBox serves three core roles in the BY-SYSTEMS platform:
 
 ## 2. Community Edition — Features and Limitations
 
-NetBox is open source (Apache 2.0). BY-SYSTEMS uses the **community edition** (self-hosted).
+NetBox is open source (Apache 2.0). ORG uses the **community edition** (self-hosted).
 
 ### Included in Community (free)
 
@@ -66,7 +66,7 @@ NetBox is open source (Apache 2.0). BY-SYSTEMS uses the **community edition** (s
 
 ---
 
-## 3. NetBox Object Model (BY-SYSTEMS)
+## 3. NetBox Object Model (ORG)
 
 ### Sites
 
@@ -142,7 +142,7 @@ Examples: `vm-gitlab-prod-01`, `vm-vault-prod-01`, `vm-netbox-prod-01`
 
 | Tenant slug | Name | Purpose |
 |---|---|---|
-| `by-systems` | BY-SYSTEMS | Internal platform |
+| `org` | ORG | Internal platform |
 | `{customer-slug}` | Customer name | Per-customer isolation |
 
 > Tenant slug = customer slug used in GitLab subgroups, repo names, and K8S namespaces.
@@ -153,7 +153,7 @@ Every service registered in NetBox carries these custom fields:
 
 | Field | Type | Example | Purpose |
 |---|---|---|---|
-| `repo_url` | URL | `https://gitlab.by-systems.internal/platform/gitlab-core` | Links to source repo |
+| `repo_url` | URL | `https://gitlab.org.internal/platform/gitlab-core` | Links to source repo |
 | `prometheus_job` | Text | `gitlab` | Prometheus scrape job name |
 | `grafana_tag` | Text | `service:gitlab` | Grafana dashboard tag |
 | `version` | Text | `17.0.1` | Currently deployed version |
@@ -185,7 +185,7 @@ NetBox replaces static inventory files. The `netbox.netbox` Ansible collection p
 ```yaml
 # inventory/netbox.yml
 plugin: netbox.netbox.nb_inventory
-api_endpoint: https://netbox.by-systems.internal
+api_endpoint: https://netbox.org.internal
 token: "{{ lookup('hashi_vault', 'secret/netbox/ansible-token:token') }}"
 validate_certs: true
 group_by:
@@ -270,7 +270,7 @@ The `netbox.netbox` collection provides idempotent modules:
 # Ensure device exists (create or update)
 - name: Register switch in NetBox
   netbox.netbox.netbox_device:
-    netbox_url: "https://netbox.by-systems.internal"
+    netbox_url: "https://netbox.org.internal"
     netbox_token: "{{ netbox_token }}"
     data:
       name: "sw-arista-prod-01"
@@ -288,7 +288,7 @@ The `netbox.netbox` collection provides idempotent modules:
 # Ensure IP prefix exists
 - name: Register management prefix
   netbox.netbox.netbox_prefix:
-    netbox_url: "https://netbox.by-systems.internal"
+    netbox_url: "https://netbox.org.internal"
     netbox_token: "{{ netbox_token }}"
     data:
       prefix: "10.0.10.0/24"
@@ -355,7 +355,7 @@ NetBox webhooks can trigger automation on object changes:
 | Attribute | Value |
 |---|---|
 | Deployment | Docker Compose (Phase 1) → Helm chart (Phase 2+) |
-| FQDN | `netbox.by-systems.internal` |
+| FQDN | `netbox.org.internal` |
 | Repo | `platform-netbox-config` |
 | Database | Shared PostgreSQL cluster |
 | Cache | Shared Redis |
@@ -374,8 +374,8 @@ NetBox object names must match the naming convention in `docs/naming-convention.
 | Device name | `name` | `{function}-{vendor}-{env}-{number:02d}` | `sw-arista-prod-01` |
 | VM name | `name` | `vm-{service}-{env}-{number:02d}` | `vm-gitlab-prod-01` |
 | Service slug | `name` (service) | Component slug from repo name | `gitlab` |
-| Tenant slug | `slug` | `{customer-short-name}` | `acme`, `rtbf` |
-| FQDN | Computed | `{service}.by-systems.internal` | `netbox.by-systems.internal` |
+| Tenant slug | `slug` | `{customer-short-name}` | `acme`, `client-a` |
+| FQDN | Computed | `{service}.org.internal` | `netbox.org.internal` |
 | Prometheus job | Custom field | Matches service slug | `netbox` |
 
-> **One slug, three systems:** A service named `gitlab` in NetBox = FQDN `gitlab.by-systems.internal` = repo `platform-gitlab-core`.
+> **One slug, three systems:** A service named `gitlab` in NetBox = FQDN `gitlab.org.internal` = repo `platform-gitlab-core`.

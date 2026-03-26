@@ -2,15 +2,15 @@
 
 **Date:** 2026-03-25  
 **Status:** Accepted  
-**Scope:** BY-SYSTEMS internal DevOps PoC platform (Tier 1 base + Tier 2 optional modules)  
-**Authors:** BY-SYSTEMS platform team  
+**Scope:** ORG internal DevOps PoC platform (Tier 1 base + Tier 2 optional modules)  
+**Authors:** ORG platform team  
 **Related docs:** `docs/stack.md`, `docs/naming-convention.md`, `docs/archive/brainstorm-2026-03-25.md`
 
 ---
 
 ## Context
 
-BY-SYSTEMS is a broadcast/telecom system integrator building an internal DevOps PoC platform. Goals:
+ORG is a broadcast/telecom system integrator building an internal DevOps PoC platform. Goals:
 
 - Replace legacy/manual workflows with proper DevOps tooling
 - Serve as reference architecture for SME customers
@@ -22,7 +22,7 @@ The platform is structured in two tiers:
 - **Tier 1:** Base platform, required for all deployments
 - **Tier 2:** Optional modules per customer profile (`module-broadcast`, `module-voip`, `module-cctv`)
 
-Reference prior art: RTBF CMDB audit (2024) — production app landscape, CI/CD pipeline, infrastructure, and Neo4J-backed CMDB.
+Reference prior art: CLIENT-A CMDB audit (2024) — production app landscape, CI/CD pipeline, infrastructure, and Neo4J-backed CMDB.
 
 ---
 
@@ -89,7 +89,7 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 | pfSense CE + pfBlockerNG | Firewall, DHCP, DNS, VPN, threat blocking |
 | Bind 9 | Authoritative internal DNS |
 | Traefik v3 | Edge reverse proxy + TLS termination |
-| step-ca (Smallstep) | Internal CA for `*.by-systems.internal` |
+| step-ca (Smallstep) | Internal CA for `*.org.internal` |
 | WireGuard (pfSense) | Site-to-site + road warrior VPN |
 | NetBird | Zero-config mesh VPN for user devices (SSO via Authentik) |
 | Cloudflare | Public DNS + DNS-01 ACME challenge |
@@ -97,7 +97,7 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 **Key rules:**
 - **Traefik is the only edge proxy.** No Apache/Nginx at the network edge. Internal service reverse proxies (e.g., GitLab's built-in Nginx) run on localhost only (`listen_port 8080`, `listen_https false`).
 - **Internal TLD is `.internal`** — avoids mDNS `.local` conflicts per RFC 6762.
-- **Split DNS:** `*.by-systems.internal` → pfSense Unbound; `*.by-systems.be` → Cloudflare.
+- **Split DNS:** `*.org.internal` → pfSense Unbound; `*.org.example` → Cloudflare.
 - **Dual-stack everywhere:** IPv4 + IPv6, A + AAAA DNS records.
 
 **Rationale:**
@@ -274,7 +274,7 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 **Rationale:**
 - Prometheus + Grafana + Loki is the de-facto OSS observability stack (PLG stack)
 - Zabbix retained for SNMP polling of network devices and legacy hosts not covered by Prometheus exporters
-- Icinga2 is referenced from the RTBF audit but is optional — Zabbix covers the same use case
+- Icinga2 is referenced from the CLIENT-A audit but is optional — Zabbix covers the same use case
 
 **Alternatives considered:**
 - **Elasticsearch/ELK**: Heavier resource footprint than Loki for log aggregation — rejected for PoC scale
@@ -352,12 +352,12 @@ Full details in `docs/naming-convention.md`. Key rules:
 | Repository | `{scope}-{component}-{qualifier}` | `platform-gitlab-core` |
 | Branch | `{type}/{issue-id}-{short-description}` | `feat/42-add-vault-integration` |
 | Commit | `{type}({scope}): {description}` | `feat(platform): add vault compose stack` |
-| FQDN (internal) | `{service}.{org}.internal` | `vault.by-systems.internal` |
-| FQDN (public) | `{service}.{org}.be` | `gitlab.by-systems.be` |
+| FQDN (internal) | `{service}.{org}.internal` | `vault.org.internal` |
+| FQDN (public) | `{service}.{org}.be` | `gitlab.org.example` |
 | Device | `{function}-{vendor}-{env}-{number}` | `sw-arista-prod-01` |
 | VM | `vm-{service}-{env}-{number}` | `vm-gitlab-prod-01` |
 | K8S namespace | `{scope}-{env}` | `platform-prod` |
-| Container image | `{registry}/{scope}/{component}:{version}-{env}` | `registry.by-systems.internal/platform/gitlab-core:1.2.3-prod` |
+| Container image | `{registry}/{scope}/{component}:{version}-{env}` | `registry.org.internal/platform/gitlab-core:1.2.3-prod` |
 
 ---
 
@@ -398,4 +398,4 @@ Full details in `docs/naming-convention.md`. Key rules:
 - `docs/stack.md` — full tool inventory with license and deployment options
 - `docs/naming-convention.md` — complete naming rules across all domains
 - `docs/archive/brainstorm-2026-03-25.md` — session notes and locked decisions (archived)
-- RTBF CMDB audit (2024) — prior art reference architecture
+- CLIENT-A CMDB audit (2024) — prior art reference architecture

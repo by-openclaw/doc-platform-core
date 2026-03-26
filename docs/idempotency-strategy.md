@@ -1,4 +1,4 @@
-# BY-SYSTEMS Platform — Idempotency and Strategy Guide
+# ORG Platform — Idempotency and Strategy Guide
 **Last updated:** 2026-03-26
 **Status:** Active
 **Scope:** All platform tools
@@ -323,7 +323,7 @@ All scanners are idempotent — re-running produces fresh results:
 |---|---|
 | **Idempotency** | Declarative config via labels (Docker) or IngressRoute CRDs (K8S) |
 | **Free plan** | MIT (free). All features. |
-| **TLS** | step-ca for `*.by-systems.internal`, Cloudflare DNS-01 for `*.by-systems.be` |
+| **TLS** | step-ca for `*.org.internal`, Cloudflare DNS-01 for `*.org.example` |
 
 ### Bind 9
 

@@ -2,7 +2,7 @@
 
 Thanks for contributing.
 
-This repository follows the BY-SYSTEMS engineering conventions for naming, delivery, security, and documentation. Keep changes small, reviewable, and traceable.
+This repository follows the ORG engineering conventions for naming, delivery, security, and documentation. Keep changes small, reviewable, and traceable.
 
 ---
 
@@ -89,7 +89,7 @@ Allowed commit types:
 - `security`
 - `revert`
 
-Allowed scopes usually align with BY-SYSTEMS repo scopes:
+Allowed scopes usually align with ORG repo scopes:
 
 - `infra`
 - `platform`
@@ -274,14 +274,14 @@ General rules:
 - do not deploy `latest` to production
 - production should use immutable semver tags
 - environment-specific behavior must be explicit, not hidden in code
-- internal services should use `*.by-systems.internal`
+- internal services should use `*.org.internal`
 - Traefik is the edge proxy; do not introduce ad hoc edge Nginx/Apache patterns
 
 ---
 
 ## Naming Rules
 
-Use the BY-SYSTEMS naming convention consistently.
+Use the ORG naming convention consistently.
 
 ### Repository
 
@@ -292,8 +292,8 @@ Use the BY-SYSTEMS naming convention consistently.
 ### Internal FQDN
 
 ```text
-{service}.by-systems.internal
-{service}.{env}.by-systems.internal
+{service}.org.internal
+{service}.{env}.org.internal
 ```
 
 ### Device names
@@ -322,7 +322,7 @@ Recommended baseline:
 - project language toolchain
 - access to Vault dev secrets if required
 
-If you add tooling, prefer open-source and self-hostable options aligned with the BY-SYSTEMS stack.
+If you add tooling, prefer open-source and self-hostable options aligned with the ORG stack.
 
 ---
 

@@ -3,7 +3,7 @@
 - **Document ID:** `sow-{{PROJECT_SLUG}}-{{SUBJECT}}-{{DATE}}`
 - **Customer:** `{{CUSTOMER_NAME}}`
 - **Customer slug:** `{{CUSTOMER_SLUG}}`
-- **Prepared by:** `BY-SYSTEMS`
+- **Prepared by:** `ORG`
 - **Date:** `{{DATE}}`
 - **Version:** `{{VERSION}}`
 - **Status:** `Draft`
@@ -12,11 +12,11 @@
 
 ## 1. Executive Summary
 
-{{PROJECT_NAME}} is a BY-SYSTEMS delivery scoped to implement, configure, integrate, or document the following outcome:
+{{PROJECT_NAME}} is a ORG delivery scoped to implement, configure, integrate, or document the following outcome:
 
 > {{EXECUTIVE_SUMMARY}}
 
-This work aligns with the BY-SYSTEMS reference platform:
+This work aligns with the ORG reference platform:
 
 - open source, self-hosted, low lock-in
 - standard DevOps operating model
@@ -67,7 +67,7 @@ Any item not explicitly listed under **In Scope** is considered out of scope unl
 
 ### Target Environments
 
-Use one of the approved BY-SYSTEMS environment tracks:
+Use one of the approved ORG environment tracks:
 
 ```text
 dev → test → staging → acceptance → prod
@@ -81,7 +81,7 @@ dev → staging → prod
 
 ### Naming and Standards
 
-All repo, branch, document, FQDN, image, and service names must follow the BY-SYSTEMS naming convention:
+All repo, branch, document, FQDN, image, and service names must follow the ORG naming convention:
 
 - lowercase only
 - hyphens only
@@ -93,7 +93,7 @@ Examples:
 - repo: `platform-vault-config`
 - branch: `feat/42-add-vault-integration`
 - document: `sow-infra-network-setup-2026-03-25.md`
-- FQDN: `vault.by-systems.internal`
+- FQDN: `vault.org.internal`
 
 ---
 
@@ -113,7 +113,7 @@ Examples:
 
 Remove rows that do not apply.
 
-### Standard BY-SYSTEMS Stack References
+### Standard ORG Stack References
 
 Depending on scope, the implementation may include or integrate with:
 
@@ -169,7 +169,7 @@ This scope assumes:
 
 - customer stakeholders are available for validation and access approvals
 - required network, DNS, firewall, and infrastructure prerequisites exist or are separately planned
-- BY-SYSTEMS standard tooling is accepted unless an exception is documented
+- ORG standard tooling is accepted unless an exception is documented
 - credentials, licenses, and API access required from the customer are provided on time
 - deviations from the reference architecture are documented and approved
 
@@ -232,7 +232,7 @@ Optional detailed criteria:
 - 24/7 managed service operations unless separately contracted
 - custom features not described in this SOW
 - commercial third-party tooling outside approved exceptions
-- undocumented architecture drift from the BY-SYSTEMS baseline
+- undocumented architecture drift from the ORG baseline
 
 ---
 
@@ -261,7 +261,7 @@ Any change to scope, assumptions, schedule, deliverables, or acceptance criteria
 
 1. be documented in writing
 2. include impact on cost, timeline, and risk
-3. be reviewed by BY-SYSTEMS and the customer
+3. be reviewed by ORG and the customer
 4. be approved before implementation
 
 ---
@@ -291,7 +291,7 @@ docs/runbooks/
 
 | Name | Role | Signature | Date |
 |---|---|---|---|
-| {{SIGNOFF_1}} | BY-SYSTEMS |  |  |
+| {{SIGNOFF_1}} | ORG |  |  |
 | {{SIGNOFF_2}} | Customer |  |  |
 
 ---
@@ -303,7 +303,7 @@ Repo:      {scope}-{component}-{qualifier}
 Branch:    {type}/{issue-id}-{short-description}
 Commit:    {type}({scope}): {description}
 Document:  {type}-{subject}-{YYYY-MM-DD}.md
-FQDN:      {service}.by-systems.internal
+FQDN:      {service}.org.internal
 Device:    {function}-{vendor}-{env}-{number:02d}
 ```
 
@@ -311,14 +311,14 @@ Device:    {function}-{vendor}-{env}-{number:02d}
 
 Typical internal FQDNs:
 
-- `gitlab.by-systems.internal`
-- `vault.by-systems.internal`
-- `authentik.by-systems.internal`
-- `netbox.by-systems.internal`
-- `grafana.by-systems.internal`
+- `gitlab.org.internal`
+- `vault.org.internal`
+- `authentik.org.internal`
+- `netbox.org.internal`
+- `grafana.org.internal`
 
 Use environment-qualified names when needed:
 
-- `gitlab.dev.by-systems.internal`
-- `gitlab.staging.by-systems.internal`
-- `gitlab.prod.by-systems.internal`
+- `gitlab.dev.org.internal`
+- `gitlab.staging.org.internal`
+- `gitlab.prod.org.internal`

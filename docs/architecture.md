@@ -1,10 +1,10 @@
-# BY-SYSTEMS Platform — Architecture
+# ORG Platform — Architecture
 
 **Last updated:** 2026-03-25
 **Status:** Draft — PoC phase
 **Related docs:** `docs/stack.md`, `docs/naming-convention.md`, `docs/adr/0001-platform-stack-decisions.md`
 
-> Diagrams are written in PlantUML. Rendered via KROKI (`kroki.by-systems.internal`).
+> Diagrams are written in PlantUML. Rendered via KROKI (`kroki.org.internal`).
 > Source files: `assets/diagrams/` — exports: `assets/exports/`
 
 ---
@@ -20,7 +20,7 @@ skinparam backgroundColor #FAFAFA
 skinparam defaultFontName monospace
 skinparam linetype ortho
 
-title BY-SYSTEMS Platform — Overview
+title ORG Platform — Overview
 
 together {
   package "Edge & Network" {
@@ -160,36 +160,36 @@ skinparam backgroundColor #FAFAFA
 skinparam defaultFontName monospace
 skinparam linetype ortho
 
-title BY-SYSTEMS Network — Logical Topology
+title ORG Network — Logical Topology
 
 cloud "Internet / ISP" as internet
 
 package "DMZ (VLAN 10)" {
-  [Traefik v3\nedge.by-systems.be] as traefik_dmz
-  [Cloudflare DNS\nby-systems.be] as cf
+  [Traefik v3\nedge.org.example] as traefik_dmz
+  [Cloudflare DNS\norg.example] as cf
 }
 
 package "Management (VLAN 20)" {
   [pfSense CE\nfw-pfsense-prod-01] as pfsense
-  [Bind 9\ndns.by-systems.internal] as dns
-  [step-ca\nca.by-systems.internal] as ca
+  [Bind 9\ndns.org.internal] as dns
+  [step-ca\nca.org.internal] as ca
   [Proxmox VE\nsrv-proxmox-prod-01] as proxmox
 }
 
 package "Platform (VLAN 30)" {
-  [GitLab CE\ngitlab.by-systems.internal] as gitlab
-  [Vault\nvault.by-systems.internal] as vault
-  [Authentik\nauth.by-systems.internal] as authentik
-  [NetBox\nnetbox.by-systems.internal] as netbox
-  [Nexus OSS\nnexus.by-systems.internal] as nexus
-  [Teleport CE\nbastion.by-systems.internal] as teleport
+  [GitLab CE\ngitlab.org.internal] as gitlab
+  [Vault\nvault.org.internal] as vault
+  [Authentik\nauth.org.internal] as authentik
+  [NetBox\nnetbox.org.internal] as netbox
+  [Nexus OSS\nnexus.org.internal] as nexus
+  [Teleport CE\nbastion.org.internal] as teleport
 }
 
 package "Observability (VLAN 40)" {
-  [Prometheus\nprometheus.by-systems.internal] as prom
-  [Grafana\ngrafana.by-systems.internal] as grafana
-  [Loki\nloki.by-systems.internal] as loki
-  [Wazuh\nwazuh.by-systems.internal] as wazuh
+  [Prometheus\nprometheus.org.internal] as prom
+  [Grafana\ngrafana.org.internal] as grafana
+  [Loki\nloki.org.internal] as loki
+  [Wazuh\nwazuh.org.internal] as wazuh
 }
 
 package "Workloads / K8S (VLAN 50)" {
@@ -197,9 +197,9 @@ package "Workloads / K8S (VLAN 50)" {
 }
 
 package "Storage (VLAN 60)" {
-  [PostgreSQL\npg.by-systems.internal] as pg
-  [MinIO\nminio.by-systems.internal] as minio
-  [Nextcloud\ncloud.by-systems.internal] as nextcloud
+  [PostgreSQL\npg.org.internal] as pg
+  [MinIO\nminio.org.internal] as minio
+  [Nextcloud\ncloud.org.internal] as nextcloud
 }
 
 package "User devices (VLAN 99)" {
@@ -212,7 +212,7 @@ internet --> pfsense : WAN
 pfsense --> traefik_dmz : HTTPS 443
 
 ' Internal routing
-traefik_dmz --> platform : route *.by-systems.internal
+traefik_dmz --> platform : route *.org.internal
 pfsense --> management : admin
 ws --> pfsense : VPN tunnel
 ws --> teleport : SSH/K8S/DB (bastion)
@@ -261,11 +261,11 @@ End-to-end flow from git push to deployed service.
 skinparam backgroundColor #FAFAFA
 skinparam defaultFontName monospace
 
-title BY-SYSTEMS CI/CD Pipeline — End-to-End Flow
+title ORG CI/CD Pipeline — End-to-End Flow
 
 actor Developer as dev
 participant "Workstation\n(VSCode + Commitizen)" as ws
-participant "GitLab CE\ngitlab.by-systems.internal" as gitlab
+participant "GitLab CE\ngitlab.org.internal" as gitlab
 participant "GitLab Runner\n(Docker executor)" as runner
 participant "Nexus OSS\n(dep proxy/cache)" as nexus
 participant "Kaniko\n(image builder)" as kaniko
@@ -293,7 +293,7 @@ nexus --> runner : cached or fetched\nfrom upstream
 == Stage 3: Build ==
 runner -> kaniko : build container image\n(rootless, no Docker daemon)
 kaniko -> nexus : RUN steps fetch deps via Nexus
-kaniko -> gcr : push image\nregistry.by-systems.internal/{project}:{sha}
+kaniko -> gcr : push image\nregistry.org.internal/{project}:{sha}
 
 == Stage 4: Scan ==
 runner -> scan : trivy image (CVE + secrets)\ngitleaks (git history)\nowasp dep-check
@@ -347,7 +347,7 @@ skinparam backgroundColor #FAFAFA
 skinparam defaultFontName monospace
 skinparam linetype ortho
 
-title BY-SYSTEMS — Access & Identity Flow
+title ORG — Access & Identity Flow
 
 actor "Engineer\n(DevOps)" as eng
 actor "Non-technical\nuser" as ntu
@@ -445,7 +445,7 @@ skinparam backgroundColor #FAFAFA
 skinparam defaultFontName monospace
 skinparam linetype ortho
 
-title BY-SYSTEMS — Tier 1 Base + Tier 2 Optional Modules
+title ORG — Tier 1 Base + Tier 2 Optional Modules
 
 package "Tier 1 — Base Platform (all deployments)" {
   [Compute: Proxmox + k3s] as compute
@@ -534,5 +534,5 @@ end note
 | Access & identity | `assets/diagrams/arch-access-identity-v1.puml` | `assets/exports/arch-access-identity-v1.png` |
 | Module architecture | `assets/diagrams/arch-module-tiers-v1.puml` | `assets/exports/arch-module-tiers-v1.png` |
 
-> To render locally: install KROKI CLI or use `kroki.by-systems.internal`.
+> To render locally: install KROKI CLI or use `kroki.org.internal`.
 > To export PNG: `kroki convert assets/diagrams/arch-*.puml --format png --output assets/exports/`

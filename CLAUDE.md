@@ -9,7 +9,7 @@ This file is read by AI agents (Claude Code, Codex, etc.) for context before wor
 
 ## What This Repo Does
 
-`doc-platform-core` is the central documentation repository for the BY-SYSTEMS platform. It contains architecture decisions, stack references, naming conventions, and platform-wide documentation. This repo contains **no code** — its sole purpose is to maintain accurate, well-structured platform documentation for engineers, operators, and agents working within the BY-SYSTEMS ecosystem.
+`doc-platform-core` is the central documentation repository for the ORG platform. It contains architecture decisions, stack references, naming conventions, and platform-wide documentation. This repo contains **no code** — its sole purpose is to maintain accurate, well-structured platform documentation for engineers, operators, and agents working within the ORG ecosystem.
 
 ---
 
@@ -59,7 +59,7 @@ Do **not** add source code, Dockerfiles, CI pipelines, or build tooling to this 
 
 ## Naming Conventions
 
-This repo follows the BY-SYSTEMS naming convention. **Always check `docs/naming-convention.md` before creating new files.**
+This repo follows the ORG naming convention. **Always check `docs/naming-convention.md` before creating new files.**
 
 - **Repo pattern:** `{scope}-{component}-{qualifier}` — all lowercase, hyphens only
 - **Branch pattern:** `docs/{issue-id}-{short-description}` (e.g. `docs/12-add-vault-adr`)
@@ -99,7 +99,7 @@ Examples:
 
 ## Agent Instructions
 
-1. **Always read `docs/naming-convention.md` before creating any new files.** File names, paths, and structures must follow BY-SYSTEMS conventions.
+1. **Always read `docs/naming-convention.md` before creating any new files.** File names, paths, and structures must follow ORG conventions.
 2. **Always read `docs/stack.md`** when writing about platform components, tools, or services — use the canonical names.
 3. This is a documentation repo. Stay in your lane: edit `.md` files only.
 4. ADRs go in `docs/adr/` with sequential numbering (`0001-`, `0002-`, etc.).

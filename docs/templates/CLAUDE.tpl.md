@@ -1,7 +1,7 @@
 # CLAUDE.md — AI Agent Context for `{{REPO_NAME}}`
 
 > **Scope:** `{{SCOPE}}` | **Component:** `{{COMPONENT}}` | **Qualifier:** `{{QUALIFIER}}`
-> **GitLab path:** `by-systems/{{SCOPE}}/{{REPO_NAME}}`
+> **GitLab path:** `org/{{SCOPE}}/{{REPO_NAME}}`
 
 This file is read by AI agents (Claude Code, Codex, etc.) for context before working in this repository. Keep it up to date.
 
@@ -26,9 +26,9 @@ This file is read by AI agents (Claude Code, Codex, etc.) for context before wor
 | Container | Docker / Kaniko (rootless builds) |
 | IaC | Terraform / Ansible _(if applicable)_ |
 | Secrets | HashiCorp Vault |
-| Registry | `registry.by-systems.internal/{{SCOPE}}/{{COMPONENT}}` |
+| Registry | `registry.org.internal/{{SCOPE}}/{{COMPONENT}}` |
 
-Full platform stack: see [`docs/stack.md`](https://gitlab.by-systems.internal/by-systems/doc/stack)
+Full platform stack: see [`docs/stack.md`](https://gitlab.org.internal/org/doc/stack)
 
 ---
 
@@ -54,15 +54,15 @@ Full platform stack: see [`docs/stack.md`](https://gitlab.by-systems.internal/by
 
 ## Naming Conventions
 
-This repo follows the BY-SYSTEMS naming convention:
+This repo follows the ORG naming convention:
 
 - **Repo pattern:** `{scope}-{component}-{qualifier}` — all lowercase, hyphens only
 - **Branch pattern:** `{type}/{issue-id}-{short-description}` (e.g. `feat/42-add-vault-integration`)
 - **Commit pattern:** `{type}({scope}): {description}` (Commitizen enforced)
-- **Container image:** `registry.by-systems.internal/{{SCOPE}}/{{COMPONENT}}:{semver}-{env}`
-- **FQDN (internal):** `{{COMPONENT}}.by-systems.internal`
+- **Container image:** `registry.org.internal/{{SCOPE}}/{{COMPONENT}}:{semver}-{env}`
+- **FQDN (internal):** `{{COMPONENT}}.org.internal`
 
-Full reference: [`docs/naming-convention.md`](https://gitlab.by-systems.internal/by-systems/doc/naming-convention)
+Full reference: [`docs/naming-convention.md`](https://gitlab.org.internal/org/doc/naming-convention)
 
 ---
 
@@ -85,7 +85,7 @@ Breaking change: add `!` after type or `BREAKING CHANGE:` footer (bumps MAJOR).
 
 ## CI/CD Pipeline
 
-The pipeline follows the BY-SYSTEMS standard stages:
+The pipeline follows the ORG standard stages:
 
 1. **lint** — commitlint, shellcheck, yamllint, hadolint
 2. **test** — unit + integration tests
@@ -102,9 +102,9 @@ Secrets are injected via Vault. No secrets in `.gitlab-ci.yml` or environment va
 
 | Env | Branch | FQDN |
 |---|---|---|
-| dev | `feat/*`, `fix/*` | `{{COMPONENT}}.dev.by-systems.internal` |
-| staging | `main` (pre-release) | `{{COMPONENT}}.staging.by-systems.internal` |
-| prod | tagged release `v*` | `{{COMPONENT}}.by-systems.internal` |
+| dev | `feat/*`, `fix/*` | `{{COMPONENT}}.dev.org.internal` |
+| staging | `main` (pre-release) | `{{COMPONENT}}.staging.org.internal` |
+| prod | tagged release `v*` | `{{COMPONENT}}.org.internal` |
 
 Lite track (simple SME): `dev → staging → prod`
 Full track: `dev → test → staging → acceptance → prod`
@@ -140,7 +140,7 @@ Full track: `dev → test → staging → acceptance → prod`
 
 ## Links
 
-- GitLab repo: `https://gitlab.by-systems.internal/by-systems/{{SCOPE}}/{{REPO_NAME}}`
-- Grafana: `https://grafana.by-systems.internal/d/?var-service={{COMPONENT}}`
-- NetBox: `https://netbox.by-systems.internal/dcim/services/?name={{COMPONENT}}`
-- Vault: `https://vault.by-systems.internal/ui/vault/secrets/{{SCOPE}}/{{COMPONENT}}`
+- GitLab repo: `https://gitlab.org.internal/org/{{SCOPE}}/{{REPO_NAME}}`
+- Grafana: `https://grafana.org.internal/d/?var-service={{COMPONENT}}`
+- NetBox: `https://netbox.org.internal/dcim/services/?name={{COMPONENT}}`
+- Vault: `https://vault.org.internal/ui/vault/secrets/{{SCOPE}}/{{COMPONENT}}`

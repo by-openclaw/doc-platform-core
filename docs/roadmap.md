@@ -1,9 +1,9 @@
-# BY-SYSTEMS DevOps Platform — Roadmap
+# ORG DevOps Platform — Roadmap
 **Last updated:** 2026-03-25
 **Status:** Active — PoC phase
 **Document type:** `roadmap`
 
-> Practical, phased delivery plan for the BY-SYSTEMS internal DevOps PoC.
+> Practical, phased delivery plan for the ORG internal DevOps PoC.
 > Each phase must be fully operational before the next begins.
 > Naming conventions follow `docs/naming-convention.md`. Stack follows `docs/stack.md`.
 
@@ -40,12 +40,12 @@
   - Configure: WAN/ISP uplink, VLAN segmentation, DHCP, DNS resolver (Unbound)
   - Enable pfBlockerNG (threat blocking, IP reputation)
   - Configure WireGuard: site-to-site + road warrior profiles
-- [ ] Deploy Bind 9 (authoritative internal DNS, `*.by-systems.internal`)
-- [ ] Register `by-systems.be` zone on Cloudflare (public DNS + DNS-01 ACME)
+- [ ] Deploy Bind 9 (authoritative internal DNS, `*.org.internal`)
+- [ ] Register `org.example` zone on Cloudflare (public DNS + DNS-01 ACME)
 - [ ] Configure Arista switches (`sw-arista-prod-01`) via Ansible `arista.eos`
   - VLANs, IGMP snooping, spanning tree, QoS baseline
 - [ ] Deploy UniFi Network Controller (Docker) for AP management
-- [ ] Configure split DNS: `*.by-systems.internal` → pfSense | `*.by-systems.be` → Cloudflare
+- [ ] Configure split DNS: `*.org.internal` → pfSense | `*.org.example` → Cloudflare
 - [ ] Deploy NetBird (mesh VPN for user devices, OIDC via Authentik — wire up after Phase 2)
 
 ### 1.3 Infrastructure as Code Baseline
@@ -74,8 +74,8 @@
 ### 2.1 Reverse Proxy & TLS
 
 - [ ] Deploy Traefik v3 (K8S Helm or Docker Compose)
-  - Integrate with step-ca (Smallstep) for `*.by-systems.internal` TLS
-  - Integrate with Cloudflare DNS-01 for `*.by-systems.be` public TLS
+  - Integrate with step-ca (Smallstep) for `*.org.internal` TLS
+  - Integrate with Cloudflare DNS-01 for `*.org.example` public TLS
   - Enforce HTTPS everywhere; no plain HTTP exposed
 - [ ] Deploy step-ca (`platform-traefik-config`, `platform-stepca-config`)
 - [ ] Document Traefik/GitLab Nginx passthrough pattern (nginx internal on 8080, Traefik edge)
@@ -149,7 +149,7 @@
 - [ ] ADR repo initialised: `docs/adr/0001-platform-stack-decisions.md` (all tool choices)
 - [ ] VSCode devcontainer templates published in `tpl-repo-infra` and `tpl-repo-app`
 
-**Exit criteria:** All platform services accessible at `*.by-systems.internal` via Traefik + SSO. GitLab CI running. NetBox populated. K8S cluster operational. No plaintext secrets in repos.
+**Exit criteria:** All platform services accessible at `*.org.internal` via Traefik + SSO. GitLab CI running. NetBox populated. K8S cluster operational. No plaintext secrets in repos.
 
 ---
 

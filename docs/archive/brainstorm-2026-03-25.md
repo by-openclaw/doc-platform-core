@@ -1,4 +1,4 @@
-# BY-SYSTEMS DevOps Platform — Brainstorm Session
+# ORG DevOps Platform — Brainstorm Session
 **Date:** 2026-03-25  
 **Status:** In progress — decisions locked, formal docs pending
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-BY-SYSTEMS is a **broadcast/telecom system integrator** building an internal DevOps PoC platform.
+ORG is a **broadcast/telecom system integrator** building an internal DevOps PoC platform.
 
 Goals:
 - Replace manual/legacy workflows with proper DevOps tooling
@@ -14,7 +14,7 @@ Goals:
 - Support broadcast/telecom integration projects
 - All tooling: open source, self-hosted, free tier where possible
 
-Reference work: RTBF CMDB audit (2024) — 62-slide PowerPoint covering production app landscape, CI/CD pipeline, infrastructure, monitoring, CMDB with Neo4J.
+Reference work: CLIENT-A CMDB audit (2024) — 62-slide PowerPoint covering production app landscape, CI/CD pipeline, infrastructure, monitoring, CMDB with Neo4J.
 
 ---
 
@@ -63,10 +63,10 @@ Standard DevOps stack, IT-focused, required for all customers.
 | WireGuard (pfSense) | Site-to-site + road warrior VPN |
 | NetBird | Zero-config mesh VPN for user devices (SSO via Authentik) |
 | Traefik | Reverse proxy + TLS everywhere (no Nginx/Apache at edge) |
-| step-ca (Smallstep) | Internal CA for *.by-systems.internal |
+| step-ca (Smallstep) | Internal CA for *.org.internal |
 | Internal TLD | `.internal` (avoids mDNS .local conflict — RFC 6762) |
-| Public TLD | `by-systems.be` (Cloudflare) |
-| Split DNS | by-systems.internal (pfSense Unbound) + by-systems.be (Cloudflare) |
+| Public TLD | `org.example` (Cloudflare) |
+| Split DNS | org.internal (pfSense Unbound) + org.example (Cloudflare) |
 | mDNS | Avahi — IoT/printer discovery only, not for services |
 | IPv4 + IPv6 | Dual-stack everywhere |
 
@@ -132,7 +132,7 @@ Standard DevOps stack, IT-focused, required for all customers.
 | Grafana | Dashboards |
 | Loki | Log aggregation (Syslog RFC5424) |
 | Zabbix | SNMP/agentd monitoring (network devices, legacy) |
-| Icinga2 | Service monitoring (optional, from RTBF reference) |
+| Icinga2 | Service monitoring (optional, from CLIENT-A reference) |
 
 ### Security & Compliance
 | Tool | Role |
@@ -179,17 +179,17 @@ Standard DevOps stack, IT-focused, required for all customers.
 
 ### GitHub (public/open source)
 ```
-by-systems              → root org
-by-systems-infra        → infrastructure repos
-by-systems-platform     → platform services
-by-systems-sec          → security/compliance
-by-systems-tpl          → templates
-by-systems-doc          → documentation
+org              → root org
+org-infra        → infrastructure repos
+org-platform     → platform services
+org-sec          → security/compliance
+org-tpl          → templates
+org-doc          → documentation
 ```
 
 ### GitLab self-hosted (private/internal)
 ```
-by-systems/
+org/
   infra/
     proxmox-ansible
     network-arista
@@ -251,9 +251,9 @@ fix/17-dns-resolution-failure
 ```
 {service}.{org}.internal          → internal
 {service}.{org}.be                → public (if needed)
-vault.by-systems.internal
-gitlab.by-systems.internal
-authentik.by-systems.internal
+vault.org.internal
+gitlab.org.internal
+authentik.org.internal
 ```
 
 ### Environment stages
@@ -336,5 +336,5 @@ Same pattern applies to all services.
 1. Whiteboard photo — full infra design (Proxmox, K8S, AD, Vault, GitLab, monitoring, ISO 27001, NIS1/NIS2)
 2. Draw.io file 1 (`network-infra.drawio`) — 7 tabs: DC-OU, ECAM-DC-OU, FIREWALL-SSO-LDAPS/RADIUS/KERBEROS/VPN, Network infra
 3. Draw.io file 2 (`devops-diagrams.drawio`) — 9 tabs: K8S-JAVA, CI_K8S, VMWARE, CI_VMWARE, BARE METAL, C#APPS, INTUNE, NETWORK, OLD-C#APPS
-4. PowerPoint (`rtbf_cmdb_applications_de_production_et_de_gestion.pptx`) — 62 slides, RTBF 2024 CMDB audit
+4. PowerPoint (`client-a_cmdb_applications_de_production_et_de_gestion.pptx`) — 62 slides, CLIENT-A 2024 CMDB audit
 5. Corey Ganim PDF — "Anatomy of a perfect OpenClaw setup" guide

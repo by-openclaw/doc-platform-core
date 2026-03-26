@@ -1,10 +1,10 @@
-# BY-SYSTEMS — Naming Convention
+# ORG — Naming Convention
 **Last updated:** 2026-03-25  
 **Status:** Draft — living document  
 **Scope:** All projects (internal + customer deployments)
 
 > **Key principle:** One slug, three systems.  
-> A service named `gitlab` in NetBox = FQDN `gitlab.by-systems.internal` = repo `platform-gitlab-core`.  
+> A service named `gitlab` in NetBox = FQDN `gitlab.org.internal` = repo `platform-gitlab-core`.  
 > All names use the same format: **lowercase, hyphens, no spaces, no special characters, English only.**
 
 ---
@@ -95,7 +95,7 @@ doc-runbooks
 
 ### GitLab subgroup structure (self-hosted)
 ```
-by-systems/
+org/
   infra/
   platform/
   sec/
@@ -112,10 +112,10 @@ by-systems/
 
 ### GitHub org structure (public/open source)
 ```
-by-systems-infra/
-by-systems-platform/
-by-systems-sec/
-by-systems-tpl/
+org-infra/
+org-platform/
+org-sec/
+org-tpl/
 {customer-slug}-infra/
 ```
 
@@ -123,7 +123,7 @@ by-systems-tpl/
 ```
 {customer-short-name}
 ```
-Examples: `acme`, `rtbf`, `telenet`, `proximus`  
+Examples: `acme`, `client-a`, `telenet`, `isp1`  
 Must match NetBox **tenant slug**.
 
 ---
@@ -297,7 +297,7 @@ docs/diagrams/
 
 ## 6. FQDN and DNS Naming
 
-### Internal (private — by-systems.internal)
+### Internal (private — org.internal)
 ```
 {service}.{org}.internal
 {service}.{env}.{org}.internal    (per environment)
@@ -306,33 +306,33 @@ docs/diagrams/
 
 > **Note:** `.internal` TLD used (not `.local` — avoids mDNS conflict per RFC 6762).
 
-### Public (by-systems.be)
+### Public (org.example)
 ```
 {service}.{org}.be               (only public-facing services)
 ```
 
 ### Examples
 ```
-vault.by-systems.internal
-gitlab.by-systems.internal
-authentik.by-systems.internal
-netbox.by-systems.internal
-grafana.by-systems.internal
-prometheus.by-systems.internal
-guacamole.by-systems.internal
-kamailio.by-systems.internal
+vault.org.internal
+gitlab.org.internal
+authentik.org.internal
+netbox.org.internal
+grafana.org.internal
+prometheus.org.internal
+guacamole.org.internal
+kamailio.org.internal
 
-gitlab.prod.by-systems.internal       (production environment scoped)
-gitlab.staging.by-systems.internal    (staging)
-gitlab.dev.by-systems.internal        (dev)
+gitlab.prod.org.internal       (production environment scoped)
+gitlab.staging.org.internal    (staging)
+gitlab.dev.org.internal        (dev)
 
-gitlab.by-systems.be                  (public — external Git access)
-vpn.by-systems.be                     (public — VPN entry)
+gitlab.org.example                  (public — external Git access)
+vpn.org.example                     (public — VPN entry)
 ```
 
 ### DNS ownership
-- `*.by-systems.internal` → pfSense Unbound (internal resolver)
-- `*.by-systems.be` → Cloudflare (public DNS + DNS-01 ACME)
+- `*.org.internal` → pfSense Unbound (internal resolver)
+- `*.org.example` → Cloudflare (public DNS + DNS-01 ACME)
 - Split DNS: same FQDN can resolve differently inside vs outside
 
 ---
@@ -379,10 +379,10 @@ Matches FQDN prefix and Prometheus job label.
 
 | NetBox service name | Repo | FQDN | Prometheus job |
 |---|---|---|---|
-| `gitlab` | `platform-gitlab-core` | `gitlab.by-systems.internal` | `gitlab` |
-| `vault` | `platform-vault-config` | `vault.by-systems.internal` | `vault` |
-| `kamailio` | `mod-voip-kamailio` | `kamailio.by-systems.internal` | `kamailio` |
-| `netbox` | `platform-netbox-config` | `netbox.by-systems.internal` | `netbox` |
+| `gitlab` | `platform-gitlab-core` | `gitlab.org.internal` | `gitlab` |
+| `vault` | `platform-vault-config` | `vault.org.internal` | `vault` |
+| `kamailio` | `mod-voip-kamailio` | `kamailio.org.internal` | `kamailio` |
+| `netbox` | `platform-netbox-config` | `netbox.org.internal` | `netbox` |
 
 ### NetBox custom fields per service
 - `repo_url` — GitLab/GitHub repo link
@@ -403,15 +403,15 @@ Matches FQDN prefix and Prometheus job label.
 
 ### Registry
 ```
-registry.by-systems.internal/{scope}/{component}
+registry.org.internal/{scope}/{component}
 ```
-(GitLab built-in registry, accessible at `gitlab.by-systems.internal/registry`)
+(GitLab built-in registry, accessible at `gitlab.org.internal/registry`)
 
 ### Examples
 ```
-registry.by-systems.internal/platform/gitlab-core:1.2.3-prod
-registry.by-systems.internal/mod/voip-kamailio:2.0.1-staging
-registry.by-systems.internal/svc/virtual-sip-codec:0.3.0
+registry.org.internal/platform/gitlab-core:1.2.3-prod
+registry.org.internal/mod/voip-kamailio:2.0.1-staging
+registry.org.internal/svc/virtual-sip-codec:0.3.0
 ```
 
 ### CI tags
@@ -456,9 +456,9 @@ labels:
   app.kubernetes.io/component: core
   app.kubernetes.io/version: "1.2.3"
   app.kubernetes.io/managed-by: helm
-  by-systems.io/scope: platform
-  by-systems.io/env: prod
-  by-systems.io/service: gitlab
+  org.io/scope: platform
+  org.io/env: prod
+  org.io/service: gitlab
 ```
 
 ---
@@ -530,8 +530,8 @@ Automated via release-please GitHub/GitLab Action:
 
 Examples:
 ```
-Youssef Boujraf (BY-SYSTEMS DevOps) <y.boujraf@by-systems.be>
-GitLab CI Runner (platform-gitlab-prod-01) <ci@by-systems.be>
+Youssef Boujraf (ORG DevOps) <y.boujraf@org.example>
+GitLab CI Runner (platform-gitlab-prod-01) <ci@org.example>
 ```
 
 ### GPG Key policy
@@ -553,7 +553,7 @@ All lowercase, underscores (SSH convention), no hyphens in filename.
 
 #### Examples
 ```
-id_ed25519_personal_bysystems        # personal workstation → BY-SYSTEMS infra
+id_ed25519_personal_org        # personal workstation → ORG infra
 id_ed25519_deploy_platform_gitlab    # deploy key for platform-gitlab-core repo
 id_ed25519_ci_runner_prod            # GitLab CI runner (prod)
 id_ed25519_ansible_infra             # Ansible service account
@@ -666,7 +666,7 @@ assets/exports/seq-vault-auth-flow-v2.png
 Examples:
 ```
 assets/docs/arista-eos-7050x-datasheet-2026-01-15.pdf
-assets/docs/customer-rtbf-network-diagram-2026-03-01.pdf
+assets/docs/customer-client-a-network-diagram-2026-03-01.pdf
 assets/docs/hashicorp-vault-reference-arch-2025-11-01.pdf
 ```
 
@@ -707,7 +707,7 @@ Relative paths only. No absolute paths, no external image URLs in committed docs
 | `prod` | External provider | real domain | Microsoft Exchange, Google Workspace, or equivalent |
 
 > **Why `example.com` for non-prod?**  
-> RFC 2606 reserves `example.com` — safe to use internally with no risk of leaking mail externally. Mailcow is configured to be authoritative for this domain on the internal DNS (`*.by-systems.internal`).
+> RFC 2606 reserves `example.com` — safe to use internally with no risk of leaking mail externally. Mailcow is configured to be authoritative for this domain on the internal DNS (`*.org.internal`).
 
 ---
 
