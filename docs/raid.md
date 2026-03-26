@@ -22,6 +22,12 @@
 | R-07 | GitLab LFS storage growth (assets, media) | Medium | Low | 🟢 Low | LFS → MinIO backend. Quota per project. Monitor via Prometheus. | Platform | Open |
 | R-08 | Anthropic/OpenAI API overload during heavy agent use | High | Low | 🟡 Medium | Fallback chain configured (Anthropic → OpenAI). Token tied to MAX plan. Monitor via OpenClaw `/stats`. | DevOps | Open |
 | R-09 | Arista EOS misconfiguration causing broadcast storm | Low | Critical | 🟡 Medium | Change control via Ansible only. No manual EOS edits in prod. Pre-apply dry-run (`--check`). | Network | Open |
+| R-15 | Arista EOS version mismatch (FABRIC-1: 4.34.3.1M vs FABRIC-2: 4.33.5M) — unpredictable behavior on trunk | Medium | High | 🔴 Critical | Upgrade FABRIC-2 to 4.34.x. Schedule maintenance window (reload required). | Network | Open |
+| R-16 | Single inter-switch uplink pair (Et33/Et49 RED, Et34/Et50 BLUE) — no MLAG | Medium | Medium | 🟡 Medium | Accept for PoC. MSTP failover ~1-2s on link failure. Plan MLAG when 7048T-A replaced. | Network | Open |
+| R-17 | PTP grandmaster single point of failure — GM-02 (pve01 vmbrPTP2) not wired | Medium | High | 🟡 Medium | GM-02 to be provided by non-prod Proxmox (future). Document as known gap until wired. | Network | Open |
+| R-18 | 3com/HPE WAN switch: Telnet enabled — cleartext credentials | High | High | 🔴 Critical | Disable Telnet: `undo local-user admin service-type telnet`. SSH only. | Network | Open |
+| R-19 | synology-nfs shared between prod and non-prod Proxmox | High | High | 🔴 Critical | Create dedicated NFS exports for non-prod (nonprod-iso, nonprod-backup) in Synology File Station. | Infra | Open |
+| R-20 | Ansible LXC (non-prod, CT100) has no static IP — DHCP only | Medium | Medium | 🟡 Medium | Add static DHCP reservation in pfSense for MAC BC:24:11:2A:95:93. | Infra | Open |
 | R-10 | Authentik SSO outage blocks all platform access | Low | Critical | 🔴 Critical | Local admin accounts on each service as break-glass. Authentik HA in prod (Phase 2.5). | Platform | Open |
 | R-11 | Teleport CA key loss — all SSH certs revoked | Low | Critical | 🔴 Critical | Teleport CA backed up to Vault. Rotation procedure documented in runbook. | Security | Open |
 | R-12 | Nexus upstream proxy blocked (corporate firewall / ISP) | Low | Medium | 🟡 Medium | Nexus configured to use HTTP proxy if needed. pfSense egress rules explicitly allow nexus outbound. | Network | Open |
@@ -61,6 +67,12 @@
 | I-04 | `ANTHROPIC_API_KEY` ([REDACTED]) was stored in session history JSONL | Medium | 2026-03-25 | Key revoked on Anthropic console. Session log is local-only. Config files cleaned. | ✅ Resolved |
 | I-05 | Template files used `.md.template` extension — not rendered by editors | Low | 2026-03-25 | Renamed all templates to `.tpl.md`. Convention documented in naming-convention.md §5. | ✅ Resolved |
 | I-06 | Verdaccio and Athens identified as gaps — npm/Go proxy only, not multi-format | Medium | 2026-03-25 | Replaced by Nexus OSS in stack decision. ADR and roadmap updated. | ✅ Resolved |
+| I-07 | VLAN 620/720 referenced in FABRIC-2 OSPF (`no passive-interface Vlan620/720`) but never created | Low | 2026-03-26 | Remove `no passive-interface Vlan620` and `Vlan720` from FABRIC-2 OSPF until VLANs are provisioned. | Open |
+| I-08 | `interface Vlan60` with VRRP config on FABRIC-2 — VLAN not in VLAN table (orphaned config) | Low | 2026-03-26 | Run `no interface Vlan60` on FABRIC-2. Stale from earlier design iteration. | Open |
+| I-09 | FABRIC-1 missing `ptp source ip` — uses default management IP implicitly | Low | 2026-03-26 | Add `ptp source ip 10.6.224.21` on FABRIC-1 for consistency with FABRIC-2. | Open |
+| I-10 | FABRIC-2 Priority1 not set (default 128) — should match FABRIC-1 (248) to prevent accidental GM election | Low | 2026-03-26 | Add `ptp priority1 248` on FABRIC-2. | Open |
+| I-11 | Ansible LXC (CT100, non-prod) has no backup job and no onboot flag | High | 2026-03-26 | Add daily backup job → tank-backup. Set `onboot=1` on CT100. | Open |
+| I-12 | Proxmox firewall disabled on both prod and non-prod nodes | High | 2026-03-26 | Enable firewall with INPUT DROP policy. Allow only OOB/MGMT source IPs. | Open |
 
 ---
 
@@ -69,7 +81,9 @@
 | ID | Dependency | Type | Required by | Risk if unavailable | Owner |
 |---|---|---|---|---|---|
 | D-01 | Bare metal server(s) for Proxmox | Hardware | Phase 1 | Phase 1 blocked | Infra |
-| D-02 | Arista switches (7020/7060/7048) | Hardware | Phase 1 | Network automation blocked | Network |
+| D-02 | Arista switches (7020/7060) operational; 7048T-A broken/offline | Hardware | Phase 1 | OOB switch missing — 3com WAN switch used as temp OOB | Network |
+| D-17 | Replacement/repair of Arista DCS-7048T-A (OOB switch) | Hardware | Phase 1 | Permanent OOB switch missing; 3com is temporary workaround | Network |
+| D-18 | Non-prod Proxmox node added to cluster (2-node cluster with QDevice) | Hardware/Software | Phase 2 | HA and live migration blocked | Infra |
 | D-03 | UniFi APs | Hardware | Phase 1 | Wireless access blocked | Network |
 | D-04 | ISP uplink (static IP or DDNS) | External service | Phase 1 | Public access blocked | Infra |
 | D-05 | Cloudflare account + API token | External service | Phase 1 | Public DNS + ACME blocked | Infra |
