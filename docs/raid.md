@@ -1,6 +1,6 @@
 # ORG Platform — RAID Log
 
-**Last updated:** 2026-03-25
+**Last updated:** 2026-03-27
 **Status:** Active — PoC phase
 **Related docs:** `docs/stack.md`, `docs/roadmap.md`, `docs/architecture.md`
 
@@ -73,6 +73,10 @@
 | I-10 | FABRIC-2 Priority1 not set (default 128) — should match FABRIC-1 (248) to prevent accidental GM election | Low | 2026-03-26 | Add `ptp priority1 248` on FABRIC-2. | Open |
 | I-11 | Ansible LXC (CT100, non-prod) has no backup job and no onboot flag | High | 2026-03-26 | Add daily backup job → tank-backup. Set `onboot=1` on CT100. | Open |
 | I-12 | Proxmox firewall disabled on both prod and non-prod nodes | High | 2026-03-26 | Enable firewall with INPUT DROP policy. Allow only OOB/MGMT source IPs. | Open |
+| I-13 | Synology NAS firewall completely disabled (`enable_firewall: false`) — all services open on 10.6.0.0/20 | Critical | 2026-03-27 | Enable DSM firewall; allow only OOB segment (10.6.0.0/20); drop all else. Test NFS/SMB after. | Open |
+| I-14 | No 2FA on any NAS account — `yboujraf`, `wissem.boujraf` and all admin-equivalent accounts unprotected | Critical | 2026-03-27 | Enable TOTP 2FA on all human NAS accounts via DSM Control Panel → User & Group | Open |
+| I-15 | DSM 7.1.1-42962 outdated (2+ major versions behind) — unpatched CVEs likely | High | 2026-03-27 | Upgrade to DSM 7.2.x. Take backup snapshot first. Schedule maintenance window. | Open |
+| I-16 | Python 2.7 (EOL since 2020) installed on NAS — no security updates | High | 2026-03-27 | Uninstall Python2 package from NAS unless strictly required by a specific package | Open |
 
 ---
 
