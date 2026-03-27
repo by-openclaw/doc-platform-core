@@ -137,3 +137,27 @@ Platform services:
 - Employee: add to EntraID `BY-SYSTEMS Platform` group → SCIM pushes to Authentik → login via Microsoft
 - Customer/freelancer: create Authentik account manually → invite email → set password → login with Authentik credentials
 - No Microsoft 365 license required for external users
+
+---
+
+## External user provisioning policy
+
+**Self-service signup: DISABLED**
+No public registration. All accounts created by admin only.
+
+**Customer onboarding flow:**
+1. Admin creates account in Authentik (name, email, assign to customer group)
+2. Authentik sends invite email with one-time enrollment link (via SMTP)
+3. Customer sets own password + enrolls TOTP (MFA mandatory)
+4. Customer accesses only services their group is authorized for
+
+**Account lifecycle:**
+- Active project → account enabled
+- Project pause/end → account **disabled** (not deleted — audit trail preserved)
+- Re-engagement → re-enable account
+- Never delete accounts — disable only (NIS2/ISO 27001 audit trail requirement)
+
+**Admin controls:**
+- Per-account enabled/disabled flag
+- Group membership controls access scope
+- All login events logged (Authentik audit log → future: Wazuh/Loki)
