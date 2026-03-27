@@ -121,3 +121,19 @@ Platform services:
 - All users MUST complete Authentik enrollment (set local password) at first login
 - Enforced via Authentik enrollment flow — users cannot access platform services until local password is set
 - Prevents lockout when EntraID is unavailable
+
+---
+
+## User population model
+
+| User type | Identity source | Auth method | Managed by |
+|---|---|---|---|
+| BY-SYSTEMS employee | EntraID | "Login with Microsoft" (OIDC) | EntraID / IT |
+| Customer / freelancer / partner | Authentik local | Username + Authentik password | Authentik admin |
+| Service account (CI, Ansible, automation) | Authentik local | API token / client credentials | Authentik / Vault |
+| Break-glass (emergency ops) | OS local | SSH key / console | Vault / infra team |
+
+**Onboarding flows:**
+- Employee: add to EntraID `BY-SYSTEMS Platform` group → SCIM pushes to Authentik → login via Microsoft
+- Customer/freelancer: create Authentik account manually → invite email → set password → login with Authentik credentials
+- No Microsoft 365 license required for external users
