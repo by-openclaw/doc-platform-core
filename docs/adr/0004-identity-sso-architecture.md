@@ -103,3 +103,21 @@ Platform services:
 - Authentik SCIM source: https://docs.goauthentik.io/docs/providers/scim/
 - NIS2 requirement: user lifecycle management, access revocation within 24h
 - ISO 27001: A.9.2 (user access management), A.9.4 (system access control)
+
+---
+
+## Password flow clarification
+
+**EntraID available (normal):**
+- User clicks "Login with Microsoft" → redirected to EntraID → EntraID validates password → token returned to Authentik
+- Authentik never sees or stores the EntraID password
+- EntraID password changes take effect immediately with no sync needed
+
+**EntraID unavailable (fallback):**
+- User clicks "Login with password" → Authentik validates local password
+- This is a separate credential set at first login via Authentik enrollment flow
+
+**Risk mitigation:**
+- All users MUST complete Authentik enrollment (set local password) at first login
+- Enforced via Authentik enrollment flow — users cannot access platform services until local password is set
+- Prevents lockout when EntraID is unavailable
