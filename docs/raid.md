@@ -98,6 +98,7 @@
 | D-14 | PostgreSQL up before GitLab/Vault/Authentik/NetBox | Service ordering | Phase 2 | Service startup fails | Platform |
 | D-15 | Nexus cache seeded before CI pipelines run at scale | Service readiness | Phase 2 | First pipeline runs hit internet; slow + brittle | Platform |
 | D-16 | Teleport deployed before pfSense blocks direct SSH | Service ordering | Phase 2 | Engineers locked out if firewall rule applied early | Security |
+| D-19 | `lib-synology-dsm` Python library — API coverage complete before NetBox webhook integration | Software/lib | Platform automation | NFS management blocked without it | Platform |
 
 ---
 
