@@ -1,0 +1,71 @@
+@startuml flow-contribution-v1
+!theme cerulean-outline
+skinparam backgroundColor #0D1117
+skinparam defaultFontColor #C9D1D9
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 12
+skinparam ArrowColor #58A6FF
+skinparam ActivityBackgroundColor #161B22
+skinparam ActivityBorderColor #30363D
+skinparam ActivityFontColor #C9D1D9
+skinparam NoteBackgroundColor #1C2A3A
+skinparam NoteBorderColor #2563EB
+skinparam NoteFontColor #93C5FD
+
+title <color:#58A6FF><b>BY-SYSTEMS — Contribution Flow</b></color>\n<color:#8B949E>ADR-0006 · Layer-gated · RAID-tracked</color>
+
+start
+
+:Read **ADR-0006** — Platform Charter;
+note right: doc-platform-core/docs/adr/0006-platform-charter.md
+
+:Read repo **CLAUDE.md** + **AGENTS.md**;
+
+:Check current **Layer** (ADR-0006 §1);
+
+if (Correct layer ready?) then (no)
+  :Stop — finish current layer first;
+  note right: <color:#F59E0B>Layer gates are non-negotiable</color>
+  stop
+else (yes)
+endif
+
+:Check open RAID items in platform-setup GitHub Issues;
+
+:Create branch\n**feature/{issue-id}-{short-desc}**;
+
+partition "Development" {
+  :Make changes;
+  :Write / update tests;
+  :Run linting + tests locally;
+  :Update docs if needed;
+}
+
+if (New finding / risk / gap?) then (yes)
+  :RAID.md entry\n+ GitHub Issue (raid:* label)\n+ Projects board;
+  note right: <color:#F59E0B>All three. Atomic.</color>
+else (no)
+endif
+
+if (Architecture decision?) then (yes)
+  :New ADR in\ndoc-platform-core/docs/adr/;
+else (no)
+endif
+
+:Commit — **conventional commit**\n//type(scope): subject//;
+
+:Open PR → dev branch;
+
+:Rune reviews\nPosts diagram to Discord #bot-openclaw;
+
+:yboujraf approves;
+
+:Merge → dev → main;
+
+:Tag with **semantic version**\n//vMAJOR.MINOR.PATCH//;
+
+:CHANGELOG updated;
+
+stop
+
+@enduml
