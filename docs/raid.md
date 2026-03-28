@@ -1,6 +1,6 @@
 # ORG Platform — RAID Log
 
-**Last updated:** 2026-03-27
+**Last updated:** 2026-03-28
 **Status:** Active — PoC phase
 **Related docs:** `docs/stack.md`, `docs/roadmap.md`, `docs/architecture.md`
 
@@ -61,6 +61,9 @@
 
 | ID | Issue | Severity | Date raised | Resolution | Status |
 |---|---|---|---|---|---|
+| I-17 | Terraform scaffold incomplete — no OPNsense VM, no vmbrPOC bridge, PoC VMs on vmbrOOB (prod bridge) | High | 2026-03-28 | Deploy OPNsense VM + vmbrPOC. Move all PoC VMs to vmbrPOC. See platform-setup#58. | Open |
+| I-18 | vm-netbox-poc-01 not deployed — NetBox (CMDB/IPAM source of truth) unavailable | High | 2026-03-28 | Deploy after OPNsense. Terraform module ready. See platform-setup#59. | Open |
+| I-19 | GitHub issues #1 and #44 were stale/open despite being completed | Low | 2026-03-28 | Closed with completion comments 2026-03-28. | ✅ Resolved |
 | I-01 | OpenClaw Anthropic token was OpenClaw shared pool (not MAX plan) — caused overload errors | High | 2026-03-25 | Re-ran `openclaw models auth setup-token --provider anthropic` — new token tied to MAX plan. Old API key removed from config and revoked. | ✅ Resolved |
 | I-02 | Discord WebSocket instability (code 1006, 520) — intermittent reconnects | Low | 2026-03-25 | Discord-side transient issue. Gateway auto-recovered. Monitor for recurrence. | ✅ Resolved (monitoring) |
 | I-03 | `openclaw gateway restart` kills agent mid-command (self-restart) | Low | 2026-03-25 | Workaround: use `systemctl --user restart openclaw-gateway.service` from terminal. | ⚠️ Workaround |

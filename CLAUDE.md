@@ -112,3 +112,22 @@ Examples:
 
 - GitHub repo: `https://github.com/by-openclaw/doc-platform-core`
 - Org: `https://github.com/by-openclaw`
+
+---
+
+## Agent Onboarding (Rune / BY-SYSTEMS)
+
+This repo is part of the BY-SYSTEMS PoC platform maintained by Rune.
+
+- **AGENTS.md:** [`AGENTS.md`](AGENTS.md) — generic agent onboarding file (read by Codex, Claude Code, and all agents)
+- **Owner:** @yboujraf
+- **Org:** [by-openclaw](https://github.com/by-openclaw)
+- **Platform agent:** Rune (DevOps familiar)
+
+### Quick Checklist for Any Agent
+
+- [ ] Read `docs/naming-convention.md` before creating any file
+- [ ] Read `docs/stack.md` before writing about any platform component
+- [ ] Markdown only — no code, no scripts, no CI
+- [ ] Conventional Commits with docs-only types (`docs`, `chore`, `fix`)
+- [ ] ADRs go in `docs/adr/` with next sequential number
