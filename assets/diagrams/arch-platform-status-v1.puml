@@ -1,0 +1,97 @@
+@startuml arch-platform-status-v1
+!theme cerulean-outline
+skinparam backgroundColor #0D1117
+skinparam defaultFontColor #C9D1D9
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+skinparam ArrowColor #58A6FF
+skinparam ArrowThickness 1.5
+skinparam NodeBackgroundColor #161B22
+skinparam NodeBorderColor #30363D
+skinparam NodeFontColor #C9D1D9
+skinparam PackageBackgroundColor #0D1117
+skinparam PackageBorderColor #30363D
+skinparam PackageFontColor #8B949E
+skinparam ComponentBackgroundColor #161B22
+skinparam ComponentBorderColor #30363D
+skinparam ComponentFontColor #C9D1D9
+skinparam NoteBackgroundColor #1C2A3A
+skinparam NoteBorderColor #2563EB
+skinparam NoteFontColor #93C5FD
+skinparam legendBackgroundColor #161B22
+skinparam legendBorderColor #30363D
+
+title <color:#58A6FF><b>BY-SYSTEMS — Platform Status</b></color>\n<color:#8B949E>ADR-0001 · 2026-03-28 · Legend: ✅ live  ⏳ next  🔲 planned</color>
+
+rectangle "Win11 Workstation\n<color:#10B981>Tailscale 100.116.107.x</color>" as DESK #1a2332 {
+  component "MobaXterm / Browser" as MOBO #161B22
+}
+
+rectangle "Rune VM\n<color:#10B981>Tailscale 100.108.175.24</color>\n<color:#8B949E>OOB 10.100.0.102</color>" as RUNE #1a2332 {
+  component "OpenClaw Gateway ✅" as OC #161B22
+  component "Terraform ✅" as TF #161B22
+  component "Ansible ✅" as ANS #161B22
+  component "gh / git ✅" as GH #161B22
+}
+
+rectangle "Proxmox PoC\n<color:#8B949E>10.6.224.105</color>" as PVE #1a2332 {
+  component "VM debian-bootstrap ✅\n10.6.225.11" as VM0 #161B22
+  component "VM netbox-poc-01 ⏳\n10.6.226.10" as NETBOX #161B22
+  component "VM vault-poc-01 🔲\n10.6.226.11" as VAULT #161B22
+  component "VM authentik-poc-01 🔲\n10.6.226.12" as AUTH #161B22
+  component "VM gitlab-poc-01 🔲\n10.6.226.20" as GITLAB #161B22
+}
+
+rectangle "Synology NAS\n<color:#8B949E>10.6.224.6</color>" as NAS #1a2332 {
+  component "NFS shares ✅" as NFS #161B22
+  component "DSM API (rune-api) ⏳\n<color:#F59E0B>blocked: DSM user perm</color>" as DSM #161B22
+}
+
+rectangle "GitHub\n<color:#8B949E>by-openclaw</color>" as GITHUB #1a2332 {
+  component "infra-terraform-proxmox ✅" as R1 #161B22
+  component "ansible-platform ✅" as R2 #161B22
+  component "lib-synology-dsm ⏳" as R3 #161B22
+  component "platform-setup ✅" as R4 #161B22
+  component "doc-platform-core ✅" as R5 #161B22
+}
+
+rectangle "Discord / Tailscale" as CLOUD #0a1628 {
+  component "Discord #bot-openclaw ✅" as DISC #161B22
+}
+
+DESK --> CLOUD : "HTTPS"
+CLOUD --> OC : "Tailscale tunnel ✅"
+DESK --> RUNE : "SSH :22222 via Tailscale ✅"
+OC --> DISC : "Discord API ✅"
+
+RUNE --> PVE : "SSH :22222 OOB 1.7ms ✅\nTerraform API :8006 ✅"
+RUNE --> NAS : "SSH + NFS + DSM API ✅"
+RUNE --> GITHUB : "HTTPS / git ✅"
+
+TF --> VM0
+TF -.-> NETBOX : "⏳ next"
+TF -.-> VAULT : "🔲"
+TF -.-> AUTH : "🔲"
+TF -.-> GITLAB : "🔲"
+
+ANS --> VM0 : "hardening ⏳"
+ANS -.-> NETBOX : "⏳"
+
+NETBOX -[#F59E0B]-> TF : "dynamic inventory\n🔲 NetBox → Terraform"
+NETBOX -[#F59E0B]-> ANS : "dynamic inventory\n🔲 NetBox → Ansible"
+
+note bottom of RUNE
+  <color:#10B981>Rune reachability confirmed</color>
+  Ping Proxmox: 1.7ms ✅
+  Ping Synology: 1.9ms ✅
+  Tailscale: active ✅
+end note
+
+legend right
+  <color:#10B981>✅</color> Live / validated
+  <color:#58A6FF>⏳</color> Next action (unblocked)
+  <color:#8B949E>🔲</color> Planned
+  <color:#F59E0B>⚠️</color> Blocked
+endlegend
+
+@enduml
