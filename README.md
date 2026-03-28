@@ -39,3 +39,14 @@ Platform documentation for the ORG internal DevOps PoC — stack decisions, arch
 - Stack: `docs/stack.md`
 - Naming: `docs/naming-convention.md`
 - Decisions: `docs/adr/`
+
+---
+
+## AI Agent Context
+
+This repo includes onboarding files for AI agents (Claude Code, Codex, etc.):
+
+- [`AGENTS.md`](AGENTS.md) — generic agent onboarding: what this repo is, commit standards, what NOT to do
+- [`CLAUDE.md`](CLAUDE.md) — Claude Code specific: constraints, naming rules, agent instructions
+
+**Agent:** Rune | **Owner:** @yboujraf | **Org:** [by-openclaw](https://github.com/by-openclaw)
