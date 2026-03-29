@@ -1,0 +1,138 @@
+# Concept: Odoo → Platform Orchestration
+
+**Status:** Concept — not scheduled  
+**Date:** 2026-03-29  
+**Author:** @yboujraf + Rune  
+
+---
+
+## Vision
+
+BY-SYSTEMS hosts Odoo instances on-demand. Odoo itself is both the **product** and the **business layer** — accounting, sales, customer portal. When a customer orders an instance, Odoo drives the full provisioning flow through the platform orchestration stack. The customer manages their instance from their Odoo portal account.
+
+---
+
+## Full Flow
+
+```
+Customer (Odoo Portal)
+    1. Selects template or custom config (CPU, RAM, disk, Odoo version, addons)
+    2. Quotation generated (Odoo Sales)
+    3. Order confirmed → payment processed (Odoo Accounting / Payment)
+    4. Odoo custom module fires: POST /api/platform/provision
+           ↓
+    Platform Orchestration API  ← the missing piece (see below)
+           ↓                    ↓
+        NetBox               Event queue / webhook
+     allocates IP,           triggers pipeline
+     creates VM record,
+     assigns customer tag
+           ↓
+        Terraform
+     provisions VM from template (Proxmox)
+           ↓
+        ansible-platform
+     hardens OS, configures Odoo instance (reuses odoo-install scope)
+           ↓
+    Instance ready
+     → customer portal updated: URL, credentials, status
+     → metrics exposed: CPU, RAM, disk, uptime
+     → actions available: restart, stop, backup, restore
+```
+
+---
+
+## Layers & Responsibilities
+
+| Layer | Component | Role |
+|---|---|---|
+| Business | Odoo (Sales + Accounting + Portal) | Order lifecycle, payment, customer self-service |
+| Connector | `odoo-platform` custom module | Translates business events → orchestration API calls |
+| Orchestration API | Platform API (TBD) | Single entry point for all provisioning requests. Owns state machine. |
+| CMDB | NetBox | Source of truth: IP allocation, VM record, customer assignment |
+| Provisioning | Terraform (infra-terraform-proxmox) | VM creation from template |
+| Configuration | ansible-platform + odoo-install scope | OS hardening, Odoo install, cert, nginx/Traefik, DNS |
+| Observability | Metrics endpoint → Odoo portal | CPU, RAM, disk, uptime per instance |
+
+---
+
+## The Missing Piece: Platform Orchestration API
+
+Everything else exists (partially). The gap is a **lightweight orchestration API** that:
+
+- Receives provisioning requests from Odoo
+- Coordinates NetBox → Terraform → Ansible in order
+- Tracks instance state (provisioning / running / stopped / failed)
+- Exposes instance status + metrics back to Odoo
+- Handles lifecycle actions: restart, stop, backup, restore
+
+**Candidate:** FastAPI service, deployed as a VM or container. Talks to:
+- NetBox API (allocate/release resources)
+- GitLab CI (trigger Terraform + Ansible pipelines)
+- Proxmox API (direct VM lifecycle: restart/stop)
+- MinIO S3 (backup/restore operations)
+
+---
+
+## Odoo Custom Module — `odoo-platform`
+
+A dedicated Odoo module (not a hack on Sales). Responsibilities:
+
+- **Provision trigger:** on SO confirmation, POST to orchestration API
+- **Status polling:** periodic job syncs instance state back to Odoo
+- **Portal views:** customer sees their instance(s), URL, status, metrics
+- **Actions:** restart/stop/backup/restore → POST to orchestration API
+- **Billing hooks:** usage-based billing if needed (future)
+
+Follows ADR-0007: idempotent, present/absent, dry-run/validation before any API call.
+
+---
+
+## Reuse from odoo-install
+
+`by-systems/odoo-install` is the reference for Odoo instance configuration:
+- nginx/Traefik proxy setup
+- Certbot DNS-01 (Cloudflare)
+- DNS sync (A/AAAA/CNAME via Cloudflare API)
+- PostgreSQL provisioning
+- Fail2ban, GeoIP, log rotation
+- instances.yml pattern → drives per-instance config
+
+The ansible-platform role for Odoo **wraps odoo-install** — same scripts, driven by Ansible variables. No duplication, no divergence.
+
+---
+
+## Customer Portal Features (MVP)
+
+| Feature | Source |
+|---|---|
+| Instance URL | Provisioned by pipeline, stored in NetBox |
+| Status (running/stopped/error) | Orchestration API → Odoo |
+| CPU / RAM / disk metrics | Proxmox API → Orchestration API → Odoo |
+| Restart / Stop | Portal action → Orchestration API → Proxmox API |
+| Backup now | Portal action → Orchestration API → MinIO S3 |
+| Restore from backup | Portal action → Orchestration API → MinIO S3 |
+| Upgrade Odoo version | Future (post-MVP) |
+
+---
+
+## Open Questions (for later)
+
+- Multi-tenant isolation: one VM per customer vs shared + containerised?
+- Billing model: flat monthly vs usage-based?
+- SLA tiers: which tier gets which resource guarantee?
+- Orchestration API: build vs adopt (Temporal, Prefect, or simple FastAPI)?
+- GitLab CI as trigger vs direct Terraform API call?
+
+---
+
+## Status
+
+**Not scheduled.** Prerequisites:
+1. NetBox deployed and validated ← in progress
+2. Terraform VM provisioning stable ← in progress
+3. ansible-platform hardening role complete ← in progress
+4. Platform Orchestration API — not started
+5. `odoo-platform` Odoo module — not started
+
+Revisit when items 1-3 are stable.
