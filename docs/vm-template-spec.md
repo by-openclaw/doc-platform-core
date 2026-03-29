@@ -385,8 +385,23 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 > ```
 > Each domain gets its own cert resolver in Traefik config. No manual cert assignment. pfSense/OPNsense HAProxy not required for multi-domain TLS — Traefik does it natively.
 >
+> **Split DNS + DNS-01 pattern:**
+> ```
+> Internal DNS (OPNsense resolver)
+>   by-systems.be      → internal Traefik IP  (split horizon)
+>   by-management.be   → internal Traefik IP
+>   *.poc.by-systems.arpa → internal (Vault PKI, never public)
+>
+> Public DNS (provider API)
+>   by-systems.be      → public IP (A/AAAA)
+>   CRUD via API       → Traefik ACME DNS-01 challenge auto-manages cert renewal
+> ```
+>
+> - **DNS-01 challenge:** Traefik talks directly to DNS provider API for cert issuance/renewal. No port 80 required. Works for internal services using public domain names.
+> - **IP change:** update A record at DNS provider → Traefik re-challenges on next renewal. No manual cert work.
+> - **Internal-only names** (`*.arpa`, `*.local`): Vault PKI or self-signed, only resolvable on internal DNS. Never exposed.
 > - Internal envs (poc, test): Vault PKI. No internet dependency.
-> - External envs (staging, prod): Let's Encrypt via DNS challenge.
+> - External envs (staging, prod): Let's Encrypt via DNS-01 (provider API).
 > - GitLab uses its own internal nginx — Traefik sits in front for external TLS termination only
 > - No Apache anywhere
 
