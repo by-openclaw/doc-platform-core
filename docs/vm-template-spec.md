@@ -250,7 +250,7 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 | 10.2 | NetBox | 2 | 4096 | 30 | poc-data | Docker |
 | 10.3 | Vault | 2 | 2048 | 20 | poc-data | Docker |
 | 10.4 | Authentik | 2 | 4096 | 20 | poc-data | Docker |
-| 10.5 | GitLab CE | 4 | 8192 | 50 | poc-data + NFS (repos/artifacts) | Docker — local disk for app, NAS NFS **and/or S3** for repo storage + artifacts |
+| 10.5 | GitLab CE | 4 | 8192 | 50 | poc-data + NFS (git repos) + S3 (LFS/artifacts/registry) | Docker — ZFS for app/DB, NAS NFS for git repo data, NAS S3 for LFS + artifacts + registry + backups |
 | 10.6 | GitLab Runner | 2 | 4096 | 50 | poc-data | Docker |
 | 10.7 | Nexus OSS | 2 | 4096 | 50 | poc-data + NFS/S3 | Docker — artifacts on NAS/S3 |
 | 10.8 | OPNsense | 2 | 2048 | 10 | poc-data | **Appliance image** — not Docker |
@@ -261,10 +261,19 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 | 10.13 | Monitoring (Grafana/Loki/Prometheus) | 2 | 4096 | 50 | poc-data + NAS for long-term metrics | Docker |
 
 > **10.5 — GitLab storage split:**
-> - VM local disk (ZFS `poc-data`): GitLab application, DB (PoC bundled), config
-> - NAS NFS share: Git repo data (`/var/opt/gitlab/git-data`) — large, grows unbounded
-> - S3 (future or MinIO on NAS): CI artifacts, container registry, LFS objects
-> - This split keeps the VM disk predictable and offloads bulk storage to NAS/S3
+> - **ZFS `poc-data`** (VM local): GitLab application, PostgreSQL (PoC bundled), config — predictable, fast
+> - **NAS NFS** (`poc-iso` or dedicated share): `/var/opt/gitlab/git-data` — Git repo data, block-level, NFS correct here
+> - **NAS S3** (Synology built-in S3-compatible service): Git LFS objects, CI artifacts, container registry images, GitLab backup archives
+>
+> S3 bucket layout on Synology:
+> | Bucket | Content |
+> |---|---|
+> | `gitlab-lfs` | Git LFS blobs |
+> | `gitlab-artifacts` | CI job artifacts |
+> | `gitlab-registry` | Container registry layers |
+> | `gitlab-backups` | GitLab backup tarballs |
+>
+> GitLab `object_storage` config in `gitlab.rb` → Ansible-managed. Synology S3 endpoint: `https://10.6.224.6:<s3-port>` (confirm port from Synology DSM S3 service config).
 >
 > **10.11 — Traefik:**
 > Single Traefik instance per environment handles:
