@@ -89,7 +89,7 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 | ID | Property | Value | Status |
 |---|---|---|---|
 | 5.1 | Interface count | Depends on VM role — see matrix below | 🔄 |
-| 5.2 | OOB interface | Only for break-glass VMs — not default | 🔄 |
+| 5.2 | OOB scope | All physical devices + critical VMs — switches, WiFi APs, firewall, Proxmox, NAS, + break-glass VMs | 🔄 |
 | 5.3 | VLAN strategy | Agnostic — VLAN IDs from NetBox, not hardcoded in template | 🔄 |
 | 5.4 | Bridge naming | Follows NetBox VLAN naming — see §7.3 | 🔄 |
 | 5.5 | IP assignment | From NetBox IPAM — Terraform reads NetBox API | ⚠️ Phase 2 |
@@ -110,6 +110,20 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 > | VoIP VM | 1 × service VLAN + 1 × VoIP VLAN | Separate bridge for QoS |
 > | K3s node | 1 × cluster VLAN | |
 > | Supervision / metrics VM | 1 × MGMT-equivalent bridge for fabric access | See §7.3 |
+>
+> **5.2 — OOB scope (physical fabric):**
+> OOB is the management plane for ALL physical infrastructure — not just VMs:
+>
+> | Device type | OOB access | Method |
+> |---|---|---|
+> | Arista switches | ✅ Management port or dedicated MGMT VLAN | eAPI + SSH |
+> | WiFi APs | ✅ Dedicated MGMT VLAN or OOB port | REST API / SSH |
+> | OPNsense FW | ✅ Console + MGMT interface | SSH / web UI on MGMT |
+> | Proxmox nodes | ✅ IPMI/iDRAC if available + vmbrOOB | Proxmox API + SSH |
+> | Synology NAS | ✅ Dedicated MGMT VLAN | DSM API + SSH |
+> | UPS | ✅ SNMP on MGMT VLAN | Monitoring only |
+>
+> All OOB traffic stays on the OOB/MGMT VLAN — never mixed with production. If production VLANs go down, OOB remains reachable for recovery. This is the break-glass guarantee for the entire fabric.
 
 > **5.3 — VLAN agnostic strategy:**
 > Template does not hardcode VLAN IDs. VLAN assignment is a variable passed by Terraform, which reads from NetBox. VLAN IDs are defined in the network topology session (D.6) and stored in NetBox as the single source. This keeps the template portable across PoC, staging, and production environments.
