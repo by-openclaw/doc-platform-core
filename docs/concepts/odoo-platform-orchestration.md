@@ -102,6 +102,18 @@ The ansible-platform role for Odoo **wraps odoo-install** — same scripts, driv
 
 ---
 
+## Reference: Cloudpepper.io
+
+Cloudpepper is the closest existing product to this vision — Odoo hosting platform with portal, backups, staging, Git deploy, white-label, and API. **SaaS, not self-hosted.** Study their UX and feature set; build the equivalent on sovereign infrastructure.
+
+Key patterns to adopt:
+- **Staging neutralisation:** clone prod → auto-disable outbound email + cron jobs on clone. Prevents accidental customer emails during testing. Must-have.
+- **White-label portal:** customer logs in at `portal.by-systems.be`, sees only their instances. No BY-SYSTEMS branding leak.
+- **Git autodeploy:** GitLab push → pipeline → module upgrade on instance. Cloudpepper does this; we have GitLab CI already.
+- **Backup retention policies:** daily/weekly/monthly, configurable per instance. MinIO ILM handles tiering; orchestration API handles scheduling.
+
+---
+
 ## Customer Portal Features (MVP)
 
 | Feature | Source |
@@ -112,7 +124,9 @@ The ansible-platform role for Odoo **wraps odoo-install** — same scripts, driv
 | Restart / Stop | Portal action → Orchestration API → Proxmox API |
 | Backup now | Portal action → Orchestration API → MinIO S3 |
 | Restore from backup | Portal action → Orchestration API → MinIO S3 |
+| Staging clone (neutralised) | Portal action → clone VM → disable email/cron → notify customer |
 | Upgrade Odoo version | Future (post-MVP) |
+| Git autodeploy | Future — GitLab push → pipeline → module upgrade |
 
 ---
 
