@@ -271,8 +271,27 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 | 10.9 | PostgreSQL (shared) | 2 | 4096 | 50 | poc-data | Docker |
 | 10.10 | Redis (shared) | 1 | 2048 | 10 | poc-data | Docker |
 | 10.11 | **Traefik** | 1 | 1024 | 10 | poc-data | Docker — TLS termination, routing for all services |
+| 10.14 | **MinIO** | N/A | N/A | N/A | NAS direct | Container Manager on NAS — S3 gateway on top of NAS filesystem, Authentik OIDC for console, Contabo S3 replication |
 | 10.12 | K3s / K8s node | 4 | 8192 | 80 | poc-data | On 2nd Proxmox node |
 | 10.13 | Monitoring (Grafana/Loki/Prometheus) | 2 | 4096 | 50 | poc-data + NAS for long-term metrics | Docker |
+
+> **10.14 — MinIO architecture:**
+>
+> ```
+> Authentik (OIDC/SSO)
+>        ↓ human console auth (groups → bucket policies)
+> MinIO (Container Manager on NAS)
+>        ↓ S3 API (machines: GitLab, Nexus, backup jobs)
+>   NAS filesystem (direct volume mount — no NFS hop)
+>        ↓ async bucket replication
+>   Contabo S3 (DR off-site)
+> ```
+>
+> - **Human access:** Authentik OIDC → MinIO console. Authentik groups map to MinIO policies (read-only / read-write / admin per bucket)
+> - **Machine access:** MinIO service account keys per application (GitLab, Nexus, Proxmox backup). Not OIDC — S3 API keys stored in Vault
+> - **Data backend:** NAS share mounted directly into MinIO container — no NFS, no latency overhead
+> - **Replication:** MinIO site replication or bucket replication → Contabo S3 async. DR: point applications to Contabo endpoint if NAS fails
+> - **PoC deployment:** Container Manager on NAS (single container). Migrate to dedicated VM if NAS load becomes an issue
 
 > **10.5 — GitLab storage split:**
 > - **ZFS `poc-data`** (VM local): GitLab application, PostgreSQL (PoC bundled), config — predictable, fast
