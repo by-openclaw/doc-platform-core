@@ -112,6 +112,19 @@ Key patterns to adopt:
 - **Git autodeploy:** GitLab push → pipeline → module upgrade on instance. Cloudpepper does this; we have GitLab CI already.
 - **Backup retention policies:** daily/weekly/monthly, configurable per instance. MinIO ILM handles tiering; orchestration API handles scheduling.
 
+### Staging Neutralisation — Detail
+
+When cloning prod → staging, the following are toggled automatically via Odoo API / script:
+
+| Resource | Action |
+|---|---|
+| `ir.cron` (all scheduled actions) | `active = False` — no background jobs run |
+| `ir.mail_server` (outbound SMTP) | Disabled or redirected to catch-all mailbox |
+| Payment acquirers | Switched to test/sandbox mode |
+| External webhooks / API integrations | Disabled |
+
+Clone has full prod data. Cannot reach real customers. Safe to test modules, upgrades, data migrations. Scriptable and reversible.
+
 ---
 
 ## Customer Portal Features (MVP)
@@ -127,6 +140,29 @@ Key patterns to adopt:
 | Staging clone (neutralised) | Portal action → clone VM → disable email/cron → notify customer |
 | Upgrade Odoo version | Future (post-MVP) |
 | Git autodeploy | Future — GitLab push → pipeline → module upgrade |
+
+---
+
+## Business Model: BY-SYSTEMS as SaaS Provider
+
+BY-SYSTEMS operates as a sovereign SaaS hosting platform under its own brand. Odoo portal is the customer-facing product. The infra stack is the engine — invisible to customers.
+
+### Three Tiers
+
+| Tier | Who | Portal | What they see |
+|---|---|---|---|
+| **Admin** | BY-SYSTEMS team | Internal admin | Full infra, all customers, all instances, billing |
+| **Customer** | End client | `portal.by-systems.be` | Their instances only — metrics, actions, billing |
+| **Partner** | Odoo reseller | `portal.theirbrand.be` (CNAME to BY-SYSTEMS infra) | Their clients' instances under their brand |
+
+### Partner / Reseller Tier
+
+Partners get a white-label sub-portal under their own domain and branding. Their clients never see BY-SYSTEMS — they see the partner's brand. BY-SYSTEMS provides:
+- Infra + provisioning
+- Backup + monitoring
+- Orchestration API access (scoped to partner's instances)
+
+Partner manages their own client relationships, billing, support.
 
 ---
 
