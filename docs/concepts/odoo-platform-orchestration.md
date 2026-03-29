@@ -201,6 +201,30 @@ Partner manages their own client relationships, billing, support.
 
 ---
 
+## Growth Path: Hybrid Local + Contabo
+
+When local Proxmox capacity is exhausted, extend to Contabo VPS without changing the platform model:
+
+```
+Phase 1 — PoC
+  srv-proxmox-poc-01 → all customer LXCs (local)
+
+Phase 2 — Growth
+  Local Proxmox      → existing customers, internal services
+  Contabo VPS(es)    → overflow, new customers, geo placement
+       ↑
+  Same Terraform + ansible-platform manages both
+  Same NetBox tracks all nodes + IPs
+  Same Traefik + MinIO stack
+  Customer is unaware which node hosts their LXC
+```
+
+Placement logic (orchestration API): local first → Contabo when local capacity threshold hit. Node selection driven by NetBox inventory (available capacity, region, tier).
+
+Contabo also provides S3-compatible object storage — already used as MinIO cold tier (ILM). For Contabo-hosted LXCs, MinIO hot tier can be a local disk on the VPS instead of NAS.
+
+---
+
 ## Open Questions (for later)
 
 - Multi-tenant isolation: one VM per customer vs shared + containerised?
