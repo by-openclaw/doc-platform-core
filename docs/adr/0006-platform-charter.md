@@ -63,7 +63,7 @@ PoC WAN path: ISP → pfSense OOB → vmbrOOB → OPNsense VM → vmbrPOC
 | POC-MGMT | PoC VM management | 10.6.225.0 | /24 | .1 – .254 | 10.6.225.1 |
 | POC-SVC | PoC services | 10.6.226.0 | /24 | .1 – .254 | 10.6.226.1 |
 | POC-DHCP | Dynamic (dev/test) | 10.6.239.0 | /24 | .101 – .199 | 10.6.239.1 |
-| MGMT | Platform orchestration | 10.6.240.0 | /20 | .1 – .254 | 10.6.255.254 |
+| MGMT | Platform orchestration | 10.6.240.0 | /20 | .1 – .254 | 10.6.224.1 |
 
 **Static assignment table (PoC):**
 
