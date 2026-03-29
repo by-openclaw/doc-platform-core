@@ -1,6 +1,6 @@
 # ORG Platform — RAID Log
 
-**Last updated:** 2026-03-28
+**Last updated:** 2026-03-29
 **Status:** Active — PoC phase
 **Related docs:** `docs/stack.md`, `docs/roadmap.md`, `docs/architecture.md`
 
@@ -64,6 +64,8 @@
 | I-17 | Terraform scaffold incomplete — no OPNsense VM, no vmbrPOC bridge, PoC VMs on vmbrOOB (prod bridge) | High | 2026-03-28 | Deploy OPNsense VM + vmbrPOC. Move all PoC VMs to vmbrPOC. See platform-setup#58. | Open |
 | I-18 | vm-netbox-poc-01 not deployed — NetBox (CMDB/IPAM source of truth) unavailable | High | 2026-03-28 | Deploy after OPNsense. Terraform module ready. See platform-setup#59. | Open |
 | I-19 | GitHub issues #1 and #44 were stale/open despite being completed | Low | 2026-03-28 | Closed with completion comments 2026-03-28. | ✅ Resolved |
+| I-20 | Terraform state had no remote backup — Rune VM loss = state loss | High | 2026-03-29 | NAS backup operational (`/by-terraform-state/poc/`). Script + wrapper in `infra-terraform-proxmox/scripts/`. ADR-0008. Phase 5: migrate to GitLab backend. platform-setup#60 | ✅ Resolved (Phase 1) |
+| I-21 | OOB gateway `10.6.255.254` used incorrectly in all repo docs (correct: `10.6.224.1` pfSense) | Low | 2026-03-29 | Fixed in all docs, CLAUDE.md, ADR-0006, MEMORY.md. platform-setup#61. | ✅ Resolved |
 | I-01 | OpenClaw Anthropic token was OpenClaw shared pool (not MAX plan) — caused overload errors | High | 2026-03-25 | Re-ran `openclaw models auth setup-token --provider anthropic` — new token tied to MAX plan. Old API key removed from config and revoked. | ✅ Resolved |
 | I-02 | Discord WebSocket instability (code 1006, 520) — intermittent reconnects | Low | 2026-03-25 | Discord-side transient issue. Gateway auto-recovered. Monitor for recurrence. | ✅ Resolved (monitoring) |
 | I-03 | `openclaw gateway restart` kills agent mid-command (self-restart) | Low | 2026-03-25 | Workaround: use `systemctl --user restart openclaw-gateway.service` from terminal. | ⚠️ Workaround |
@@ -105,7 +107,7 @@
 | D-14 | PostgreSQL up before GitLab/Vault/Authentik/NetBox | Service ordering | Phase 2 | Service startup fails | Platform |
 | D-15 | Nexus cache seeded before CI pipelines run at scale | Service readiness | Phase 2 | First pipeline runs hit internet; slow + brittle | Platform |
 | D-16 | Teleport deployed before pfSense blocks direct SSH | Service ordering | Phase 2 | Engineers locked out if firewall rule applied early | Security |
-| D-19 | `lib-synology-dsm` Python library — API coverage complete before NetBox webhook integration | Software/lib | Platform automation | NFS management blocked without it | Platform |
+| D-19 | `lib-synology-dsm` Python library — API coverage complete before NetBox webhook integration | Software/lib | Platform automation | NFS management blocked without it | Platform | ✅ v0.6.1 — User/Group/Share/NFS/FileStation all implemented |
 
 ---
 
