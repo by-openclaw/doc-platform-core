@@ -270,7 +270,7 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 | 10.8 | OPNsense | 2 | 2048 | 10 | poc-data | **Appliance image** — not Docker |
 | 10.9 | PostgreSQL (shared) | 2 | 4096 | 50 | poc-data | Docker |
 | 10.10 | Redis (shared) | 1 | 2048 | 10 | poc-data | Docker |
-| 10.11 | **Traefik** | 1 | 1024 | 10 | poc-data | Docker — TLS termination, routing for all services |
+| 10.11 | **Traefik** (one per env) | 1 | 1024 | 10 | poc-data | Docker — one instance per environment (poc/test/staging/prod). TLS termination + routing scoped to that env |
 | 10.14 | **MinIO** | N/A | N/A | N/A | NAS direct | Container Manager on NAS — S3 gateway on top of NAS filesystem, Authentik OIDC for console, Contabo S3 replication |
 | 10.12 | K3s / K8s node | 4 | 8192 | 80 | poc-data | On 2nd Proxmox node |
 | 10.13 | Monitoring (Grafana/Loki/Prometheus) | 2 | 4096 | 50 | poc-data + NAS for long-term metrics | Docker |
@@ -323,11 +323,20 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 > - Configure MinIO → Contabo S3 bucket replication
 > - Confirm Contabo egress limits / throttling policy
 >
-> **10.11 — Traefik:**
-> Single Traefik instance per environment handles:
-> - TLS termination (Let's Encrypt or internal CA via Vault PKI)
-> - Routing to all Docker services by hostname
-> - GitLab uses internal nginx, but Traefik sits in front for external TLS — GitLab nginx handles internal GitLab-to-GitLab communication only
+> **10.11 — Traefik (one per environment):**
+>
+> | Environment | Traefik VM | Domain scope | TLS source |
+> |---|---|---|---|
+> | poc | `vm-traefik-poc-01` | `*.poc.by-systems.arpa` | Vault PKI (internal CA) |
+> | test | `vm-traefik-test-01` | `*.test.by-systems.arpa` | Vault PKI |
+> | staging | `vm-traefik-staging-01` | `*.staging.by-systems.be` | Let's Encrypt or Vault PKI |
+> | prod | `vm-traefik-prod-01` | `*.by-systems.be` | Let's Encrypt |
+>
+> Each Traefik instance only knows about services in its own environment. Complete blast-radius isolation — a misconfigured routing rule in test cannot affect prod.
+>
+> - Internal envs (poc, test): Vault PKI issues certificates. No internet dependency.
+> - External envs (staging, prod): Let's Encrypt via DNS challenge (OPNsense / public DNS API)
+> - GitLab uses its own internal nginx — Traefik sits in front for external TLS termination only
 > - No Apache anywhere
 
 ---
