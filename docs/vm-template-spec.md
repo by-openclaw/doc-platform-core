@@ -271,9 +271,23 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 | 10.9 | PostgreSQL (shared) | 2 | 4096 | 50 | poc-data | Docker |
 | 10.10 | Redis (shared) | 1 | 2048 | 10 | poc-data | Docker |
 | 10.11 | **Traefik** (one per env) | 1 | 1024 | 10 | poc-data | Docker — one instance per environment (poc/test/staging/prod). TLS termination + routing scoped to that env |
-| 10.14 | **MinIO** | N/A | N/A | N/A | NAS direct | Container Manager on NAS — S3 gateway on top of NAS filesystem, Authentik OIDC for console, Contabo S3 replication |
+| 10.14 | **MinIO** | N/A | N/A | N/A | NAS direct | Container Manager on NAS — S3 emulation on NAS disk. Machine-facing: apps (Outline, GitLab, Nexus) use S3 API. Authentik OIDC for admin console. ILM tiering to Contabo S3 for cold/DR. |
+| 10.15 | **Nextcloud** | 2 | 2048 | 20 | NAS NFS + MinIO S3 | Human-facing file sharing. Authentik OIDC SSO. Users see their shares on login. Backend: NAS (NFS) for personal files + MinIO S3 for object storage. |
 | 10.12 | K3s / K8s node | 4 | 8192 | 80 | poc-data | On 2nd Proxmox node |
 | 10.13 | Monitoring (Grafana/Loki/Prometheus) | 2 | 4096 | 50 | poc-data + NAS for long-term metrics | Docker |
+
+> **10.15 — Nextcloud (human file access):**
+>
+> ```
+> User → Authentik SSO (OIDC) → Nextcloud → NAS (NFS) personal files
+>                                          → MinIO S3 object storage
+> ```
+>
+> - Nextcloud is the **human-facing** file layer — browser, desktop, mobile clients
+> - Login via Authentik: user gets their shares immediately on auth
+> - Storage backends: NAS NFS for personal/team folders, MinIO S3 for object workloads
+> - MinIO is **machine-facing** (apps calling S3 API) — Nextcloud is **human-facing**
+> - Both authenticate through Authentik — one identity
 
 > **10.14 — MinIO architecture:**
 >
