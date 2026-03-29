@@ -277,20 +277,23 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 
 > **10.14 — MinIO architecture:**
 >
+> MinIO is the **unified S3 object storage layer for the entire platform**. Every service needing object storage talks to one S3 endpoint. MinIO stores data directly on the NAS filesystem — no NFS hop, no extra VM.
+>
 > ```
-> Authentik (OIDC/SSO)
->        ↓ human console auth (groups → bucket policies)
-> MinIO (Container Manager on NAS)
->        ↓ S3 API (machines: GitLab, Nexus, backup jobs)
->   NAS filesystem (direct volume mount — no NFS hop)
->        ↓ async bucket replication
->   Contabo S3 (DR off-site)
+> Platform services (GitLab, Nexus, apps, tools)
+>           ↓ standard S3 API (boto3 / minio-client / aws-sdk)
+>         MinIO  ←— single S3 endpoint for all environments
+>           ↓ data stored on
+>        NAS filesystem (direct container volume mount)
+>           ↓ optional async DR replication
+>        Contabo S3 (off-site copy — DR only, not primary)
 > ```
 >
-> - **Human access:** Authentik OIDC → MinIO console. Authentik groups map to MinIO policies (read-only / read-write / admin per bucket)
-> - **Machine access:** MinIO service account keys per application (GitLab, Nexus, Proxmox backup). Not OIDC — S3 API keys stored in Vault
-> - **Data backend:** NAS share mounted directly into MinIO container — no NFS, no latency overhead
-> - **Replication:** MinIO site replication or bucket replication → Contabo S3 async. DR: point applications to Contabo endpoint if NAS fails
+> - **Primary role:** Unified S3 gateway for all platform services. Not a backup tool.
+> - **Human access:** Authentik OIDC → MinIO console. Authentik groups → MinIO bucket policies (read-only / read-write / admin)
+> - **Machine access:** Per-service S3 access keys (GitLab, Nexus, etc.) stored in Vault. Standard S3 API — no DSM, no FileStation
+> - **Data backend:** NAS share mounted directly into MinIO container — no NFS hop, minimal latency
+> - **DR replication:** Optional — MinIO bucket replication → Contabo S3. Failover = point S3 endpoint to Contabo. Not the primary purpose.
 > - **PoC deployment:** Container Manager on NAS (single container). Migrate to dedicated VM if NAS load becomes an issue
 
 > **10.5 — GitLab storage split:**
@@ -323,19 +326,27 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 > - Configure MinIO → Contabo S3 bucket replication
 > - Confirm Contabo egress limits / throttling policy
 >
-> **10.11 — Traefik (one per environment):**
+> **10.11 — Traefik (one per environment, shared public IP):**
 >
-> | Environment | Traefik VM | Domain scope | TLS source |
-> |---|---|---|---|
-> | poc | `vm-traefik-poc-01` | `*.poc.by-systems.arpa` | Vault PKI (internal CA) |
-> | test | `vm-traefik-test-01` | `*.test.by-systems.arpa` | Vault PKI |
-> | staging | `vm-traefik-staging-01` | `*.staging.by-systems.be` | Let's Encrypt or Vault PKI |
-> | prod | `vm-traefik-prod-01` | `*.by-systems.be` | Let's Encrypt |
+> | Environment | Traefik VM | Domain scope | TLS source | Public IP |
+> |---|---|---|---|---|
+> | poc | `vm-traefik-poc-01` | `*.poc.by-systems.arpa` | Vault PKI | ❌ internal only |
+> | test | `vm-traefik-test-01` | `*.test.by-systems.arpa` | Vault PKI | ❌ internal only |
+> | staging | `vm-traefik-staging-01` | `*.staging.by-systems.be` | Let's Encrypt | ✅ shared via OPNsense SNI |
+> | prod | `vm-traefik-prod-01` | `*.by-systems.be` | Let's Encrypt | ✅ shared via OPNsense SNI |
 >
-> Each Traefik instance only knows about services in its own environment. Complete blast-radius isolation — a misconfigured routing rule in test cannot affect prod.
+> **Single public IP** — OPNsense routes inbound HTTPS by SNI (hostname) to the correct internal Traefik. No dedicated IP per environment needed.
 >
-> - Internal envs (poc, test): Vault PKI issues certificates. No internet dependency.
-> - External envs (staging, prod): Let's Encrypt via DNS challenge (OPNsense / public DNS API)
+> ```
+> Internet → 1 public IP → OPNsense (SNI routing)
+>                               ↓
+>              ┌────────────────┴────────────────┐
+>         Traefik-staging                  Traefik-prod
+>         (*.staging.by-systems.be)        (*.by-systems.be)
+> ```
+>
+> poc and test are never exposed externally — internal DNS (`by-systems.arpa`) only, Vault PKI, no internet dependency.
+>
 > - GitLab uses its own internal nginx — Traefik sits in front for external TLS termination only
 > - No Apache anywhere
 
