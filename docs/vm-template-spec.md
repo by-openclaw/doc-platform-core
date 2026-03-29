@@ -277,24 +277,27 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 
 > **10.14 — MinIO architecture:**
 >
-> MinIO is the **unified S3 object storage layer for the entire platform**. Every service needing object storage talks to one S3 endpoint. MinIO stores data directly on the NAS filesystem — no NFS hop, no extra VM.
+> MinIO is a **storage abstraction / virtualisation layer**. Users, VMs, and services always talk S3 to MinIO. They never talk directly to NAS or Contabo — MinIO abstracts the backend entirely. If a backend changes (new NAS, Ceph, different cloud), clients are not affected.
 >
 > ```
-> Platform services (GitLab, Nexus, apps, tools)
->           ↓ standard S3 API (boto3 / minio-client / aws-sdk)
->         MinIO  ←— single S3 endpoint for all environments
->           ↓ data stored on
->        NAS filesystem (direct container volume mount)
->           ↓ optional async DR replication
->        Contabo S3 (off-site copy — DR only, not primary)
+> Users / VMs / Platform services
+>           ↓ one protocol: S3 API (boto3 / minio-client / aws-sdk)
+>         MinIO  ←— single access point, storage-agnostic
+>           ↓ backends
+>    ┌──────┴──────────────────┬──────────────────┐
+>   NAS                  Contabo S3           Future
+> (hot tier —           (cold tier /       (Ceph, second
+>  local mount)          ILM tiering /      NAS, cloud...)
+>                         DR)
 > ```
 >
-> - **Primary role:** Unified S3 gateway for all platform services. Not a backup tool.
-> - **Human access:** Authentik OIDC → MinIO console. Authentik groups → MinIO bucket policies (read-only / read-write / admin)
-> - **Machine access:** Per-service S3 access keys (GitLab, Nexus, etc.) stored in Vault. Standard S3 API — no DSM, no FileStation
-> - **Data backend:** NAS share mounted directly into MinIO container — no NFS hop, minimal latency
-> - **DR replication:** Optional — MinIO bucket replication → Contabo S3. Failover = point S3 endpoint to Contabo. Not the primary purpose.
-> - **PoC deployment:** Container Manager on NAS (single container). Migrate to dedicated VM if NAS load becomes an issue
+> - **Abstraction:** Clients see one S3 endpoint. MinIO decides where data lives.
+> - **Hot tier:** NAS filesystem (direct container mount — no NFS hop). All active data lives here.
+> - **Cold tier / DR:** Contabo S3 via MinIO ILM (Information Lifecycle Management) — objects migrate automatically after age/size policy, or replicated for DR. Still accessible via same MinIO endpoint.
+> - **Extensible:** Add a backend later (Ceph, second NAS, another cloud provider) without changing client config.
+> - **Human access:** Authentik OIDC → MinIO console. Authentik groups → MinIO bucket policies (read-only / read-write / admin per bucket)
+> - **Machine access:** Per-service S3 keys stored in Vault (GitLab, Nexus, apps). Standard S3 API — no DSM, no FileStation, no NFS for object workloads
+> - **PoC deployment:** Container Manager on NAS (single container, direct volume). Migrate to dedicated VM if load justifies it.
 
 > **10.5 — GitLab storage split:**
 > - **ZFS `poc-data`** (VM local): GitLab application, PostgreSQL (PoC bundled), config — predictable, fast
