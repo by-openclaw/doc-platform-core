@@ -364,6 +364,29 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 >
 > poc and test are never exposed externally — internal DNS (`by-systems.arpa`) only, Vault PKI, no internet dependency.
 >
+> **Ingress flow — OPNsense port forward (no NAT 1:1 needed):**
+> ```
+> Internet → OPNsense WAN IP:443 (port forward only)
+>                  ↓ by hostname (SNI)
+>            Traefik-prod  (*.by-systems.be, *.by-management.be, ...)
+>            Traefik-staging (*.staging.by-systems.be)
+>                  ↓ Traefik routes + manages TLS per domain
+>            Backend services
+> ```
+>
+> NAT 1:1 not required — port forward from OPNsense WAN IP directly to Traefik frees up the previously dedicated public IP for other use.
+>
+> **Multi-domain TLS — Traefik handles natively, no HAProxy needed:**
+> ```yaml
+> # by-systems.be    → Let's Encrypt cert → prod backends
+> # by-management.be → Let's Encrypt cert → mgmt backends
+> # *.poc.arpa       → Vault PKI cert     → poc backends
+> # test.local       → self-signed        → test backends
+> ```
+> Each domain gets its own cert resolver in Traefik config. No manual cert assignment. pfSense/OPNsense HAProxy not required for multi-domain TLS — Traefik does it natively.
+>
+> - Internal envs (poc, test): Vault PKI. No internet dependency.
+> - External envs (staging, prod): Let's Encrypt via DNS challenge.
 > - GitLab uses its own internal nginx — Traefik sits in front for external TLS termination only
 > - No Apache anywhere
 
