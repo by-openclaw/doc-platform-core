@@ -1,11 +1,25 @@
 # VM Template Specification
 
-**Status:** Draft v3 — review 2026-03-28/29  
+**Status:** Draft v4 — review 2026-03-29  
 **Last updated:** 2026-03-29  
 **Scope:** All VMs and LXCs provisioned via Terraform on Proxmox PoC  
-**Reviewer:** @yboujraf  
+**Reviewer:** @yboujraf
 
 Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | ❌ blocked | 🔄 updated
+
+---
+
+## 0. Proxmox Storage — Current State (verified via API)
+
+| Storage ID | Type | Backend | Content | Mount |
+|---|---|---|---|---|
+| `poc-data` | **ZFS pool** | `tank/poc-data` (local ZFS) | VM images + rootdir (LXC) | `/tank/poc-data` |
+| `local-lvm` | LVM-thin | `pve/data` VG | VM images + rootdir | N/A |
+| `poc-iso` | NFS | NAS `10.6.224.6:/volume1/srv-proxmox-poc-01-iso` | ISO + templates | `/mnt/pve/poc-iso` |
+| `poc-backup` | NFS | NAS `10.6.224.6:/volume1/srv-proxmox-poc-01-backup` | Backups only | `/mnt/pve/poc-backup` |
+| `local` | dir | `/var/lib/vz` | ISO, snippets, templates | N/A |
+
+**Decision confirmed:** `poc-data` = ZFS pool. VMs run on ZFS. NFS is ISO library + backup storage only. This is correct and does not change.
 
 ---
 
@@ -13,11 +27,9 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 
 | ID | Property | Value | Status |
 |---|---|---|---|
-| 1.1 | Linux supported | ✅ Primary target | ✅ |
-| 1.2 | Linux OS templates | **Debian 12**, **Ubuntu 24.04 LTS**, **Rocky Linux 9** — 3 separate base images | ✅ |
-| 1.3 | Windows | Deferred Phase 4+ (developer workstations only) | ✅ deferred |
-
-> **Why 3 templates:** Debian 12 = infra default. Ubuntu 24.04 = workloads needing Ubuntu packages. Rocky 9 = RHEL-compatible / enterprise software. Each is a separate Proxmox cloud-init image.
+| 1.1 | Linux | ✅ Primary | ✅ |
+| 1.2 | Templates | **Debian 12**, **Ubuntu 24.04 LTS**, **Rocky Linux 9** | ✅ |
+| 1.3 | Windows | Deferred Phase 4+ | ✅ |
 
 ---
 
@@ -25,15 +37,15 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 
 | ID | Property | Value | Status |
 |---|---|---|---|
-| 2.1 | Hostname pattern | `vm-<service>-<env>-<nn>` (e.g. `vm-netbox-poc-01`) | ✅ |
-| 2.2 | Locale | `fr_BE.UTF-8` | ✅ needs re-verification |
+| 2.1 | Hostname pattern | `vm-<service>-<env>-<nn>` | ✅ |
+| 2.2 | Locale | `fr_BE.UTF-8` | ⚠️ re-verify |
 | 2.3 | Timezone | `Europe/Brussels` | ✅ |
 | 2.4 | Keyboard | `be` | ✅ |
-| 2.5 | Default shell | `/bin/bash` | ✅ |
-| 2.6 | Default user | `by-systems` — single user, no split | ✅ |
-| 2.7 | Root SSH login | Disabled (Ansible hardening) | ✅ |
+| 2.5 | Shell | `/bin/bash` | ✅ |
+| 2.6 | Default user | `by-systems` | ✅ |
+| 2.7 | Root SSH | Disabled (Ansible) | ✅ |
 | 2.8 | Search domain | `by-systems.arpa` | ✅ |
-| 2.9 | DNS | Per VLAN assignment from NetBox — not hardcoded (see §6.8) | 🔄 |
+| 2.9 | DNS | Per VLAN/switch (§6.8) — driven by NetBox | ✅ |
 
 ---
 
@@ -41,12 +53,14 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 
 | ID | Property | Value | Status |
 |---|---|---|---|
-| 3.1 | CPU type | `host` (PoC) → `x86-64-v2-AES` before cluster | ⚠️ switch before clustering |
-| 3.2 | CPU sockets | `1` (2nd socket deferred) | ✅ |
+| 3.1 | CPU type | **`x86-64-v2-AES`** — hardware-agnostic, live-migratable, supports AES-NI | ✅ confirmed |
+| 3.2 | CPU sockets | `1` | ✅ |
 | 3.3 | CPU cores | Variable per role (§10) | ✅ |
 | 3.4 | RAM | Variable per role (§10) | ✅ |
-| 3.5 | Memory ballooning | Disabled | ✅ |
+| 3.5 | Ballooning | Disabled | ✅ |
 | 3.6 | NUMA | Disabled | ✅ |
+
+> **3.1:** `x86-64-v2-AES` is the correct permanent choice. Agnostic — works across any modern x86 CPU. Any CPU in the Proxmox list that is x86-64-v2 compatible can be assigned. Enables live migration between nodes regardless of exact CPU model.
 
 ---
 
@@ -56,33 +70,17 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 |---|---|---|---|
 | 4.1 | SCSI controller | `virtio-scsi-single` | ✅ |
 | 4.2 | iothread | Enabled | ✅ |
-| 4.3 | Storage backend | See note below — ZFS preferred when available | 🔄 clarified |
-| 4.4 | Disk format on NFS | `qcow2` | ✅ |
-| 4.5 | Disk format on ZFS/LVM | `raw` | ✅ |
-| 4.6 | Boot disk size | Variable per role (§10) | ✅ |
-| 4.7 | Disk cache (NFS) | `writeback` — see note | 🔄 clarified |
-| 4.8 | Discard / TRIM | Enabled | ✅ |
-| 4.9 | SSD emulation | Enabled | ✅ |
-| 4.10 | Backup | **On demand or driven by NetBox VM tag** `backup:scheduled` | 🔄 |
-| 4.11 | Snapshot | **On demand** — no automated snapshots in PoC. Triggered manually or by CI pipeline pre-change | 🔄 |
+| 4.3 | VM / LXC storage | **`poc-data` (ZFS pool `tank/poc-data`)** — all VMs and LXCs run here | ✅ verified |
+| 4.4 | Disk format on ZFS | `raw` — best performance, native ZFS snapshots | ✅ |
+| 4.5 | ISO / template storage | `poc-iso` (NFS from NAS) — ISOs and cloud-init templates only | ✅ |
+| 4.6 | Backup storage | `poc-backup` (NFS from NAS) — Proxmox backups only | ✅ |
+| 4.7 | NFS role | **Backup + ISO only. Never VM/LXC disks.** NFS is not a VM runtime backend | ✅ clarified |
+| 4.8 | Boot disk size | Variable per role (§10) | ✅ |
+| 4.9 | Discard / TRIM | Enabled | ✅ |
+| 4.10 | Backup | On demand **or** triggered by NetBox VM tag `backup:enabled` | ✅ |
+| 4.11 | Snapshot | On demand — manual or triggered pre-change by CI pipeline. No automated schedule in PoC | ✅ |
 
-> **4.3 — Storage backend decision:**
->
-> | Backend | Where VMs run | Format | Use case |
-> |---|---|---|---|
-> | `local-zfs` | ZFS pool on Proxmox node local disk | `raw` | **Preferred** — native snapshots, compression, checksums, no single point of failure from NAS |
-> | `local-lvm` | LVM-thin pool on Proxmox node | `raw` | Fallback if no ZFS configured |
-> | `poc-data` (Synology NFS) | NAS over network | `qcow2` | Shared storage for cluster live migration — not for OS disk normally |
->
-> **Recommendation:** Configure ZFS on the Proxmox PoC node for local VM storage. Use Synology NFS (`poc-data`) only for:
-> - Shared ISO/template library
-> - Large data disks (GitLab repos, Nexus artifacts)
-> - Cluster live migration (VM must be on shared storage for that feature)
->
-> If PoC node has no ZFS pool yet → action item before tomorrow.
-
-> **4.7 — Disk cache writeback clarification:**
-> `writeback` = Proxmox tells the VM "write is done" as soon as data hits the NAS RAM cache — before it hits disk. Faster writes. Risk: if NAS loses power before flushing cache → data loss. **Acceptable only if Synology has UPS.** If no UPS → use `none` (safer, slower). Default to `none` until UPS confirmed.
+> **4.3 — Confirmed from Proxmox API:** `poc-data` is a ZFS pool (`type: zfspool`, pool: `tank/poc-data`). VMs run on ZFS. `local-lvm` exists as fallback but is not the default. NFS (`poc-iso`, `poc-backup`) is storage for ISOs and backups exclusively.
 
 ---
 
@@ -90,93 +88,74 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 
 | ID | Property | Value | Status |
 |---|---|---|---|
-| 5.1 | Interfaces per VM | **Depends on role** — see note | 🔄 |
-| 5.2 | OOB interface | Only for VMs requiring break-glass access independent of VLAN state | 🔄 |
-| 5.3 | VLAN per environment | Yes — separate VLAN per env (dev/staging/prod) is the standard | 🔄 |
-| 5.4 | Additional interfaces | Appliances (OPNsense, routers) get explicit per-NIC config — not templated | ✅ |
-| 5.5 | IP assignment | From NetBox — NetBox is source of truth for IP allocation | 🔄 |
-| 5.6 | Gateway | From NetBox VLAN prefix config | 🔄 |
-| 5.7 | MTU | Must match Arista switch config on same VLAN — 1500 default, 9000 for storage VLAN | ⚠️ Arista dependency |
-| 5.8 | Firewall / SDN | OPNsense handles routing/FW. Proxmox SDN handles VLAN provisioning programmatically. See note | 🔄 |
+| 5.1 | Interface count | Depends on VM role — see matrix below | 🔄 |
+| 5.2 | OOB interface | Only for break-glass VMs — not default | 🔄 |
+| 5.3 | VLAN strategy | Agnostic — VLAN IDs from NetBox, not hardcoded in template | 🔄 |
+| 5.4 | Bridge naming | Follows NetBox VLAN naming — see §7.3 | 🔄 |
+| 5.5 | IP assignment | From NetBox IPAM — Terraform reads NetBox API | ⚠️ Phase 2 |
+| 5.6 | Gateway | From NetBox VLAN prefix | ⚠️ Phase 2 |
+| 5.7 | MTU | Must match Arista switch config per VLAN — 1500 default, 9000 storage | ⚠️ Arista dependency |
+| 5.8 | SDN | Proxmox SDN for intra-hypervisor VM isolation + OPNsense for L3 routing/FW/internet | 🔄 |
 | 5.9 | IPv6 | Dual-stack by default | ✅ |
 | 5.10 | Network model | `virtio` | ✅ |
-| 5.11 | PCIe / IO passthrough | Per-VM explicit config — IOMMU, GPU, PTP NIC, WAN NICs | ✅ |
+| 5.11 | PCIe passthrough | Per-VM explicit — WAN NICs to OPNsense, PTP NIC to GM VM, GPU | ✅ |
 
-> **5.1/5.2 — Interface strategy per role:**
+> **5.1 — Interface matrix per role:**
 >
-> | VM role | Interfaces | Reason |
+> | VM role | Interfaces | Notes |
 > |---|---|---|
-> | Standard infra VM | 1 × service VLAN | Simpler — OPNsense handles routing between VLANs |
-> | VM needing break-glass OOB | 1 × service VLAN + 1 × OOB VLAN | Only for critical VMs where VLAN failure = locked out |
-> | OPNsense firewall VM | 1 × WAN ISP1 (PCIe passthrough or dedicated vmbr) + 1 × WAN ISP2 + 1 × per service VLAN | Full network appliance |
-> | K3s / workload node | 1 × cluster VLAN | |
->
-> **Principle:** Don't add OOB to every VM. Add it only where losing the service VLAN means losing management access. NetBox tracks which VMs have OOB and which don't.
+> | Standard infra / app VM | 1 × service VLAN | Normal case |
+> | Critical VM needing break-glass | 1 × service VLAN + 1 × OOB | Only when VLAN failure = locked out |
+> | OPNsense FW VM | WAN1 + WAN2 (passthrough) + LAN VLANs | Full appliance |
+> | VoIP VM | 1 × service VLAN + 1 × VoIP VLAN | Separate bridge for QoS |
+> | K3s node | 1 × cluster VLAN | |
+> | Supervision / metrics VM | 1 × MGMT-equivalent bridge for fabric access | See §7.3 |
 
-> **5.3 — Environment segmentation:**
-> Standard approach: separate VLAN per environment tier. This aligns with ISO 27001 network segmentation requirements.
-> ```
-> VLAN 10 — MGMT       (Arista mgmt, Proxmox, NAS, OOB)
-> VLAN 20 — INFRA      (NetBox, Vault, Authentik, GitLab)
-> VLAN 30 — APP-POC    (PoC application workloads)
-> VLAN 40 — APP-PROD   (Production workloads — future)
-> VLAN 50 — STORAGE    (Ceph/NFS traffic — MTU 9000)
-> VLAN 60 — K8S        (Kubernetes cluster internal)
-> VLAN 100 — WAN-ISP1  (OPNsense WAN 1)
-> VLAN 101 — WAN-ISP2  (OPNsense WAN 2)
-> ```
-> Exact IDs TBD in network topology session. This is a starting point.
+> **5.3 — VLAN agnostic strategy:**
+> Template does not hardcode VLAN IDs. VLAN assignment is a variable passed by Terraform, which reads from NetBox. VLAN IDs are defined in the network topology session (D.6) and stored in NetBox as the single source. This keeps the template portable across PoC, staging, and production environments.
 
-> **5.8 — SDN + OPNsense clarification:**
-> - **OPNsense** = Layer 3 routing + firewall + NAT + VPN. All inter-VLAN routing goes through OPNsense. Full REST API, Ansible collection (`ansibleguy.opnsense`). Rules are not manual — they are code.
-> - **Proxmox SDN** = Layer 2 VLAN provisioning inside Proxmox. Creates virtual bridges and VLAN segments for VMs without touching physical switch config. Complementary to OPNsense, not a replacement.
-> - **Arista switches** = Physical fabric. Access/trunk VLANs, routing between switches, potentially SDN integration via eAPI.
-> - These three layers work together. Nothing is manual.
+> **5.8 — SDN + OPNsense model:**
+> - **Inside hypervisor:** Proxmox SDN handles VM-to-VM traffic on same host — no external path needed, low latency, policy enforced at hypervisor level
+> - **Between VMs needing L3 routing or internet:** traffic goes through OPNsense (routing + FW + NAT)
+> - **OPNsense** = all firewall rules as code (`ansibleguy.opnsense` Ansible collection), full REST API, no manual rules
+> - **SDN isolation rules:** VMs in SDN zone can be isolated from each other at hypervisor level — additional layer on top of OPNsense
 
 ---
 
-## 6. Cloud-init (Linux only)
+## 6. Cloud-init (Linux)
 
 | ID | Property | Value | Status |
 |---|---|---|---|
 | 6.1 | User | `by-systems` | ✅ |
-| 6.2 | Password | `ci_password` Terraform variable | ✅ |
-| 6.3 | SSH keys | See note — one key approach, Vault-stored | 🔄 |
-| 6.4 | Upgrade packages on boot | `false` | ✅ |
-| 6.5 | Install packages on boot | `false` | ✅ |
+| 6.2 | Password | `ci_password` Terraform var | ✅ |
+| 6.3 | SSH keys | See note — per-VM keypair, pub key injected at provision | 🔄 |
+| 6.4 | Upgrade on boot | `false` | ✅ |
+| 6.5 | Packages on boot | `false` | ✅ |
 | 6.6 | Locale | `fr_BE.UTF-8` — needs re-verification | ⚠️ |
 | 6.7 | Timezone | `Europe/Brussels` | ✅ |
-| 6.8 | DNS | Per VLAN / switch topology — see note | 🔄 |
+| 6.8 | DNS | Per VLAN/switch topology (see note) | 🔄 |
 | 6.9 | Search domain | `by-systems.arpa` | ✅ |
 | 6.10 | Cloud-init drive | `ide2` | ✅ |
 
-> **6.3 — SSH key strategy (KISS):**
+> **6.3 — SSH key strategy (confirmed):**
+> Each VM has its own unique `by-systems` keypair, named by VM hostname: `by-systems@vm-netbox-poc-01`.
+> - Private key → stored in Vault at `secret/ssh/<hostname>/by-systems`
+> - Public key → injected via cloud-init at provision time
+> - Ansible retrieves private key from Vault before connecting
+> - No shared master key across VMs
 >
-> Single user `by-systems`. No split between Ansible user / Terraform user / human user. One user, one set of keys, SSO for future human access.
->
-> Key generation approach — matching `odoo-install` pattern:
-> - **One unique SSH keypair per VM** generated at provision time
-> - Key named by VM: `by-systems@vm-netbox-poc-01`
-> - Private key stored in **Vault** under `secret/ssh/<hostname>/by-systems`
-> - Public key injected via cloud-init
-> - Ansible retrieves key from Vault before connecting
->
-> This means: no shared "master key" across all VMs. Compromise of one VM does not give access to others. Clean, auditable, follows Vault best practices.
->
-> **Open decision D.7:** Confirm this approach or use a shared key (simpler, lower security). Recommendation: per-VM keys from the start.
+> The public key injected comes from **Vault** — Terraform reads `vault_generic_secret.ssh_<hostname>.public_key` and passes it to cloud-init. Keys are generated once per VM and never rotate unless explicitly triggered.
 
-> **6.8 — DNS per VLAN (not global):**
+> **6.8 — DNS per VLAN/switch (clarified):**
 >
-> DNS resolver depends on which VLAN the VM is on AND which switches are in that fabric:
->
-> | VLAN / context | DNS resolver | Reason |
+> | Context | DNS resolver | Reason |
 > |---|---|---|
-> | MGMT VLAN (Arista fabric) | VRF IP on the switch serving that VLAN | Isolated fabric — only MGMT reachable. Must resolve fabric devices locally |
-> | Arista 7048 (no VRF) | Use MGMT VLAN IP directly — no VRF isolation possible on this switch | Hardware limitation |
-> | Service VLANs (infra, app) | OPNsense VLAN interface IP | OPNsense resolves `by-systems.arpa` + upstream via DoT/DoH |
-> | External DNS | Never direct — always via OPNsense DoT/DoH | Enforced at firewall, no bypass |
+> | MGMT VLAN on Arista 7060 (has VRF) | VRF interface IP on switch | Isolated fabric — resolves fabric devices only |
+> | Arista 7048 (no VRF) | **NOT on MGMT VLAN by default** — only for DR/short test exception | Hardware limitation — no VRF segmentation possible. Exception only, not standard |
+> | Service VLANs (infra, app, etc.) | OPNsense VLAN interface IP | Resolves `by-systems.arpa` + upstream via DoT/DoH |
+> | External DNS | Never direct — always through OPNsense DoT/DoH enforcement | FW rule blocks direct port 53 outbound |
 >
-> NetBox stores the DNS server per prefix/VLAN. Cloud-init gets it from Terraform which reads NetBox. This is not hardcoded.
+> OPNsense handles this cleanly — rule-based DNS forwarding per interface/VLAN, DoT/DoH enforced, no manual config needed (Ansible-driven).
 
 ---
 
@@ -185,62 +164,61 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 | ID | Property | Value | Status |
 |---|---|---|---|
 | 7.1 | QEMU guest agent | Enabled | ✅ |
-| 7.2 | Serial port | None by default — add explicitly for headless appliances needing serial console | ✅ |
-| 7.3 | PCIe / IO passthrough | Per-VM explicit only — WAN NICs to OPNsense, GPU/PTP to specific VMs (see note) | 🔄 |
-| 7.4 | VGA type | `std` headless infra / `virtio` desktop VMs | ✅ |
-| 7.5 | Protection flag | See note | 🔄 |
+| 7.2 | Serial port | None by default — add explicitly for appliances needing serial console | ✅ |
+| 7.3 | Network bridges | See note — naming follows NetBox VLAN, no hardcoded vmbrMGMT confusion | 🔄 |
+| 7.4 | VGA | `std` headless / `virtio` desktop | ✅ |
+| 7.5 | Protection flag | **PoC: off. Production stateful VMs: on.** Delete only through NetBox (CMDB cleanup + neo4j) | 🔄 |
 | 7.6 | Start on boot | Enabled | ✅ |
-| 7.7 | Boot order | `scsi0` only | ✅ |
+| 7.7 | Boot order | `scsi0` | ✅ |
 
-> **7.3 — Network bridge naming convention and OPNsense passthrough:**
+> **7.3 — Bridge naming and role clarification:**
 >
-> Today Proxmox has `vmbrOOB` and `vmbrMGMT`. Proposed naming convention:
+> Previous confusion: `vmbrMGMT` was used for an application — that was wrong. Bridges are named by function, not by application.
 >
-> | Bridge name | VLAN | Used for |
+> | Bridge | VLAN role | Traffic |
 > |---|---|---|
-> | `vmbrOOB` | OOB (untagged, PoC) | Break-glass VM access |
-> | `vmbrMGMT` | MGMT VLAN | Proxmox host management |
-> | `vmbrAPPS` | APP VLAN | Application VM traffic |
-> | `vmbrSTOR` | STORAGE VLAN | NFS/Ceph traffic (MTU 9000) |
-> | `vmbrWAN1` | WAN ISP1 | OPNsense WAN interface 1 |
-> | `vmbrWAN2` | WAN ISP2 | OPNsense WAN interface 2 |
+> | `vmbrOOB` | OOB (break-glass) | Human emergency access only |
+> | `vmbrFAB` | Fabric / MGMT | Supervision, orchestration, Ansible, metrics collection from fabric devices (Arista, NAS, Proxmox) — VRF-aware on 7060 |
+> | `vmbrAPP` | Application | Service VMs — routed through OPNsense |
+> | `vmbrSTOR` | Storage | ZFS replication, NFS, future Ceph — MTU 9000, Arista dependency |
+> | `vmbrVOIP` | VoIP | Separate bridge for QoS/DSCP marking |
+> | `vmbrWAN1` | WAN ISP1 | OPNsense only |
+> | `vmbrWAN2` | WAN ISP2 | OPNsense only |
 >
-> OPNsense VM gets:
-> - `vmbrWAN1` → physical NIC or PCIe passthrough for ISP1
-> - `vmbrWAN2` → physical NIC or PCIe passthrough for ISP2
-> - `vmbrAPPS` (or per-VLAN bridge) → LAN side, inter-VLAN routing
+> **Naming is a placeholder — final names follow NetBox VLAN names once topology is defined (D.6).**
 >
-> **PCIe passthrough** (IOMMU required on Proxmox host): used when OPNsense needs direct access to physical NIC for WAN, or when a VM needs a PTP NIC, GPU, or any other PCIe device. Configured per-VM in Terraform, not in base template.
-
-> **7.5 — Protection flag:**
-> Proxmox VM protection flag (`protection: true`) prevents:
-> - Accidental VM deletion via API or UI
-> - Disk deletion when VM is deleted
+> **vmbrFAB (supervision/orchestration bridge):**
+> Ansible, Terraform, metrics collectors (Prometheus node_exporter, SNMP, etc.) use this bridge to reach fabric devices. On Arista 7060 this maps to the VRF interface — provides full fabric reachability. On Arista 7048 (no VRF) it reaches only devices on that switch's accessible VLANs.
 >
-> **PoC:** off (need to be able to recreate quickly during testing)
-> **Production:** on for all stateful VMs (databases, Vault, GitLab)
-> Set via Terraform variable — `var.protected = true/false` per VM role.
+> **PCIe passthrough for OPNsense WAN:**
+> Two options:
+> - **vmbrWAN1/2 (virtual bridge):** OPNsense gets virtual NIC. Proxmox handles physical NIC. If VM dies, bridge stays up but traffic stops. Simpler, less performance overhead.
+> - **PCIe passthrough (dedicated NIC):** OPNsense owns the physical NIC directly. Maximum performance, no hypervisor overhead. If VM dies, NIC is unavailable until VM restarts. No vmbr dependency.
+>
+> **Recommendation for FW/WAN:** PCIe passthrough for OPNsense WAN NICs. vmbr for LAN-side VLANs (more flexible, can trunk multiple VLANs on one virtual NIC).
+>
+> **PTP NIC passthrough (GM VM):** Intel NIC with hardware timestamping assigned directly to a VM designated as Grandmaster. This is the correct model — PTP needs direct hardware access for sub-microsecond accuracy.
 
 ---
 
 ## 8. Security Hardening (Ansible layer)
 
-Baseline: sync with `odoo-install` SSH hardening role. Extend from there.
+Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 
-| ID | Property | Value | Ansible role |
+| ID | Property | Value | Role |
 |---|---|---|---|
 | 8.1 | SSH port | `22222` | `role-ssh-hardening` |
-| 8.2 | SSH key-only auth | Yes | `role-ssh-hardening` |
+| 8.2 | SSH key-only | Yes | `role-ssh-hardening` |
 | 8.3 | Root SSH | Disabled | `role-ssh-hardening` |
-| 8.4 | Allowed ciphers | From odoo-install baseline | `role-ssh-hardening` |
-| 8.5 | ufw | Enabled, default deny | `role-ufw` |
+| 8.4 | Ciphers | From odoo-install baseline | `role-ssh-hardening` |
+| 8.5 | ufw | Default deny | `role-ufw` |
 | 8.6 | fail2ban | SSH + per-service | `role-fail2ban` |
-| 8.7 | NTP | **Chrony** → MGMT VLAN NTP source | `role-chrony` |
+| 8.7 | NTP | **Chrony** → fabric NTP source | `role-chrony` |
 | 8.8 | auditd | Enabled | `role-auditd` |
 | 8.9 | Sudo | `by-systems` passwordless | `role-base` |
-| 8.10 | MOTD | Disabled — no OS/version banner leak | `role-base` |
-| 8.11 | Unattended-upgrades | Security only | `role-unattended-upgrades` |
-| 8.12 | sysctl hardening | Network + filesystem hardening | `role-sysctl` |
+| 8.10 | MOTD | Disabled — no OS/version banner | `role-base` |
+| 8.11 | unattended-upgrades | Security only | `role-unattended-upgrades` |
+| 8.12 | sysctl | Network + FS hardening | `role-sysctl` |
 
 ---
 
@@ -248,134 +226,104 @@ Baseline: sync with `odoo-install` SSH hardening role. Extend from there.
 
 | ID | Property | Value | Status |
 |---|---|---|---|
-| 9.1 | Python3 | Included in all 3 cloud images | ✅ |
-| 9.2 | SSH port in inventory | `ansible_port: 22222` after hardening | ✅ |
-| 9.3 | Bootstrap sequence | Port 22 → hardening → port 22222 (see below) | ✅ |
-| 9.4 | Privilege escalation | `become: yes` + sudo passwordless | ✅ |
+| 9.1 | Python3 | In all 3 cloud images | ✅ |
+| 9.2 | SSH port | `22222` post-hardening | ✅ |
+| 9.3 | Bootstrap sequence | Port 22 → hardening → port 22222 | ✅ |
+| 9.4 | Privilege escalation | `become: yes` + sudo | ✅ |
 | 9.5 | Inventory Phase 1 | Static `hosts.yml` | ✅ |
-| 9.6 | Inventory Phase 2+ | NetBox dynamic inventory | ⚠️ blocked on NetBox |
-| 9.7 | Connection Linux | `ssh` | ✅ |
-| 9.8 | Connection Windows | `winrm` — deferred Phase 4 | ⚠️ |
+| 9.6 | Inventory Phase 2+ | NetBox dynamic inventory | ⚠️ |
+| 9.7 | Connection | `ssh` (Linux), `winrm` deferred (Windows) | ✅ |
 | 9.9 | OS-specific roles | Role vars per OS family | ⚠️ |
-| 9.10 | Synology DSM Ansible | Build Ansible module wrapping `lib-synology-dsm` — see note | 🔄 |
+| 9.10 | Synology DSM | Ansible collection `by_systems.dsm` wrapping `lib-synology-dsm` — CI-tested | 🔄 |
 
-> **9.3 Bootstrap sequence:**
-> ```
-> Day 0: Terraform → VM provisioned (SSH port 22, key from cloud-init)
-> Day 1: Ansible bootstrap play (inventory group: bootstrap, port 22)
->   → role-base (user, sudo, hostname)
->   → role-ssh-hardening (port → 22222, key-only)
->   → role-chrony, role-ufw, role-fail2ban
-> Day 2+: All plays use port 22222 (inventory group: hardened)
-> ```
-
-> **9.10 — Ansible DSM module:**
-> `lib-synology-dsm` is a Python lib. Two integration options:
->
-> | Option | Effort | Risk | Value |
-> |---|---|---|---|
-> | Ansible `uri` module calling DSM API directly | Low | Low | Works but verbose playbooks |
-> | Ansible role wrapping `lib-synology-dsm` Python calls | Medium | Low | Clean, reusable |
-> | Full Ansible collection (`ansible_collections.by_systems.dsm`) | High | Low | Best long-term |
->
-> **Recommendation:** Start with Ansible role wrapping lib calls. Build full collection when GitLab CI is live. No risk — lib is already validated.
+> **9.10:** Build as full Ansible collection from the start — not just a role. Collection structure enables CI loop testing (molecule + GitHub Actions). Low risk: lib is validated, API is stable. Target: `ansible_collections/by_systems/dsm/` in `ansible-platform` repo.
 
 ---
 
 ## 10. Role-based Sizing Defaults
 
-| ID | Role | CPU | RAM (MB) | Disk (GB) | Storage | Notes |
-|---|---|---|---|---|---|---|
-| 10.1 | Utility / bootstrap | 1 | 1024 | 10 | ZFS local | Temporary |
-| 10.2 | NetBox | 2 | 4096 | 30 | ZFS local | Uses shared PostgreSQL + Redis |
-| 10.3 | Vault | 2 | 2048 | 20 | ZFS local | |
-| 10.4 | Authentik | 2 | 4096 | 20 | ZFS local | Uses shared PostgreSQL + Redis |
-| 10.5 | GitLab CE | 4 | 8192 | 100 | NAS NFS | Bundled Postgres PoC, external prod |
-| 10.6 | GitLab Runner | 2 | 4096 | 50 | ZFS local | |
-| 10.7 | Nexus OSS | 2 | 4096 | 100 | NAS NFS | Artifact storage |
-| 10.8 | OPNsense | 2 | 2048 | 10 | ZFS local | Full API + Ansible |
-| 10.9 | PostgreSQL (shared) | 2 | 4096 | 50 | ZFS local | Shared by NetBox, Authentik |
-| 10.10 | Redis (shared) | 1 | 2048 | 10 | ZFS local | Shared cache |
-| 10.11 | K3s / K8s node | 4 | 8192 | 80 | ZFS local | See note |
-| 10.12 | Monitoring | 2 | 4096 | 50 | NAS NFS | Grafana/Loki/Prometheus |
+**Deployment model:** All services run as **Docker containers** on their respective VMs (docker-compose or single container), except where noted. No bare-metal `apt install` for application services. OPNsense is an image-based appliance. GitLab uses bundled nginx internally but **Traefik** handles external TLS termination and routing.
 
-> **10.11 — K3s placement:**
-> K3s node runs as a VM on the **2nd Proxmox node** (the one being set up tomorrow). Not on the PoC node that already hosts NetBox, Vault, etc. Reasons:
-> - Separates workload plane from control/infra plane
-> - 2-node Proxmox cluster: node 1 = infra VMs, node 2 = K3s + future workloads
-> - If second node is an existing server: fine as a single K3s node to start, expand to multi-node K3s later
-> - K3s on a single VM = valid for PoC. Production K3s = 3 nodes minimum (control plane quorum)
+| ID | Role | CPU | RAM (MB) | Disk (GB) | Storage | Deployment |
+|---|---|---|---|---|---|---|
+| 10.1 | Bootstrap / utility | 1 | 1024 | 10 | poc-data | N/A |
+| 10.2 | NetBox | 2 | 4096 | 30 | poc-data | Docker |
+| 10.3 | Vault | 2 | 2048 | 20 | poc-data | Docker |
+| 10.4 | Authentik | 2 | 4096 | 20 | poc-data | Docker |
+| 10.5 | GitLab CE | 4 | 8192 | 50 | poc-data + NFS (repos/artifacts) | Docker — local disk for app, NAS NFS **and/or S3** for repo storage + artifacts |
+| 10.6 | GitLab Runner | 2 | 4096 | 50 | poc-data | Docker |
+| 10.7 | Nexus OSS | 2 | 4096 | 50 | poc-data + NFS/S3 | Docker — artifacts on NAS/S3 |
+| 10.8 | OPNsense | 2 | 2048 | 10 | poc-data | **Appliance image** — not Docker |
+| 10.9 | PostgreSQL (shared) | 2 | 4096 | 50 | poc-data | Docker |
+| 10.10 | Redis (shared) | 1 | 2048 | 10 | poc-data | Docker |
+| 10.11 | **Traefik** | 1 | 1024 | 10 | poc-data | Docker — TLS termination, routing for all services |
+| 10.12 | K3s / K8s node | 4 | 8192 | 80 | poc-data | On 2nd Proxmox node |
+| 10.13 | Monitoring (Grafana/Loki/Prometheus) | 2 | 4096 | 50 | poc-data + NAS for long-term metrics | Docker |
+
+> **10.5 — GitLab storage split:**
+> - VM local disk (ZFS `poc-data`): GitLab application, DB (PoC bundled), config
+> - NAS NFS share: Git repo data (`/var/opt/gitlab/git-data`) — large, grows unbounded
+> - S3 (future or MinIO on NAS): CI artifacts, container registry, LFS objects
+> - This split keeps the VM disk predictable and offloads bulk storage to NAS/S3
+>
+> **10.11 — Traefik:**
+> Single Traefik instance per environment handles:
+> - TLS termination (Let's Encrypt or internal CA via Vault PKI)
+> - Routing to all Docker services by hostname
+> - GitLab uses internal nginx, but Traefik sits in front for external TLS — GitLab nginx handles internal GitLab-to-GitLab communication only
+> - No Apache anywhere
 
 ---
 
 ## 11. NetBox as Source of Truth
 
-NetBox is the orchestrator — it holds the authoritative data that drives Terraform, Ansible, and DNS.
+NetBox is the orchestrator. It owns: IP allocation, VLAN definitions, VM records, naming convention, DNS per prefix, environment labels, backup flags.
 
-| ID | What NetBox owns | Terraform reads | Ansible reads | Status |
-|---|---|---|---|---|
-| 11.1 | IP address allocation (IPAM) | VM IP via NetBox API | Inventory IP | ⚠️ blocked on NetBox |
-| 11.2 | VLAN definitions | VLAN ID for VM NIC | Network config | ⚠️ |
-| 11.3 | VM naming convention | Hostname | `ansible_hostname` | ⚠️ |
-| 11.4 | DNS server per prefix | DNS in cloud-init | DNS in role vars | ⚠️ |
-| 11.5 | VM role / tags | Template selection | Role assignment | ⚠️ |
-| 11.6 | Backup flag | `backup: true/false` | N/A | ⚠️ |
-| 11.7 | Environment label | `env: poc/prod` tag | Inventory group | ⚠️ |
-| 11.8 | Physical device inventory | N/A | Arista/NAS targeting | ⚠️ |
+| ID | What NetBox owns | Drives |
+|---|---|---|
+| 11.1 | IPAM (IP per VM) | Terraform cloud-init IP, Ansible inventory, DNS A/AAAA records |
+| 11.2 | VLAN definitions | Terraform NIC config, Proxmox bridge assignment |
+| 11.3 | Naming convention | VM hostname, DNS record, Ansible host_vars |
+| 11.4 | DNS server per prefix | Cloud-init nameserver config |
+| 11.5 | VM role/tags | Ansible group assignment, Terraform template selection |
+| 11.6 | Backup flag | Proxmox backup job trigger |
+| 11.7 | Environment | Ansible inventory group, Terraform workspace |
+| 11.8 | Physical devices | Arista/NAS/Proxmox targeting for Ansible |
 
-> **11 — NetBox flow (Phase 2+):**
-> ```
-> Engineer defines in NetBox:
->   → Add prefix/VLAN
->   → Allocate IP
->   → Create VM record (name, role, env, tags)
->
-> Terraform:
->   → Reads NetBox VM record via API
->   → Provisions Proxmox VM with correct IP, VLAN, storage, sizing
->   → Tags Proxmox VM with NetBox ID for cross-reference
->
-> Ansible:
->   → NetBox dynamic inventory plugin pulls VM list
->   → Groups VMs by role/env/OS tags
->   → Applies correct roles and config per group
->
-> DNS (Bind/OPNsense):
->   → Reads NetBox IPAM
->   → Auto-generates A/AAAA records for all VMs
-> ```
->
-> **Phase 1 (now):** Static `hosts.yml` + manual NetBox-like discipline (naming, IPs tracked in a spreadsheet or RAID.md until NetBox is live).
+> **Bridge naming follows NetBox VLAN names (D.11 confirmed).** When topology is defined in NetBox, bridge names are generated from VLAN slugs. No manual naming.
+
+> **VM protection (7.5):** Deletion of a protected VM requires:
+> 1. NetBox record updated (status → decommissioned)
+> 2. CMDB cleanup (neo4j if used)
+> 3. Only then Terraform destroy allowed
+> This prevents accidental deletion of stateful VMs outside of change management.
 
 ---
 
 ## 12. Open Decisions
 
-| ID | Question | Decision |
+| ID | Question | Status |
 |---|---|---|
-| D.1 | CPU type | `host` now → `x86-64-v2-AES` before cluster |
-| D.2 | Storage: ZFS vs LVM-thin vs NAS | ZFS on Proxmox node (action: verify ZFS pool exists). NAS for shared/large disks |
-| D.3 | UPS on Synology | Must confirm before enabling writeback cache |
-| D.4 | SSH port change | Ansible day-1 only. Terraform does not manage post-provision security |
-| D.5 | Windows | Deferred Phase 4 |
-| D.6 | Network topology | Dedicated session needed — VLAN IDs, IP ranges, dual-stack, VRF strategy |
-| D.7 | SSH key strategy | Per-VM keys in Vault vs shared key — recommendation: per-VM |
-| D.8 | PostgreSQL HA | Single VM PoC → 3-VM cluster Phase 3 |
-| D.9 | OPNsense | ✅ confirmed — replaces pfSense |
-| D.10 | Proxmox SDN | Enable alongside OPNsense for VLAN provisioning via API |
-| D.11 | vmbr naming convention | Proposed in §7.3 — confirm before cluster setup |
+| D.1 | CPU type | ✅ `x86-64-v2-AES` confirmed |
+| D.2 | Storage | ✅ ZFS `poc-data` for VMs, NFS for ISO + backup only |
+| D.3 | UPS on Synology | ✅ confirmed — writeback cache safe |
+| D.4 | SSH port | ✅ Ansible day-1 only, Terraform does not manage post-provision security |
+| D.5 | Windows | ✅ Deferred Phase 4 |
+| D.6 | Network topology | ⚠️ Dedicated session — VLAN IDs, IP ranges, dual-stack, ISP config from 3COM |
+| D.7 | SSH keys | ✅ Per-VM keys, Vault-stored, `by-systems` user |
+| D.8 | PostgreSQL HA | Single VM PoC → cluster Phase 3 |
+| D.9 | OPNsense | ✅ Confirmed |
+| D.10 | Proxmox SDN | ✅ Enable alongside OPNsense |
+| D.11 | Bridge naming | ✅ Follows NetBox VLAN names |
 
 ---
 
-## 13. Storage: NAS vs Ceph
+## 13. Storage Summary
 
-| | Synology NAS (ZFS-backed NFS) | Local ZFS on Proxmox | Ceph |
-|---|---|---|---|
-| Min nodes | 1 | 1 | 3 |
-| 2-node cluster | ✅ live migration | ✅ local only (no migration) | ⚠️ no quorum |
-| Snapshots | ✅ (qcow2 on NFS) | ✅ native ZFS | ✅ native |
-| Performance | Network-bound | Best (local NVMe/SSD) | Near-local |
-| HA | ✅ with NAS | ❌ | ✅ |
-| Phase 1–2 | ✅ NAS for shared, ZFS for local | ✅ | ❌ |
-| Phase 3+ | Valid | Valid | ✅ preferred |
-| Prerequisite | NAS + Proxmox NFS config | ZFS pool on node | 3 nodes + storage VLAN on Arista + OSD disks |
+| Backend | Type | VM disks | LXC rootdir | ISO | Backup | Notes |
+|---|---|---|---|---|---|---|
+| `poc-data` | ZFS (`tank/poc-data`) | ✅ Default | ✅ | ❌ | ❌ | All VMs run here |
+| `local-lvm` | LVM-thin | Fallback only | Fallback | ❌ | ❌ | Not default |
+| `poc-iso` | NFS (NAS) | ❌ | ❌ | ✅ | ❌ | ISO + cloud templates |
+| `poc-backup` | NFS (NAS) | ❌ | ❌ | ❌ | ✅ | Proxmox backup jobs |
+| `local` | dir | ❌ | ❌ | ✅ | ✅ | Legacy/fallback |
