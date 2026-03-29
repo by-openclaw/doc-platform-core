@@ -8,7 +8,42 @@
 
 ## Vision
 
-BY-SYSTEMS hosts Odoo instances on-demand. Odoo itself is both the **product** and the **business layer** — accounting, sales, customer portal. When a customer orders an instance, Odoo drives the full provisioning flow through the platform orchestration stack. The customer manages their instance from their Odoo portal account.
+**Self-hosted odoo.sh.** One (or a few) Proxmox nodes running many Odoo instances as lightweight LXC containers. Git branch = environment. `git push` → auto-deploy. Dev / test / staging / prod all on the same small hardware, isolated per container. BY-SYSTEMS is the SaaS provider — customers manage their instance from an Odoo portal account.
+
+Reference products (study, don't copy):
+- **odoo.sh** — git-driven, branch = env, SSH per container, runbot per branch
+- **Cloudpepper** — white-label, backup schedules, staging neutralisation, partner API
+
+### Architecture: LXC over VMs
+
+Not one VM per customer. One **LXC container per Odoo instance** — much smaller footprint, many per node.
+
+```
+Proxmox node
+├── lxc-odoo-customer-a-prod     (512MB RAM, 2 vCPU)
+├── lxc-odoo-customer-a-staging  (512MB RAM, 1 vCPU)
+├── lxc-odoo-customer-b-prod     (1GB RAM, 2 vCPU)
+├── lxc-odoo-customer-c-dev      (256MB RAM, 1 vCPU)
+└── ...N more
+     shared: PostgreSQL LXC (one per node, per-instance DB)
+     shared: Traefik LXC    (reverse proxy, TLS termination)
+     shared: MinIO           (filestore — S3 backend for all instances)
+```
+
+### Git-Driven Environments (odoo.sh model)
+
+```
+GitLab repo: customer-a-odoo
+├── branch: production   → lxc-odoo-customer-a-prod
+├── branch: staging      → lxc-odoo-customer-a-staging
+└── branch: feature-xyz  → lxc-odoo-customer-a-dev (ephemeral)
+
+git push origin staging
+→ GitLab CI pipeline triggers
+→ ansible-platform deploys to lxc-odoo-customer-a-staging
+→ odoo-install scripts run inside LXC (idempotent)
+→ staging neutralised automatically on first deploy
+```
 
 ---
 
