@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-03-29
+
+### Added
+- `docs/adr/0008-terraform-state-management.md`: Terraform state on Synology NAS, restore procedure, FileStation auth quirk, Phase 2 GitLab migration path
+
+### Fixed
+- `docs/adr/0006-platform-charter.md`: OOB gateway corrected `10.6.255.254` → `10.6.224.1`
+
+## [0.4.0] — 2026-03-28
+
+### Added
+- `docs/adr/0006-platform-charter.md`: Platform charter — layer model (0–5), asset structure, network topology, VM baseline
+- `docs/adr/0007-automation-scripting-standard.md`: Scripting and automation standards — separation of concerns, Ansible/Terraform/Python patterns
+- `docs/raid.md`: RAID log — Risks, Assumptions, Issues, Dependencies
+
 ## [0.3.0] - 2026-03-26
 
 ### Changed
