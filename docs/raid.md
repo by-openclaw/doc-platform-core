@@ -33,6 +33,7 @@
 | R-12 | Nexus upstream proxy blocked (corporate firewall / ISP) | Low | Medium | 🟡 Medium | Nexus configured to use HTTP proxy if needed. pfSense egress rules explicitly allow nexus outbound. | Network | Open |
 | R-13 | License drift — tool switches from OSS to paid | Low | Medium | 🟡 Medium | All tools pinned to OSS/CE/Community editions. Version locked in Ansible/Helm. Monitored via ADR review. | Platform | Open |
 | R-14 | PII data leak via unredacted screenshots/logs in Git | Medium | High | 🔴 Critical | Presidio pre-commit hook + CI scan. Asset naming convention enforces redaction check before commit. | Security | Open |
+| R-15 | `lib-synology-dsm` `verify_ssl=False` default — MitM risk in non-lab environments | Medium | High | 🟡 Medium | Documented in CLAUDE.md HARD RULES. Blocked on platform TLS strategy (cert naming, Unbound DNS, CA choice). GitHub #64. Fix: flip default once TLS strategy decided. | Security | Open |
 
 ---
 
