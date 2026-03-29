@@ -265,7 +265,16 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 > - **NAS NFS** (`poc-iso` or dedicated share): `/var/opt/gitlab/git-data` — Git repo data, block-level, NFS correct here
 > - **NAS S3** (Synology built-in S3-compatible service): Git LFS objects, CI artifacts, container registry images, GitLab backup archives
 >
-> S3 bucket layout on Synology:
+> **S3 architecture — two tiers:**
+>
+> | Tier | Backend | Role | Bandwidth |
+> |---|---|---|---|
+> | Primary | MinIO on NAS (Container Manager) | All active reads/writes | Local LAN — no limit |
+> | DR replica | Contabo S3 | Off-site replication, DR failover | ~100–200 Mbps — needs benchmark |
+>
+> MinIO replicates buckets to Contabo S3 asynchronously. If NAS fails → point GitLab to Contabo endpoint. RPO = last sync. RTO = config change.
+>
+> S3 bucket layout (MinIO primary):
 > | Bucket | Content |
 > |---|---|
 > | `gitlab-lfs` | Git LFS blobs |
@@ -273,7 +282,13 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 > | `gitlab-registry` | Container registry layers |
 > | `gitlab-backups` | GitLab backup tarballs |
 >
-> GitLab `object_storage` config in `gitlab.rb` → Ansible-managed. Synology S3 endpoint: `https://10.6.224.6:<s3-port>` (confirm port from Synology DSM S3 service config).
+> GitLab `object_storage` config in `gitlab.rb` → Ansible-managed, pointing to MinIO endpoint.
+>
+> **Action items (post-cluster):**
+> - Benchmark Contabo S3 throughput (`aws s3 cp` 1GB test)
+> - Deploy MinIO via Container Manager on NAS
+> - Configure MinIO → Contabo S3 bucket replication
+> - Confirm Contabo egress limits / throttling policy
 >
 > **10.11 — Traefik:**
 > Single Traefik instance per environment handles:
