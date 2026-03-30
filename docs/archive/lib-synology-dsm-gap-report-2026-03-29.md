@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-03-30** — Most gaps resolved as of v0.8.0/v0.9.3/v0.10.0. See `lib-synology-dsm/docs/` for current state and `lib-synology-dsm/docs/audits/` for the 2026-03-30 full audit.
+
 # lib-synology-dsm — Gap Report & Fix Plan
 
 **Date:** 2026-03-29

@@ -131,3 +131,8 @@ This repo is part of the BY-SYSTEMS PoC platform maintained by Rune.
 - [ ] Markdown only — no code, no scripts, no CI
 - [ ] Conventional Commits with docs-only types (`docs`, `chore`, `fix`)
 - [ ] ADRs go in `docs/adr/` with next sequential number
+
+## GitHub → Discord Release Webhook
+This repo has a GitHub webhook configured for `release` events → Discord `#releases` channel (by-openclaw standard).
+No discord-notify.yml workflow. No DISCORD_WEBHOOK secret. Discord-native parsing.
+See `workspace/docs/stack.md` for the full standard and command to replicate on new repos.
