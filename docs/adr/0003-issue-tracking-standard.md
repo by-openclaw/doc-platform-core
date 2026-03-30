@@ -26,3 +26,11 @@ This applies to:
 - All findings have a paper trail
 - RAID.md serves as the compliance evidence log (NIS2/ISO 27001)
 - GitHub Issues serve as the work queue
+
+## Amendment (2026-03-30)
+
+ADR-0004 (per-repo documentation) was accepted. RAID tracking is now hybrid:
+- Repo-scoped items → each repo's own `RAID.md`
+- Cross-repo / platform items → `doc-platform-core/docs/raid.md` (this file's scope)
+
+See: lib-synology-dsm ADR-0004 for the full decision record.
