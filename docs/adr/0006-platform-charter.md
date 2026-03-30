@@ -41,8 +41,17 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Current status (2026-03-28):** Layer 0 in progress. Layer 1 at 80%.
-**Next action:** Complete Layer 0 (this charter + templates), finalize Layer 1.
+**Current status (2026-03-30):**
+- **Layer 0 (Standards):** ~90% — charter, naming, templates complete. Gap: RAID location hybrid model adopted (ADR-0004).
+- **Layer 1 (Proxmox Base):** ~85% — VMs deploying via Terraform, baseline validated. Gap: OPNsense VM, vmbrPOC bridge.
+- **Layer 2 (Vault):** Not started — blocked on Layer 1.
+- **Layer 3 (Identity):** Not started — blocked on Layer 2.
+- **Layer 4 (Storage/libs):** Active — lib-synology-dsm v0.10.0, 283 unit tests. Gap: v1.0 blockers (timeout, return dict, mypy).
+- **Layer 5 (PoC Services):** Not started — blocked on Layers 2–4.
+
+> **Parallel development exception:** Layer 4 library work (lib-synology-dsm) is developed in parallel with infrastructure layers as it has no infra runtime dependency.
+
+**Next action:** Complete Layer 1 (OPNsense VM + vmbrPOC), begin Layer 2 (Vault).
 
 ---
 

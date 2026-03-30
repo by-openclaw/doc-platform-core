@@ -1,6 +1,6 @@
 # ORG Platform — RAID Log
 
-**Last updated:** 2026-03-29
+**Last updated:** 2026-03-30
 **Status:** Active — PoC phase
 **Related docs:** `docs/stack.md`, `docs/roadmap.md`, `docs/architecture.md`
 
@@ -13,6 +13,7 @@
 
 | ID | Risk | Probability | Impact | Severity | Mitigation | Owner | Status |
 |---|---|---|---|---|---|---|---|
+| R-21 | ADR number collision — lib-synology-dsm ADR-NNNN vs doc-platform-core ADR-NNNN use same numbering scheme | Low | Medium | 🟡 Medium | Add scoping note to ADR README indexes. Consider PADR- prefix for platform ADRs if collision occurs. | Platform | Open |
 | R-01 | Proxmox VE single node — no HA during PoC | High | High | 🔴 Critical | Accept for PoC; plan multi-node cluster before prod. Document recovery runbook. | Infra | Open |
 | R-02 | PostgreSQL single instance during PoC (no Patroni) | High | High | 🔴 Critical | Accept for PoC; migrate to Patroni HA cluster in Phase 2.5. Daily pg_dump to MinIO. | Platform | Open |
 | R-03 | HashiCorp Vault seal/unseal — data loss if node lost without backup | Medium | Critical | 🔴 Critical | Vault auto-unseal via cloud KMS or Shamir shares stored in Vaultwarden. Snapshot policy: daily to MinIO. | Platform | Open |
@@ -62,6 +63,8 @@
 
 | ID | Issue | Severity | Date raised | Resolution | Status |
 |---|---|---|---|---|---|
+| I-23 | `FileStation.upload()` return dict returns `{"skipped": bool}` — violates ADR-0007 `{"changed": bool, "action": str}` contract | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: return `{"changed": bool, "action": "created"\|"skipped"\|"overwritten"}` | Open |
+| I-24 | `client.py` timeout hardcoded at 30s — no per-operation timeout, no streaming upload support | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: per-op timeout param with sensible defaults | Open |
 | I-17 | Terraform scaffold incomplete — no OPNsense VM, no vmbrPOC bridge, PoC VMs on vmbrOOB (prod bridge) | High | 2026-03-28 | Deploy OPNsense VM + vmbrPOC. Move all PoC VMs to vmbrPOC. See platform-setup#58. | Open |
 | I-18 | vm-netbox-poc-01 not deployed — NetBox (CMDB/IPAM source of truth) unavailable | High | 2026-03-28 | Deploy after OPNsense. Terraform module ready. See platform-setup#59. | Open |
 | I-19 | GitHub issues #1 and #44 were stale/open despite being completed | Low | 2026-03-28 | Closed with completion comments 2026-03-28. | ✅ Resolved |
@@ -91,6 +94,7 @@
 
 | ID | Dependency | Type | Required by | Risk if unavailable | Owner |
 |---|---|---|---|---|---|
+| D-20 | lib-synology-dsm v1.0 depends on return dict audit across all 9 managers (ADR-0007 compliance) | Software/lib | lib-synology-dsm v1.0 | Ansible collection blocked without consistent return dict contract | Platform |
 | D-01 | Bare metal server(s) for Proxmox | Hardware | Phase 1 | Phase 1 blocked | Infra |
 | D-02 | Arista switches (7020/7060) operational; 7048T-A broken/offline | Hardware | Phase 1 | OOB switch missing — 3com WAN switch used as temp OOB | Network |
 | D-17 | Replacement/repair of Arista DCS-7048T-A (OOB switch) | Hardware | Phase 1 | Permanent OOB switch missing; 3com is temporary workaround | Network |
@@ -117,7 +121,7 @@
 
 | Phase | RAID review |
 |---|---|
-| Phase 1 (Foundation) | Weekly during active work |
+| Phase 1 (Foundation) | Weekly during active work — last review: 2026-03-30 |
 | Phase 2 (Platform Services) | Weekly |
 | Phase 3+ | Bi-weekly |
 | Production promotion | Full RAID review required before go-live |
