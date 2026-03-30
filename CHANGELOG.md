@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.5.1](https://github.com/by-openclaw/doc-platform-core/compare/v0.5.0...v0.5.1) (2026-03-30)
+
+
+### Bug Fixes
+
+* correct pull_request trigger in project-board-sync workflow ([f94e64d](https://github.com/by-openclaw/doc-platform-core/commit/f94e64de4056f4ec0fa4ae08049cf0a0958ae29b))
+
 ## [Unreleased]
 
 ## [0.5.0] — 2026-03-29
