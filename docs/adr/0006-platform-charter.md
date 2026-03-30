@@ -94,8 +94,8 @@ Every VM/LXC has exactly two user accounts:
 
 | User | Purpose | Sudo | Auth | Notes |
 |---|---|---|---|---|
-| `by-systems` | Human OOB access | yes | SSH pubkey (personal Win11 key) | Break-glass, human only |
-| `rune` | Automation/agent OOB | yes | SSH pubkey (rune automation key) | Terraform, OpenClaw, CI |
+| `by-systems` | Human OOB access | yes | <REDACTED:ssh-pubkey> | Break-glass, human only |
+| `rune` | Automation/agent OOB | yes | <REDACTED:ssh-pubkey> | Terraform, OpenClaw, CI |
 
 **No other users at provisioning time.** Service accounts are added post-Vault via Authentik (Layer 3).
 

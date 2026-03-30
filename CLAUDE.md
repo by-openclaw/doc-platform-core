@@ -57,54 +57,10 @@ Do **not** add source code, Dockerfiles, CI pipelines, or build tooling to this 
 
 ---
 
-## Naming Conventions
+## Naming, Commit, and Branch Conventions
 
-This repo follows the ORG naming convention. **Always check `docs/naming-convention.md` before creating new files.**
-
-- **Repo pattern:** `{scope}-{component}-{qualifier}` — all lowercase, hyphens only
-- **Branch pattern:** `docs/{issue-id}-{short-description}` (e.g. `docs/12-add-vault-adr`)
-- **Commit pattern:** `{type}({scope}): {description}` (Conventional Commits)
-- **ADR files:** `docs/adr/{NNNN}-{kebab-title}.md`
-
-Full reference: [`docs/naming-convention.md`](docs/naming-convention.md)
-
----
-
-## Commit Types (Docs Repo Only)
-
-Only these commit types are used in this repo:
-
-| Type | Use |
-|---|---|
-| `docs` | Documentation content changes |
-| `chore` | Maintenance (rename, reorganise, update template) |
-| `fix` | Correct errors, broken links, or outdated info |
-
-Do **not** use `feat`, `ci`, `build`, `refactor`, or other code-oriented types in this repo.
-
----
-
-## Branch Naming
-
-```
-docs/{issue-id}-{subject}
-```
-
-Examples:
-- `docs/7-add-networking-adr`
-- `docs/15-update-stack-references`
-- `docs/42-document-secret-rotation`
-
----
-
-## Agent Instructions
-
-1. **Always read `docs/naming-convention.md` before creating any new files.** File names, paths, and structures must follow ORG conventions.
-2. **Always read `docs/stack.md`** when writing about platform components, tools, or services — use the canonical names.
-3. This is a documentation repo. Stay in your lane: edit `.md` files only.
-4. ADRs go in `docs/adr/` with sequential numbering (`0001-`, `0002-`, etc.).
-5. Use present tense in documentation. Keep it concise and factual.
-6. When in doubt about naming: check `docs/naming-convention.md`. Don't guess.
+> Commit types, branch naming, naming conventions, and agent onboarding → see [`AGENTS.md`](AGENTS.md).
+> Full naming reference: [`docs/naming-convention.md`](docs/naming-convention.md).
 
 ---
 
@@ -114,23 +70,6 @@ Examples:
 - Org: `https://github.com/by-openclaw`
 
 ---
-
-## Agent Onboarding (Rune / BY-SYSTEMS)
-
-This repo is part of the BY-SYSTEMS PoC platform maintained by Rune.
-
-- **AGENTS.md:** [`AGENTS.md`](AGENTS.md) — generic agent onboarding file (read by Codex, Claude Code, and all agents)
-- **Owner:** @yboujraf
-- **Org:** [by-openclaw](https://github.com/by-openclaw)
-- **Platform agent:** Rune (DevOps familiar)
-
-### Quick Checklist for Any Agent
-
-- [ ] Read `docs/naming-convention.md` before creating any file
-- [ ] Read `docs/stack.md` before writing about any platform component
-- [ ] Markdown only — no code, no scripts, no CI
-- [ ] Conventional Commits with docs-only types (`docs`, `chore`, `fix`)
-- [ ] ADRs go in `docs/adr/` with next sequential number
 
 ## GitHub → Discord Release Webhook
 This repo has a GitHub webhook configured for `release` events → Discord `#releases` channel (by-openclaw standard).

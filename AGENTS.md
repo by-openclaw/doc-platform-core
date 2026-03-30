@@ -26,6 +26,8 @@ Before creating or editing anything in this repo:
 
 ## What NOT To Do
 
+> Also read [`CLAUDE.md`](CLAUDE.md) for repo layout, docs-only constraints, and key file references.
+
 - ❌ Do NOT add source code, scripts, Dockerfiles, or CI pipelines
 - ❌ Do NOT create files without checking naming conventions first
 - ❌ Do NOT use `feat` or code-oriented commit types

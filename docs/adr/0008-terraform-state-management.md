@@ -51,7 +51,7 @@ The Rune agent (`claude-sonnet-4-6`) is responsible for:
    from synology_dsm.client import DSMClient
    from synology_dsm.filestation import FileStationManager
    c = DSMClient("10.6.224.6", port=5001, https=True, verify_ssl=False)
-   c.login("rune-api", "BySyst3ms_")
+   c.login("rune-api", "<REDACTED:password>")
    FileStationManager(c).download(
        "/by-terraform-state/poc/terraform.tfstate",
        "environments/poc/terraform.tfstate"
