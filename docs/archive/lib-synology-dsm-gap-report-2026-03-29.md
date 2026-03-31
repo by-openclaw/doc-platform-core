@@ -126,7 +126,7 @@ CI (`pytest tests/ -v`) currently exits non-zero. The CI workflow is broken.
 | **FileStation ops completely absent from all bash smoke tests** — no upload/download/list/delete via curl | **Critical** | 2 h |
 | `test_full_crud.sh` uses `grep -q '"success":true'` (fragile, no jq) — could false-positive | **Medium** | 30 min |
 | No smoke test for `VaultCredentialProvider` — Vault integration is untested at the integration level | **High** | 1 h |
-| Hardcoded credentials in bash scripts (`BySyst3ms_`, `BySyst3ms_test!`) — secrets in test files | **High** | 30 min |
+| Hardcoded credentials in bash scripts (`<REDACTED:password>`, `<REDACTED:password>test!`) — secrets in test files | **High** | 30 min |
 
 **Missing FileStation curl commands (for reference when implementing):**
 

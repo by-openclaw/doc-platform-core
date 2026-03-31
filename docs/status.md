@@ -1,6 +1,6 @@
 # Platform Status
 
-> **Last updated:** 2026-03-30
+> **Last updated:** 2026-03-31
 > **Maintained by:** Rune — update after any release, layer change, or RAID update
 > **Reading order:** status.md → roadmap.md → stack.md → relevant repo CLAUDE.md
 
@@ -14,7 +14,7 @@
 | 1 | Proxmox Base | ✅ In progress | ~85% | OPNsense VM not deployed, vmbrPOC bridge missing |
 | 2 | Vault | ❌ Not started | 0% | Blocked on Layer 1 completion |
 | 3 | Identity (Authentik) | ❌ Not started | 0% | Blocked on Layer 2 |
-| 4 | Storage (Synology) | 🔄 Active | ~80% | lib-synology-dsm v1.0 blockers (timeout, return dict, mypy) |
+| 4 | Storage (Synology) | 🔄 Active | ~95% | lib-synology-dsm: integration tests pending live NAS run, then v1.0 |
 | 5 | PoC Services | ❌ Not started | 0% | Blocked on Layers 2–4 |
 
 > **Layer 4 parallel development:** lib-synology-dsm has no infra runtime dependency on Vault/Identity.
@@ -26,10 +26,10 @@
 
 | Repo | Version | Tests | Key Blockers |
 |---|---|---|---|
-| lib-synology-dsm | v0.10.0 | 283 unit, 100% coverage | timeout (client.py hardcoded 30s), upload return dict, 2 mypy issues |
+| lib-synology-dsm | v0.9.3 → v1.0 pending | 345 unit, 100% coverage, ruff+mypy clean | Integration tests pending live NAS run — **awaiting team approval** |
 | infra-terraform-proxmox | — | n/a | OPNsense VM scaffold, vmbrPOC bridge |
 | ansible-platform | — | n/a | Hardening roles only — NetBox/Vault roles not started |
-| doc-platform-core | — | n/a (docs only) | Layer 0 gap: RAID hybrid model, status.md now live |
+| doc-platform-core | — | n/a (docs only) | Layer 0 gap: RAID hybrid model |
 | platform-setup | — | n/a | Tracks issues only |
 
 ---
@@ -38,11 +38,9 @@
 
 | # | Item | Type | Priority | Repo |
 |---|---|---|---|---|
-| 1 | `client.py` timeout hardcoded at 30s — no per-operation, no streaming | ISSUE | HIGH | lib-synology-dsm |
-| 2 | `FileStation.upload()` return dict violates ADR-0007 `{changed, action}` | ISSUE | HIGH | lib-synology-dsm |
-| 3 | Return dict audit — all 9 managers must comply before v1.0 | DEPENDENCY | HIGH | lib-synology-dsm |
-| 4 | 2 mypy errors remaining (verify_ssl typing) | ISSUE | HIGH | lib-synology-dsm |
-| 5 | OPNsense VM not deployed — blocks Layer 1 completion | ISSUE | HIGH | infra-terraform-proxmox |
+| 1 | lib-synology-dsm: integration tests need live NAS run before v1.0 tag | DEPENDENCY | HIGH | lib-synology-dsm |
+| 2 | lib-synology-dsm: team approval required before push + PR | ACTION | HIGH | lib-synology-dsm |
+| 3 | OPNsense VM not deployed — blocks Layer 1 completion | ISSUE | HIGH | infra-terraform-proxmox |
 
 ---
 
@@ -50,6 +48,7 @@
 
 | Date | What changed |
 |---|---|
+| 2026-03-31 | lib-synology-dsm: SharePermissionManager + SystemManager — 345 unit tests, ruff+mypy clean. Awaiting integration run + approval. Review: `docs/open-status.md` |
 | 2026-03-30 | Full Tier 1 audit remediation applied — CLAUDE.md, AGENTS.md, CONTRIBUTING.md, ADRs 0004/0005/0007, SOUL.md cleaned, status.md created, gap report archived, RAID.md updated |
 | 2026-03-30 | project-board-sync workflow live on all 5 repos, GH_TOKEN rotated and set org-wide |
 | 2026-03-30 | lib-synology-dsm audit (16 files, 68 action items) completed by team |

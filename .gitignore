@@ -16,3 +16,9 @@ site/
 # Temp
 *.tmp
 *.bak
+
+# Firewall config exports — sensitive, not for git
+docs/archive/*.xml
+
+# Large binary files — no LFS configured
+docs/concepts/*.pptx
