@@ -64,6 +64,13 @@ Do **not** add source code, Dockerfiles, CI pipelines, or build tooling to this 
 
 ---
 
+## Cross-repo References
+
+- Naming convention: see `docs/adr/0010-naming-and-identity-convention.md`
+- Environment tiers: poc/dev/test/staging/acc/prod — always explicit. See `docs/adr/0012-environment-tier-standard.md`
+
+---
+
 ## Links
 
 - GitHub repo: `https://github.com/by-openclaw/doc-platform-core`
