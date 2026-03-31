@@ -56,16 +56,17 @@
 
 ---
 
-## 4. DORA — Gap Analysis
+## 4. DORA (Digital Operational Resilience Act)
 
-DORA is a compliance target (OPERATING-STANDARD.md §6.4) but no controls are yet mapped. The four pillars:
+> First pass — 2026-03-31. Covers controls referenced in current ADRs and OPERATING-STANDARD.md only.
 
-| Pillar | Articles | Overlap with ISO/NIS2 | Status |
-|---|---|---|---|
-| ICT Risk Management | Art.5-16 | ISO A.12.x, A.14.x, NIS2 Art.21(2)(a) | ❌ Gap — pending dedicated pass |
-| ICT Incident Reporting | Art.17-23 | NIS2 Art.21(2)(b), ISO A.16.x | ❌ Gap — pending dedicated pass |
-| Digital Resilience Testing | Art.24-27 | ISO A.17.x | ❌ Gap — pending dedicated pass |
-| ICT Third-Party Risk | Art.28-44 | NIS2 Art.21(2)(d), ISO A.15.x | ❌ Gap — pending dedicated pass |
+| DORA Pillar | Article | BY-SYSTEMS Implementation | Evidence/Artifact | Status |
+|---|---|---|---|---|
+| ICT risk management | Art.5-16 | RAID tracking per repo, OPERATING-STANDARD.md §7, ADR-0010 naming enables automated inventory | OPERATING-STANDARD.md §7, ADR-0010, ADR-0013 | ⚠️ Partial — no automated risk register yet |
+| ICT incident reporting | Art.17-23 | GitHub Issues + RAID atomic rule (issue+RAID+board = one operation), Discord #releases for comms | OPERATING-STANDARD.md §7.1, GitHub Issues | ⚠️ Partial — manual process, no formal incident response playbook |
+| Digital operational resilience testing | Art.24-27 | Unit + integration tests, nox matrix, CI gates on all PRs, 100% coverage gate on lib | OPERATING-STANDARD.md §5, lib-synology-dsm CI | ⚠️ Partial — no TLPT (Threat-Led Penetration Testing) yet |
+| ICT third-party risk | Art.28-44 | Secret storage per-env (ADR-0011), provider pinning (Terraform bpg/proxmox v0.99.0), no supply chain policy yet | ADR-0011, ADR-0012 | ⚠️ Planned — supply chain policy (SBOM, dependency audit) not yet in place |
+| Information sharing | Art.45-49 | Discord #releases for release comms, git commit history, CHANGELOG per repo | CHANGELOG.md per repo, GitHub releases | ⚠️ Minimal — internal only, no formal threat intelligence sharing |
 
 ---
 
