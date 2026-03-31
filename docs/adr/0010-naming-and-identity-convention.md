@@ -106,6 +106,14 @@ Only `adm_*` accounts in `grp-break-glass`. Password auth + SSH key from OOB/MGM
 
 Revise this ADR when: Vault deployed (Layer 2), Authentik deployed (Layer 3), NetBox deployed (Layer 5), first prod environment, first external user/contractor, NIS2/ISO audit preparation.
 
+## Enforcement
+
+| Repo | Mechanism | File |
+|---|---|---|
+| ansible-platform | CI workflow — checks `env:` declaration in group_vars, blocks `env: prod` in non-prod inventories, warns on service account names missing env tier | `.github/workflows/naming-check.yml` |
+
+Until Authentik (Layer 3) provides policy-as-code, naming is enforced by CI checks and code review.
+
 ## Consequences
 
 **Positive:**
