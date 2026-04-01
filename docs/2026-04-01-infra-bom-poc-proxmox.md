@@ -56,6 +56,38 @@ switchport trunk allowed vlan 300,310,320,330,340,350,400,410
 
 **Arista readiness:** VLAN IDs 300/310/320/330/340/350/400/410 must be added to Arista VLAN database and permitted on Proxmox trunk port when physically wired. For now (SDN-only) these are pure Proxmox VNets — IDs pre-reserved.
 
+---
+
+## vmbrMGMT — Fabric Control Link (Disabled for PoC)
+
+> **Status: DISABLED for PoC scope.** Config preserved here for future fabric integration.
+
+**Purpose:** `vmbrMGMT` is the Proxmox host’s connection to the Arista fabric control-plane VLAN (VLAN 600). Physical link is a **10G SFP** NIC (`nic4` / `enx0060dd44ecce`) uplinked to the Arista switch fabric. Used for switch management, SMPTE, PTP, and broadcast control traffic in prod.
+
+**Live config (as-built on srv-proxmox-poc-01):**
+```
+Interface:    vmbrMGMT
+Type:         Linux bridge
+Physical NIC: nic4 (enx0060dd44ecce) — 10G SFP
+VLAN:         nic4.600 (VLAN ID 600)
+IP:           10.6.255.250/20
+Comment:      MGMT / MGMT Untagged Vlan 600
+Bridge STP:   off, FD: 0
+Autostart:    yes (currently active on host)
+```
+
+**Why disabled for PoC:** VLAN 600 is prod fabric control plane (Arista 7060/7020 SMPTE/PTP/MGMT_CTRL range 600–999). PoC has no active fabric wiring. Enabling it risks traffic injection into prod broadcast control plane via the shared Arista switch.
+
+**Action for PoC:** `autostart=no` on `vmbrMGMT` + `nic4.600`. Interface stays defined (do not delete) but does not come up on boot.
+
+**Future re-enable (when wiring PoC to fabric):**
+1. Verify Arista port connecting nic4 is configured: `switchport mode trunk`, VLAN 600 allowed
+2. Confirm 10.6.255.250/20 is the correct IP for Proxmox on the fabric VLAN (or reassign to 10.1.x range if migrated)
+3. Re-enable autostart on `vmbrMGMT` + `nic4.600`
+4. Update OPNsense firewall rules to allow fabric VLAN access from MGMT zone
+
+**Note:** `vmbrAPPS` (VLAN-aware bridge, no ports assigned) is also a placeholder. Kept defined, no ports, no IP. Future use: app-facing bridge if SDN VNets are insufficient.
+
 **OPNsense WAN migration — phased (safety-first):**
 
 | Phase | WAN1 | WAN2 | OOB role | Notes |
@@ -191,7 +223,14 @@ Colocated on one VM for PoC (separate later in prod).
 | ~~vm-wireguard-poc-01~~ | ~~WireGuard~~ | — | — | — | — | **Removed.** WireGuard runs as OPNsense built-in plugin (`os-wireguard`). No separate VM needed. |
 | vm-unifi-poc-01 | Unifi Network App | 1 | 1 GB | 10 GB | 10.1.1.62 | Docker. Ubiquiti controller — manages PoC WiFi AP + VLAN config. Mirrors prod Ubiquiti setup. |
 
-**DNS flow:** client → Pi-hole :53 → Unbound → DoT 1.1.1.1:853. Pi-hole handles blocklists; Unbound handles encrypted upstream resolution.
+**DNS architecture (authoritative):**
+- **All VMs and clients** point to Pi-hole (`10.1.1.60:53`) as their sole DNS resolver — no direct OPNsense/Unbound from VMs
+- **OPNsense DHCP** pushes Pi-hole IP as DNS server to all DHCP clients
+- **Pi-hole → Unbound sidecar** for recursive resolution — Unbound resolves via **DoT upstream (1.1.1.1:853 + 1.0.0.1:853)**
+- **Local DNS overrides** (`*.by-systems.be` → internal IPs) configured in Pi-hole custom DNS records
+- **OPNsense Unbound** disabled — Pi-hole + Unbound sidecar is the single DNS authority
+- **Monitoring:** Pi-hole query log + dashboard. Grafana alert on DNS failure (Pi-hole down = network blind).
+- **SPOF mitigation (PoC):** OPNsense Unbound kept as cold standby — if Pi-hole VM fails, manually re-enable Unbound on OPNsense as emergency resolver
 
 **OPNsense:** deployed first — virtual router + firewall + WireGuard server (`os-wireguard` plugin). No WireGuard VM needed. Rune VM and human clients connect as WireGuard peers. Migration: change endpoint only.
 
@@ -325,7 +364,7 @@ Compose files written with Swarm compatibility in mind (`deploy:` blocks comment
 |---|---|
 | RAM | **188 GB — no constraints.** |
 | NFS shares | `poc-iso` + `poc-backup` — existing on NAS. |
-| DNS | Pi-hole + Unbound (DoT). OPNsense standby. |
+| DNS | Pi-hole (10.1.1.60) → Unbound sidecar → DoT :853. All VMs/DHCP clients point to Pi-hole only. OPNsense Unbound = disabled (cold standby). |
 | Domain | `{service}.by-systems.be` confirmed. |
 | Cloudflare token | In `infra/secrets/` — confirm key name before Traefik deploy. |
 | Contabo S3 creds | In `infra/secrets/` — confirm bucket names before GitLab/Nexus/Loki deploy. |
