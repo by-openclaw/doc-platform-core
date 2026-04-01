@@ -114,7 +114,7 @@ ISP:       3com Gi1/0/x (free port) → PoC Proxmox NIC → VLAN-aware bridge
 HTTP/S:    Internet → OPNsense dual-WAN → Traefik (10.1.2.10 DMZ) → SVC (10.1.3.x)
 VPN:       Rune VM → WireGuard@OPNsense (Telenet fixed IP) → MGMT/SVC zones
            @yboujraf → WireGuard@OPNsense (Telenet fixed IP) → MGMT/SVC zones
-DNS:       VMs → Pi-hole (10.1.1.60) → Unbound → DoT upstream
+DNS:       VMs → OPNsense NAT :53 → Pi-hole (10.1.1.60) → OPNsense Unbound DoT :853 → 1.1.1.1
 Storage:   Proxmox host → NAS (host-level NFS: poc-iso, poc-backup). VMs → Contabo S3 (runtime data).
 Isolation: prod OOB (10.6.224.x) NEVER touched by PoC traffic
 Migration: WireGuard endpoint = Telenet fixed IP — stable, no DDNS
@@ -219,18 +219,32 @@ Colocated on one VM for PoC (separate later in prod).
 
 | VM name | Tool | vCPU | RAM | Disk | IP | Notes |
 |---|---|---|---|---|---|---|
-| vm-pihole-poc-01 | Pi-hole + Unbound | 1 | 512 MB | 10 GB | 10.1.1.60 | Docker. Pi-hole sinkhole/blocklist + Unbound sidecar for **DoT upstream** (1.1.1.1:853). Provisioned via Pi-hole v6 REST API. Internal resolver for `*.by-systems.be`. |
+| vm-pihole-poc-01 | Pi-hole | 1 | 512 MB | 10 GB | 10.1.1.60 | Docker. Pi-hole blocklist + local DNS overrides (`*.by-systems.be`). **No Unbound sidecar.** Upstream = OPNsense Unbound :853. Provisioned via Pi-hole v6 REST API (Ansible). OPNsense NAT redirects all :53 to this VM. |
 | ~~vm-wireguard-poc-01~~ | ~~WireGuard~~ | — | — | — | — | **Removed.** WireGuard runs as OPNsense built-in plugin (`os-wireguard`). No separate VM needed. |
 | vm-unifi-poc-01 | Unifi Network App | 1 | 1 GB | 10 GB | 10.1.1.62 | Docker. Ubiquiti controller — manages PoC WiFi AP + VLAN config. Mirrors prod Ubiquiti setup. |
 
 **DNS architecture (authoritative):**
-- **All VMs and clients** point to Pi-hole (`10.1.1.60:53`) as their sole DNS resolver — no direct OPNsense/Unbound from VMs
-- **OPNsense DHCP** pushes Pi-hole IP as DNS server to all DHCP clients
-- **Pi-hole → Unbound sidecar** for recursive resolution — Unbound resolves via **DoT upstream (1.1.1.1:853 + 1.0.0.1:853)**
-- **Local DNS overrides** (`*.by-systems.be` → internal IPs) configured in Pi-hole custom DNS records
-- **OPNsense Unbound** disabled — Pi-hole + Unbound sidecar is the single DNS authority
-- **Monitoring:** Pi-hole query log + dashboard. Grafana alert on DNS failure (Pi-hole down = network blind).
-- **SPOF mitigation (PoC):** OPNsense Unbound kept as cold standby — if Pi-hole VM fails, manually re-enable Unbound on OPNsense as emergency resolver
+
+```
+VMs / clients
+    ↓ :53
+OPNsense NAT redirect (intercepts all :53 — blocks bypass even if VM hardcodes 8.8.8.8)
+    ↓ :53
+Pi-hole (10.1.1.60) — blocklists + local DNS overrides (*.by-systems.be → private IPs)
+    ↓ upstream :853
+OPNsense Unbound (DoT terminator)
+    ↓ DoT :853
+1.1.1.1 / 1.0.0.1 (Cloudflare)
+```
+
+- **OPNsense firewall NAT rule:** redirect all DNS :53 from PoC zones → Pi-hole `10.1.1.60:53`. Enforced at FW — no VM can bypass Pi-hole.
+- **Pi-hole:** blocklists + local custom DNS records only. **No Unbound sidecar** — upstream is OPNsense internal IP :853.
+- **OPNsense Unbound:** enabled as DoT terminator. Forwards external queries to `1.1.1.1:853` + `1.0.0.1:853`. Not used directly by VMs.
+- **OPNsense DHCP** pushes Pi-hole IP as DNS server to DHCP clients (belt + suspenders alongside NAT redirect).
+- **Local DNS overrides:** `*.by-systems.be` → internal IPs configured via Pi-hole v6 REST API (Ansible-managed, no manual UI).
+- **Cert issuance (DNS-01):** Traefik → Cloudflare API → public TXT record → Let's Encrypt validates. Pi-hole not involved.
+- **Monitoring:** Pi-hole query log + dashboard. Grafana alert on Pi-hole health (down = DNS blind).
+- **SPOF mitigation (PoC):** if Pi-hole VM fails, remove OPNsense NAT redirect → OPNsense Unbound serves DNS directly as fallback.
 
 **OPNsense:** deployed first — virtual router + firewall + WireGuard server (`os-wireguard` plugin). No WireGuard VM needed. Rune VM and human clients connect as WireGuard peers. Migration: change endpoint only.
 
@@ -364,7 +378,7 @@ Compose files written with Swarm compatibility in mind (`deploy:` blocks comment
 |---|---|
 | RAM | **188 GB — no constraints.** |
 | NFS shares | `poc-iso` + `poc-backup` — existing on NAS. |
-| DNS | Pi-hole (10.1.1.60) → Unbound sidecar → DoT :853. All VMs/DHCP clients point to Pi-hole only. OPNsense Unbound = disabled (cold standby). |
+| DNS | VMs → OPNsense NAT :53 redirect → Pi-hole (10.1.1.60) → OPNsense Unbound :853 → DoT 1.1.1.1. No Unbound sidecar on Pi-hole. OPNsense Unbound = DoT terminator (enabled). |
 | Domain | `{service}.by-systems.be` confirmed. |
 | Cloudflare token | In `infra/secrets/` — confirm key name before Traefik deploy. |
 | Contabo S3 creds | In `infra/secrets/` — confirm bucket names before GitLab/Nexus/Loki deploy. |
