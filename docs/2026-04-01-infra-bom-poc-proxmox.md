@@ -4,10 +4,10 @@
 > **Author:** Rune
 > **Status:** DRAFT — @yboujraf reviews + approves → Opus validates → ADR
 > **Hardware:** srv-proxmox-poc-01 — 12 cores, **188 GB RAM**, NAS storage (Synology DS1513+)
-> **Network:** `10.1.0.0/20` PoC supernet — **fully isolated from prod `10.6.0.0/20`** (zero OOB dependency).
+> **Network:** `10.1.0.0/20` PoC supernet — **isolated from prod `10.6.0.0/20`**. OOB dependency limited to: NAS NFS mounts (10.6.224.6) routed via OPNsense, and Proxmox host management. No PoC traffic routed into prod `10.6.0.0/20`.
 > **WAN:** OPNsense connects directly to both ISPs via 3com OOB switch — Proximus (PPPoE VLAN 10) + Telenet (static VLAN 999). Primary OOB prod confirmed working. Telenet as PoC WAN is **untested** — two firewalls (prod pfSense + PoC OPNsense) sharing same Telenet gateway is unknown territory. Must verify before relying on it. WireGuard endpoint on Telenet fixed IP is the target, not confirmed.
 > **VLAN IDs 300-series (PoC infra), 400-series (PoC users). Verified against live switch configs (2026-04-01).**
-> **Rules:** Docker-only, Traefik as reverse proxy, no Apache/nginx. Cluster-ready (Docker Swarm → K3s path). Minimum VM sizes now, scale later.
+> **Rules:** Docker-only, Traefik as reverse proxy, no Apache/nginx. Cluster-ready (Docker Swarm → K3s path). Minimum VM sizes set conservatively — bump as needed (167 GB free RAM, no constraints).
 > **Base image:** Debian 12 cloud-init template
 
 ---
@@ -108,7 +108,7 @@ Grouped by deployment priority (Layer model — ADR-0006).
 | VM name | Tool | vCPU | RAM | Disk | IP | Notes |
 |---|---|---|---|---|---|---|
 | vm-opnsense-poc-01 | OPNsense | 2 | 2 GB | 20 GB | OOB/WAN: 10.1.0.1 / MGMT: 10.1.1.1 / DMZ: 10.1.2.1 / SVC: 10.1.3.1 | **Deploy first.** Virtual router + firewall. WAN = OOB uplink. LAN = MGMT zone. DMZ zone for Traefik/WireGuard. Proxmox SDN VNets replace physical switch. |
-| vm-traefik-poc-01 | Traefik v3 | 1 | 512 MB | 10 GB | 10.1.2.10 (VLAN 120 DMZ) | Docker. Sole HTTP/S entry point. Sits in DMZ zone. Routes to MGMT zone services. TLS via LE + Cloudflare DNS-01. |
+| vm-traefik-poc-01 | Traefik v3 | 1 | 1 GB | 10 GB | 10.1.2.10 (VLAN 120 DMZ) | Docker. Sole HTTP/S entry point. Sits in DMZ zone. Routes to MGMT zone services. TLS via LE + Cloudflare DNS-01. **GitLab TLS mode: HTTP proxy (Traefik terminates TLS, proxies HTTP to GitLab:8080 internally) — SNI passthrough rejected (requires GitLab to manage its own cert).** |
 
 **Deploy order:** OPNsense first (SDN + firewall rules) → Traefik (DMZ) → all other services (MGMT zone).
 
@@ -136,7 +136,7 @@ Deploy in order: Vault first → Authentik depends on it for secrets.
 
 | VM name | Tool | vCPU | RAM | Disk | IP | Notes |
 |---|---|---|---|---|---|---|
-| vm-gitlab-poc-01 | GitLab CE | 4 | 4 GB | 50 GB | 10.1.3.20 | **Exception: GitLab ships its own nginx bundled.** Cannot be replaced with Traefik internally. Traefik sits in front as TCP passthrough on port 443. All other tools use Docker + Traefik. |
+| vm-gitlab-poc-01 | GitLab CE | 4 | 8 GB | 50 GB | 10.1.3.20 | **Exception: GitLab ships its own nginx bundled.** Cannot be replaced with Traefik internally. Traefik sits in front as TCP passthrough on port 443. All other tools use Docker + Traefik. |
 | vm-gitlab-runner-poc-01 | GitLab Runner | 2 | 2 GB | 20 GB | 10.1.3.21 | Docker executor. Runs CI pipelines. No web exposure. |
 
 **GitLab exception note:** GitLab CE bundles nginx and Puma — it cannot run cleanly with an external reverse proxy replacing its internal components. Traefik proxies it at the TCP layer (SNI passthrough or HTTP proxy). The "no nginx/apache" rule applies to all other services — GitLab is the explicit exception per your instructions.
@@ -180,7 +180,7 @@ Colocated on one VM for PoC (separate later in prod).
 
 | VM name | Tool | vCPU | RAM | Disk | IP | Notes |
 |---|---|---|---|---|---|---|
-| vm-observability-poc-01 | Prometheus + Grafana + Loki | 2 | 2 GB | 30 GB | 10.1.3.50 | Docker Compose. All three colocated — acceptable for PoC. Prometheus scrapes all VMs. |
+| vm-observability-poc-01 | Prometheus + Grafana + Loki | 2 | 4 GB | 30 GB | 10.1.3.50 | Docker Compose. All three colocated — acceptable for PoC. Prometheus scrapes all VMs. Loki S3 backend (Contabo) offloads chunks; 4 GB covers query path with 13 VMs shipping logs. |
 
 ---
 
@@ -202,7 +202,9 @@ Colocated on one VM for PoC (separate later in prod).
 
 | Tool | Reason |
 |---|---|
-| step-ca | Deferred — LE via Cloudflare DNS-01 covers PoC. step-ca for internal mTLS later. |
+| step-ca | Deferred — LE via Cloudflare DNS-01 covers PoC. step-ca for internal mTLS later. CT log exposure acceptable for PoC (wildcard cert hides subdomains). |
+| Wazuh | **Deferred to Phase 2.** stack.md lists as CISO Tier 1. PoC proceeds without SIEM — acceptable risk for internal-only PoC. Must be first service added in Phase 2. |
+| Teleport | **Deferred to Phase 2.** stack.md designates as primary bastion (cert SSH + session recording). SSH is direct to VMs for PoC. Acceptable for controlled single-operator environment. Add before multi-operator phase. |
 | MinIO | **Removed from PoC.** Contabo S3 (250 GB) is available — use directly. No self-hosted S3 needed. |
 | Zabbix | **Deferred.** Prometheus exporters cover PoC. SNMP revisit in Phase 3. |
 | OPNsense | **Promoted to Layer 0** — deploys first, network foundation. |
@@ -217,7 +219,9 @@ Colocated on one VM for PoC (separate later in prod).
 |---|---|
 | VMs | 13 | — | — |
 | vCPU total | 20 vCPU | 12 physical cores | Overcommit ~1.7x — fine, workloads are I/O-bound |
-| RAM total | ~21 GB | **188 GB** | **167 GB free — no constraints at all** |
+| RAM total | ~27 GB | **188 GB** | **161 GB free — no constraints at all** |
+
+*Sizing bumps from Opus audit (2026-04-01): Traefik 512 MB → 1 GB, GitLab 4 GB → 8 GB, Observability 2 GB → 4 GB.*
 | Disk (VM OS) | ~260 GB | Proxmox local (thin) | — |
 | Persistent data | Contabo S3 + NAS NFS | 250 GB S3 + NAS | — |
 
@@ -286,20 +290,22 @@ Compose files written with Swarm compatibility in mind (`deploy:` blocks comment
 ## Deployment order
 
 ```
-1. vm-traefik-poc-01        (entry point — deploy after OPNsense, in DMZ zone)
-2. vm-pihole-poc-01         (DNS — needed for service discovery)
-3. vm-vault-poc-01          (secrets — needed by Authentik)
-4. vm-authentik-poc-01      (identity — needed by all services)
-5. vm-gitlab-poc-01         (VCS — needed by CI)
-6. vm-gitlab-runner-poc-01  (CI — depends on GitLab)
-7. vm-netbox-poc-01         (IPAM — standalone)
-8. vm-nexus-poc-01          (registry — standalone)
-9. vm-observability-poc-01  (observability — scrapes all above)
-10. vm-nextcloud-poc-01     (collaboration — after Authentik, SSO required)
-11. vm-unifi-poc-01          (network mgmt — WiFi AP + VLAN)
-12. ~~vm-wireguard-poc-01~~ — **removed**, WireGuard runs on OPNsense directly
-0. vm-opnsense-poc-01      (firewall/SDN — **deploy FIRST, network foundation**)
+0.  vm-opnsense-poc-01        (firewall/SDN — DEPLOY FIRST, network foundation)
+1.  vm-traefik-poc-01         (entry point — DMZ zone, HTTP proxy mode for GitLab)
+2.  vm-pihole-poc-01          (DNS — needed for service discovery)
+3.  vm-netbox-poc-01          (IPAM — source of truth, register all IPs before further deploys)
+4.  vm-vault-poc-01           (secrets — needed by Authentik)
+5.  vm-vaultwarden-poc-01     (human credentials — standalone, deploy alongside Vault)
+6.  vm-authentik-poc-01       (identity — needed by all services; ADR-0011 must exist before this step)
+7.  vm-gitlab-poc-01          (VCS — needed by CI)
+8.  vm-gitlab-runner-poc-01   (CI — depends on GitLab)
+9.  vm-nexus-poc-01           (registry — standalone)
+10. vm-observability-poc-01   (observability — scrapes all above)
+11. vm-nextcloud-poc-01       (collaboration — after Authentik, SSO required)
+12. vm-unifi-poc-01           (network mgmt — WiFi AP + VLAN)
 ```
+
+**Removed:** ~~vm-wireguard-poc-01~~ — WireGuard runs on OPNsense (`os-wireguard` plugin), no separate VM needed.
 
 ---
 
@@ -307,7 +313,8 @@ Compose files written with Swarm compatibility in mind (`deploy:` blocks comment
 
 | Item | Decision |
 |---|---|
-| TLS | Let's Encrypt via Traefik + Cloudflare DNS-01. Domain: `*.by-systems.be`. Token in Vault. |
+| TLS | Let's Encrypt via Traefik + Cloudflare DNS-01. Domain: `*.by-systems.be`. Token in Vault. Cloudflare token rotation: document runbook + Grafana cert-expiry alert before PoC go-live. |
+| GitLab TLS | HTTP proxy mode: Traefik terminates TLS, forwards HTTP to GitLab:8080. SNI passthrough rejected. |
 | S3 object storage | Contabo S3 (250 GB) — GitLab artifacts, Nexus blobs, Loki chunks, backups. No MinIO VM. |
 | step-ca | Deferred — LE covers PoC. |
 
