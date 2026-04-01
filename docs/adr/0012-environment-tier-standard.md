@@ -39,7 +39,7 @@ poc → dev → test → staging → acc → prod
 
 5. **No shortcutting the pipeline.** Code does not go from `dev` directly to `prod`. Each tier has a promotion gate. Skipping tiers requires explicit CAB approval and is logged as a risk in RAID.md.
 
-6. **Certificates are per-environment.** One wildcard cert per tier: `*.{env}.by-systems.be`. Six tiers = max six active certificates. Issued by step-ca (Layer 2).
+6. **Certificates:** One wildcard cert: `*.by-systems.be` (covers all envs). Issued via Let's Encrypt Cloudflare DNS-01.
 
 ### Environment-specific constraints
 

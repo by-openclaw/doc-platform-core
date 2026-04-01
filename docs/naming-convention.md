@@ -297,40 +297,38 @@ docs/diagrams/
 
 ## 6. FQDN and DNS Naming
 
-### Canonical pattern — split DNS
-```
-{service}.{env}.by-systems.be
-```
-
-> **Decision (2026-04-01):** All service FQDNs use `{service}.{env}.by-systems.be` with split DNS.
-> Internal: Pi-hole/OPNsense Unbound resolves to private IP.
-> External: Cloudflare resolves to public IP.
-> Cert: `*.{env}.by-systems.be` via Let's Encrypt Cloudflare DNS-01.
+> **Decision (2026-04-01):** TWO layers — do not confuse.
 > NO `.internal`, NO `.arpa` for service FQDNs.
 
-### Examples
+### VM FQDNs (infrastructure layer)
+
+Pattern: `{hostname}.by-systems.be`
+
+Where hostname follows ADR-0010: `vm-{service}-{env}-{seq:02d}`
+
 ```
-vault.poc.by-systems.be
-gitlab.poc.by-systems.be
-authentik.poc.by-systems.be
-netbox.poc.by-systems.be
-grafana.poc.by-systems.be
-prometheus.poc.by-systems.be
-guacamole.poc.by-systems.be
-kamailio.poc.by-systems.be
+vm-vault-poc-01.by-systems.be
+vm-gitlab-poc-01.by-systems.be
+vm-vault-prod-01.by-systems.be
+```
 
-gitlab.prod.by-systems.be        (production environment scoped)
-gitlab.staging.by-systems.be     (staging)
-gitlab.dev.by-systems.be         (dev)
+### Service URLs (application layer — defined in Traefik config + Pi-hole)
 
-vault.prod.by-systems.be         (public — external access)
-vpn.by-systems.be                (public — VPN entry)
+Pattern: `{service-alias}.by-systems.be` (set in service config, not derived from hostname)
+
+Examples (PoC):
+```
+vault.by-systems.be       → Traefik → vm-vault-poc-01
+gitlab.by-systems.be      → Traefik → vm-gitlab-poc-01
+auth.by-systems.be        → Traefik → vm-authentik-poc-01
+passwords.by-systems.be   → Traefik → vm-vaultwarden-poc-01
 ```
 
 ### DNS ownership
-- `*.{env}.by-systems.be` → Pi-hole/OPNsense Unbound (internal resolver)
-- `*.{env}.by-systems.be` → Cloudflare DNS-01 (external / cert issuance)
-- Split DNS: same FQDN resolves differently inside vs outside
+- `*.by-systems.be` (internal) → Pi-hole/OPNsense Unbound local override → private IP
+- `*.by-systems.be` (external) → Cloudflare → public IP (only published services)
+- Split DNS: same FQDN, different resolution path
+- Cert: `*.by-systems.be` wildcard via LE Cloudflare DNS-01
 
 ---
 
