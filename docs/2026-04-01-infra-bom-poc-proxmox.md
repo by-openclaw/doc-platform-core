@@ -131,6 +131,49 @@ interface GigabitEthernet1/0/5   ! free port — verify with lldp/status
 
 ---
 
+## VM Spec Sheet
+
+> **Spec methodology:** PoC = lean but functional, no OOM risk, Docker overhead included (~256 MB RAM, ~5 GB disk base).  
+> Prod = realistic for a 5–10 operator team. Disk includes OS + container images + ephemeral data.
+
+| VM | Tool(s) | PoC: vCPU / RAM / Disk | Prod: vCPU / RAM / Disk | Vendor Min RAM | Notes |
+|---|---|---|---|---|---|
+| vm-opnsense-poc-01 | OPNsense 24.x | 2 / 2 GB / 20 GB | 2 / 4 GB / 20 GB | 1 GB | Current sizing confirmed. Dual-WAN + WireGuard plugin on 2 GB is stable. |
+| vm-pihole-poc-01 | Pi-hole v6 (Docker) | 1 / 512 MB / 10 GB | 1 / 1 GB / 10 GB | 128 MB | Current sizing confirmed. 512 MB includes OS + Docker overhead comfortably. |
+| vm-traefik-poc-01 | Traefik v3 (Docker) | 1 / 1 GB / 10 GB | 2 / 2 GB / 10 GB | 64 MB | Current sizing confirmed. Generous for single-node PoC; headroom for TLS cert ops. |
+| vm-vault-poc-01 | HashiCorp Vault (Docker, Raft backend) | 1 / 2 GB / 20 GB | 2 / 4 GB / 20 GB | 1 GB | **BUMPED from 1 GB → 2 GB.** Vault JVM + Raft + Docker/OS overhead OOM at 1 GB under load. |
+| vm-vaultwarden-poc-01 | Vaultwarden (Docker) | 1 / 512 MB / 10 GB | 1 / 1 GB / 10 GB | 64 MB | **BUMPED from 256 MB → 512 MB.** 256 MB is zero-headroom after Docker daemon + OS (~256 MB baseline). |
+| vm-authentik-poc-01 | Authentik (server+worker+Redis+PostgreSQL) | 2 / 2 GB / 20 GB | 4 / 4 GB / 20 GB | 2 GB | Current sizing confirmed. Vendor-confirmed 2 GB minimum — OOMs below this on startup. |
+| vm-gitlab-poc-01 | GitLab CE (Puma+Sidekiq+nginx+PostgreSQL+Redis) | 4 / 8 GB / 50 GB | 8 / 16 GB / 100 GB | 4 GB (8 GB recommended) | Current sizing confirmed. Constraint-held at 4 vCPU / 8 GB minimum per task spec. |
+| vm-gitlab-runner-poc-01 | GitLab Runner (Docker executor) | 2 / 2 GB / 20 GB | 4 / 4 GB / 30 GB | 1 GB | Current sizing confirmed. Light PoC pipelines (lint/build/test). Scale cores for parallel CI. |
+| vm-nextcloud-poc-01 | Nextcloud-fpm + nginx sidecar (Docker), S3 primary storage | 2 / 2 GB / 20 GB | 4 / 4 GB / 30 GB | 512 MB | Current sizing confirmed. fpm workers + nginx sidecar + S3 client fit in 2 GB. |
+| vm-netbox-poc-01 | NetBox (netbox+worker) — shared postgres+redis | 2 / 2 GB / 20 GB | 2 / 4 GB / 20 GB | 512 MB | Current sizing confirmed. Django + background worker comfortable in 2 GB. |
+| vm-nexus-poc-01 | Nexus OSS (Docker) | 2 / 6 GB / 50 GB | 4 / 8 GB / 100 GB | 4 GB | **⚠️ CRITICAL: BUMPED from 2 GB → 6 GB.** JVM default heap: -Xms2703m -Xmx2703m + MaxDirectMemory 2703m = ~5.4 GB JVM alone. 2 GB = guaranteed OOM on startup. |
+| vm-observability-poc-01 | Prometheus + Grafana + Loki (colocated) | 2 / 4 GB / 30 GB | 4 / 8 GB / 50 GB | 1 GB | Current sizing confirmed. 3 colocated services: Prometheus ~256 MB + Grafana ~256 MB + Loki ~512 MB + Docker/OS. 4 GB gives query headroom with 13 VMs shipping logs. |
+| vm-postgres-poc-01 | PostgreSQL 16 (shared: Authentik, NetBox, Nextcloud, Vaultwarden) | 2 / 4 GB / 50 GB | 4 / 8 GB / 100 GB | 256 MB | Current sizing confirmed. 4 active databases; shared_buffers ~1 GB + connection overhead. |
+| vm-redis-poc-01 | Redis 7 (shared: Authentik, NetBox, Nextcloud) | 1 / 1 GB / 10 GB | 2 / 2 GB / 10 GB | 128 MB | **REDUCED from 2 GB → 1 GB.** In-memory store, ~50-100 MB baseline at PoC load. 1 GB gives 10x headroom. |
+| vm-unifi-poc-01 | Unifi Network App (Docker) | 1 / 2 GB / 10 GB | 2 / 4 GB / 20 GB | 1 GB | **BUMPED from 1 GB → 2 GB.** Java app + bundled MongoDB require ~1.5 GB minimum. 1 GB = OOM risk on startup. |
+
+### PoC Resource Totals (finalized)
+
+| Metric | Finalized | Physical | Notes |
+|---|---|---|---|
+| vCPU total | 28 vCPU | 12 physical cores | Overcommit ~2.3x — fine, workloads are I/O-bound and mostly idle |
+| RAM total | ~41 GB | **188 GB** | **147 GB free — no constraints** |
+| Disk total | ~340 GB | `poc-data` ZFS pool | Thin provisioned |
+
+### VMs with sizing changes vs. original BoM
+
+| VM | Change | Risk if unchanged |
+|---|---|---|
+| vm-vault-poc-01 | 1 GB → **2 GB** | OOM under load (Raft + JVM overhead) |
+| vm-vaultwarden-poc-01 | 256 MB → **512 MB** | Zero headroom after Docker/OS — guaranteed OOM |
+| vm-nexus-poc-01 | 2 GB → **6 GB** | **CRITICAL** — JVM heap alone needs ~5.4 GB, OOM on startup |
+| vm-redis-poc-01 | 2 GB → **1 GB** | Over-provisioned — reclaimed 1 GB, no risk |
+| vm-unifi-poc-01 | 1 GB → **2 GB** | OOM risk — Java + MongoDB ~1.5 GB minimum |
+
+---
+
 ## VM Bill of Materials
 
 Grouped by deployment priority (Layer model — ADR-0006).
