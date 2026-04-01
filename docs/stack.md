@@ -96,7 +96,7 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 | Tool | Role | License | Free Plan | Docker | K8S |
 |---|---|---|---|---|---|
 | Authentik | SSO provider (OIDC/SAML) | MIT | ✅ Self-hosted | ✅ | ✅ Helm |
-| HashiCorp Vault (OSS) | Machine secrets (CI/CD, Ansible, services) | MPL 2.0 | ✅ | ✅ | ✅ Helm |
+| HashiCorp Vault (OSS) | Machine secrets (CI/CD, Ansible, services) | BUSL 1.1 ⚠️ | ✅ Internal use | ✅ | ✅ Helm |
 | Vaultwarden | Human credentials (Bitwarden-compatible) | AGPL v3 | ✅ Self-hosted | ✅ | ✅ |
 | **Teleport Community Edition** | **Primary bastion**: certificate-based SSH, K8S `kubectl`, DB access, session recording + replay, full audit trail, MFA, Authentik OIDC | Apache 2.0 | ✅ Self-hosted | ✅ | ✅ Helm |
 | Apache Guacamole | **Secondary OOB gateway**: browser-based RDP/VNC for Windows VMs and non-technical users | Apache 2.0 | ✅ | ✅ | ✅ |
@@ -116,7 +116,7 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 | Tool | Role | License | Free Plan | Docker | K8S |
 |---|---|---|---|---|---|
 | PostgreSQL (Patroni) | Primary relational DB cluster | PostgreSQL / Apache 2.0 | ✅ | ✅ | ✅ Helm |
-| Redis (Sentinel) | Cache + sessions + queues | BSD-3 | ✅ | ✅ | ✅ Helm |
+| Redis (Sentinel) | Cache + sessions + queues | BSD-3 (≤7.2) / RSALv2+SSPL (≥7.4) ⚠️ | ✅ Pin to 7.2 | ✅ | ✅ Helm |
 | MinIO | S3-compatible object storage | AGPL v3 | ✅ Self-hosted | ✅ | ✅ Helm |
 | Neo4J Community | Graph CMDB (nodes/edges/semantic) | GPL v3 | ✅ Community | ✅ | ✅ |
 
@@ -425,3 +425,43 @@ K8S: dual-stack service/pod CIDR.
 | 1Password / Bitwarden cloud | Replaced by self-hosted Vaultwarden |
 | Notion / Confluence | Replaced by Markdown + Sphinx in repo |
 | Jira (primary) | GitLab Issues is primary; Jira if customer requires |
+
+---
+
+## Tool License Reference
+
+> Source: Opus audit 2026-04-01. See full findings: `workspace/docs/audits/2026-04-01-opus-findings.md`
+> Legend: ✅ Yes — no restrictions | ⚠️ Conditional — see rule | ❌ Blocked
+
+| Tool | SPDX License | Type | Owner | License URL | Free Plan Scope | BY-SYSTEMS Client Offering |
+|---|---|---|---|---|---|---|
+| OPNsense | BSD-2-Clause | OSI OSS | Deciso B.V. | https://github.com/opnsense/core/blob/master/LICENSE | Full — no restrictions | ✅ Yes |
+| Pi-hole | EUPL-1.2 | OSI OSS | Pi-hole LLC | https://github.com/pi-hole/pi-hole/blob/master/LICENSE | Full | ✅ Yes |
+| Traefik | MIT | OSI OSS | Traefik Labs | https://github.com/traefik/traefik/blob/master/LICENSE.md | Full | ✅ Yes |
+| HashiCorp Vault | BUSL-1.1 | Source-available | HashiCorp (IBM) | https://github.com/hashicorp/vault/blob/main/LICENSE | Full for internal/client infra | ⚠️ Cannot resell hosted Vault as a product |
+| Vaultwarden | AGPL-3.0 | OSI OSS (copyleft) | Dani Garcia | https://github.com/dani-garcia/vaultwarden/blob/main/LICENSE | Full — includes Premium features | ⚠️ Deploy unmodified = OK. Modify + SaaS = must open-source |
+| Authentik | MIT | OSI OSS | Authentik Security Inc. | https://github.com/goauthentik/authentik/blob/main/LICENSE | Full SSO/OIDC/SAML/LDAP | ✅ Yes |
+| GitLab CE | MIT | OSI OSS | GitLab Inc. | https://gitlab.com/gitlab-org/gitlab/-/blob/master/LICENSE | Full VCS + CI + registry | ✅ Yes |
+| GitLab Runner | MIT | OSI OSS | GitLab Inc. | https://gitlab.com/gitlab-org/gitlab-runner/-/blob/main/LICENSE | Full | ✅ Yes |
+| Nextcloud | AGPL-3.0 | OSI OSS (copyleft) | Nextcloud GmbH | https://github.com/nextcloud/server/blob/master/COPYING | Full file sync + apps | ⚠️ Deploy unmodified = OK. Modify + SaaS = must open-source |
+| NetBox | Apache-2.0 | OSI OSS | NetBox Labs | https://github.com/netbox-community/netbox/blob/develop/LICENSE | Full IPAM + DCIM | ✅ Yes |
+| Nexus OSS | EPL-1.0 | OSI OSS | Sonatype | https://github.com/sonatype/nexus-public/blob/main/LICENSE.txt | All formats (npm, pip, Docker, Maven, Helm) | ✅ Yes |
+| Prometheus | Apache-2.0 | OSI OSS | CNCF | https://github.com/prometheus/prometheus/blob/main/LICENSE | Full | ✅ Yes |
+| Grafana | AGPL-3.0 | OSI OSS (copyleft) | Grafana Labs | https://github.com/grafana/grafana/blob/main/LICENSE | Full dashboards + alerting | ⚠️ Deploy unmodified = OK. Modify + SaaS = must open-source |
+| Loki | AGPL-3.0 | OSI OSS (copyleft) | Grafana Labs | https://github.com/grafana/loki/blob/main/LICENSE | Full log aggregation | ⚠️ Deploy unmodified = OK. Modify + SaaS = must open-source |
+| PostgreSQL | PostgreSQL | OSI OSS (permissive) | PostgreSQL Dev Group | https://www.postgresql.org/about/licence/ | Full | ✅ Yes |
+| Redis | BSD-3-Clause (≤7.2) / RSALv2+SSPL (≥7.4) | OSS (≤7.2) / Source-available (≥7.4) | Redis Ltd | https://github.com/redis/redis/blob/7.2/LICENSE | Full at ≤7.2 | ✅ Yes at ≤7.2. ❌ Do not use ≥7.4 — pin to `redis:7.2.7-alpine` |
+| Unifi Network App | Proprietary | Freeware | Ubiquiti Inc. | https://www.ui.com/eula/ | Free with Ubiquiti hardware | ⚠️ Deploy for clients with Ubiquiti HW = OK. Cannot modify/redistribute |
+| Proxmox VE | AGPL-3.0 | OSI OSS (copyleft) | Proxmox Server Solutions | https://git.proxmox.com/?p=pve-manager.git;a=blob;f=COPYING | Full community | ⚠️ Deploy unmodified = OK. Subscription removes nag only |
+| step-ca | Apache-2.0 | OSI OSS | Smallstep | https://github.com/smallstep/certificates/blob/master/LICENSE | Full | ✅ Yes |
+| Neo4j CE | GPL-3.0 | OSI OSS (copyleft) | Neo4j Inc. | https://github.com/neo4j/neo4j/blob/dev/LICENSE.txt | Full community | ⚠️ Deploy unmodified = OK. Distribute modifications = GPL applies |
+
+### Client Offering Summary
+
+> **Can BY-SYSTEMS build a managed platform for clients on these tools?**
+> **YES — with 3 rules:**
+> 1. **Pin Redis to `redis:7.2.7-alpine`** (BSD-3). Never upgrade to 7.4+ without license review.
+> 2. **Never sell hosted Vault as a product.** Using Vault to manage client infra secrets = OK. Reselling Vault access = BUSL violation.
+> 3. **Deploy AGPL tools unmodified** (Grafana, Loki, Vaultwarden, Nextcloud, Proxmox). Unmodified deployment for clients = zero obligation. Modify + offer as SaaS = must open-source modifications.
+>
+> **Managed service model** (BY-SYSTEMS deploys + operates tools on client infra) = **zero blockers.**

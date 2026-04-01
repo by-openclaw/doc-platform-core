@@ -117,10 +117,10 @@ switchport trunk allowed vlan 300,310,320,330,340,350,400,410
 
 ---
 
-## vmbrMGMT — Fabric Control Link (Disabled for PoC)
+## vmbrMGMT → vmbrFAB — Fabric Control Link (Disabled for PoC)
 
 > **Status: PENDING MANUAL ACTION — must be done before PoC deploy.**
-> Three-step isolation: rename bridge + disable bridge + disable physical NIC port.
+> Three-step isolation: rename `vmbrMGMT` → `vmbrFAB` + disable bridge + disable physical NIC port.
 
 **Purpose:** `vmbrMGMT` is the Proxmox host's connection to the Arista fabric control-plane VLAN (VLAN 600). Physical link is a **10G SFP** NIC (`nic4` / `enx0060dd44ecce`) uplinked to the Arista switch fabric. Used for switch management, SMPTE, PTP, and broadcast control traffic in prod.
 
@@ -140,7 +140,7 @@ Autostart:    yes (currently active on host)
 
 **Decision (2026-04-01 @yboujraf):** Three actions required — all three before PoC terraform apply:
 
-1. **Rename** `vmbrMGMT` → new name per VLAN plan (TBD — name reserved in VLAN plan, do not use `vmbrMGMT` for PoC VLANs)
+1. **Rename** `vmbrMGMT` → **`vmbrFAB`** — supervision/orchestration bridge (Ansible, Terraform, Prometheus → fabric devices). vmbrFAB is the PROD bridge name in the VLAN plan; disabled until PoC fabric is physically wired.
 2. **Disable the bridge** — `autostart=no` in `/etc/network/interfaces`, bring down with `ifdown`
 3. **Disable the physical NIC port** (`nic4` / `enx0060dd44ecce`) — hard isolation at NIC level, not just bridge software
 
@@ -154,8 +154,8 @@ ifdown nic4.600
 ip link set enx0060dd44ecce down
 
 # Step 3 — Edit /etc/network/interfaces
-# - Rename 'vmbrMGMT' to new name per VLAN plan
-# - Set: auto <newname> → remove or comment out
+# - Rename 'vmbrMGMT' → 'vmbrFAB'
+# - Remove 'auto vmbrFAB' line (or comment out) so it does not start on boot
 # - Add: post-down ip link set enx0060dd44ecce down
 
 # Step 4 — Verify bridge is gone from Proxmox UI (Datacenter → Node → Network)

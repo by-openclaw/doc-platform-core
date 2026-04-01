@@ -1,7 +1,9 @@
 # VM Template Specification
 
+> ⚠️ **DRAFT** — Items marked ⚠️ are open decisions not yet finalized. Bridge names (vmbrFAB, vmbrOOB, etc.) are placeholders — final names follow NetBox VLAN names once topology is locked (D.6). Do not treat as production-ready.
+
 **Status:** Draft v4 — review 2026-03-29  
-**Last updated:** 2026-03-29  
+**Last updated:** 2026-04-01  
 **Scope:** All VMs and LXCs provisioned via Terraform on Proxmox PoC  
 **Reviewer:** @yboujraf
 
