@@ -56,7 +56,7 @@
 | A-12 | ORG team has Ansible and Terraform skills for Phase 1 IaC | Phase 1 delayed | Skills assessment before start |
 | A-13 | Nexus OSS (Apache 2.0) remains free for all required formats | Forced migration to paid tier | Monitor Sonatype licensing changes; Nexus pinned to current OSS version |
 | A-14 | Customer production mail (Exchange/Google) will be available for SMTP relay config | Platform notification emails fail in prod | Collect SMTP relay credentials during customer onboarding |
-| A-15 | Telenet provides a /32 static IP (not a subnet) on the WAN interface | OPNsense WAN config wrong — gateway unreachable, PoC internet blocked | Verify actual IP allocation (IPv4 /32 vs routed subnet) with ISP docs or pfSense WAN config before Phase 2 migration |
+| A-15 | Telenet provides a /27 static subnet on the WAN interface (confirmed 2026-04-01) | OPNsense WAN config must use correct prefix length | Configure OPNsense WAN with /27 subnet. Verify gateway IP from ISP docs or pfSense WAN config before Phase 2 migration. |
 
 ---
 
@@ -64,7 +64,7 @@
 
 | ID | Issue | Severity | Date raised | Resolution | Status |
 |---|---|---|---|---|---|
-| I-25 | Cloudflare API token rotation runbook missing — no procedure for expiry or compromise rotation before PoC go-live | High | 2026-04-01 | Write runbook: locate token in Vault, issue new token in Cloudflare, update Vault secret, rolling Traefik restart, verify cert renewal. Add Grafana cert-expiry alert. | Open |
+| I-25 | Cloudflare API token rotation runbook missing — no procedure for expiry or compromise rotation before PoC go-live | High | 2026-04-01 | Follow CISO token rotation process. Runbook: locate token in Vault, issue new token per CISO process, update Vault secret, rolling Traefik restart, verify cert renewal. Add Grafana cert-expiry alert. | Open |
 | I-26 | NFS routing from scratch PoC VM to NAS (10.6.224.6) via OPNsense untested | High | 2026-04-01 | **CLOSED 2026-04-01** — Storage architecture corrected. VMs never mount NFS. NAS is host-level only (poc-iso + poc-backup on Proxmox host). Risk eliminated. GitHub #69 closed. | Closed |
 | I-23 | `FileStation.upload()` return dict returns `{"skipped": bool}` — violates ADR-0007 `{"changed": bool, "action": str}` contract | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: return `{"changed": bool, "action": "created"\|"skipped"\|"overwritten"}` | Open |
 | I-24 | `client.py` timeout hardcoded at 30s — no per-operation timeout, no streaming upload support | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: per-op timeout param with sensible defaults | Open |
