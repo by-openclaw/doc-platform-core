@@ -33,7 +33,7 @@
 | vm-observability-poc-01 | Grafana | <https://github.com/grafana/grafana> | `grafana/grafana:latest` |
 | vm-observability-poc-01 | Loki | <https://github.com/grafana/loki> | `grafana/loki:latest` |
 | vm-postgres-poc-01 | PostgreSQL 16 | <https://github.com/postgres/postgres> | `postgres:16-alpine` |
-| vm-redis-poc-01 | Redis 7 | <https://github.com/redis/redis> | `redis:7-alpine` |
+| vm-redis-poc-01 | Redis 7 | <https://github.com/redis/redis> | `redis:8.6.2-alpine3.23` |
 | vm-unifi-poc-01 | Unifi Network App | <https://github.com/linuxserver/docker-unifi-network-application> | `lscr.io/linuxserver/unifi-network-application:latest` |
 
 ---
