@@ -46,7 +46,7 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 | 2.5 | Shell | `/bin/bash` | ✅ |
 | 2.6 | Default user | `by-systems` | ✅ |
 | 2.7 | Root SSH | Disabled (Ansible) | ✅ |
-| 2.8 | Search domain | `by-systems.arpa` | ✅ |
+| 2.8 | Search domain | `poc.by-systems.be` | ✅ |
 | 2.9 | DNS | Per VLAN/switch (§6.8) — driven by NetBox | ✅ |
 
 ---
@@ -150,7 +150,7 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 | 6.6 | Locale | `fr_BE.UTF-8` — needs re-verification | ⚠️ |
 | 6.7 | Timezone | `Europe/Brussels` | ✅ |
 | 6.8 | DNS | Per VLAN/switch topology (see note) | 🔄 |
-| 6.9 | Search domain | `by-systems.arpa` | ✅ |
+| 6.9 | Search domain | `poc.by-systems.be` | ✅ |
 | 6.10 | Cloud-init drive | `ide2` | ✅ |
 
 > **6.3 — SSH key strategy (confirmed):**
@@ -168,7 +168,7 @@ Each property has a numeric ID. Legend: ✅ confirmed | ⚠️ open decision | �
 > |---|---|---|
 > | MGMT VLAN on Arista 7060 (has VRF) | VRF interface IP on switch | Isolated fabric — resolves fabric devices only |
 > | Arista 7048 (no VRF) | **NOT on MGMT VLAN by default** — only for DR/short test exception | Hardware limitation — no VRF segmentation possible. Exception only, not standard |
-> | Service VLANs (infra, app, etc.) | OPNsense VLAN interface IP | Resolves `by-systems.arpa` + upstream via DoT/DoH |
+> | Service VLANs (infra, app, etc.) | OPNsense VLAN interface IP | Resolves `poc.by-systems.be` + upstream via DoT/DoH |
 > | External DNS | Never direct — always through OPNsense DoT/DoH enforcement | FW rule blocks direct port 53 outbound |
 >
 > OPNsense handles this cleanly — rule-based DNS forwarding per interface/VLAN, DoT/DoH enforced, no manual config needed (Ansible-driven).
@@ -268,10 +268,10 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 | 10.4 | Authentik | 2 | 4096 | 20 | poc-data | Docker |
 | 10.5 | GitLab CE | 4 | 8192 | 50 | poc-data + NFS (git repos) + S3 (LFS/artifacts/registry) | Docker — ZFS for app/DB, NAS NFS for git repo data, NAS S3 for LFS + artifacts + registry + backups |
 | 10.6 | GitLab Runner | 2 | 4096 | 50 | poc-data | Docker |
-| 10.7 | Nexus OSS | 2 | 4096 | 50 | poc-data + NFS/S3 | Docker — artifacts on NAS/S3 |
+| 10.7 | Nexus OSS | 2 | 6144 | 50 | poc-data + NFS/S3 | Docker — artifacts on NAS/S3 |
 | 10.8 | OPNsense | 2 | 2048 | 10 | poc-data | **Appliance image** — not Docker |
 | 10.9 | PostgreSQL (shared) | 2 | 4096 | 50 | poc-data | Docker |
-| 10.10 | Redis (shared) | 1 | 2048 | 10 | poc-data | Docker |
+| 10.10 | Redis (shared) | 1 | 1024 | 10 | poc-data | Docker |
 | 10.11 | **Traefik** (one per env) | 1 | 1024 | 10 | poc-data | Docker — one instance per environment (poc/test/staging/prod). TLS termination + routing scoped to that env |
 | 10.14 | **MinIO** | N/A | N/A | N/A | NAS direct | Container Manager on NAS — S3 emulation on NAS disk. Machine-facing: apps (Outline, GitLab, Nexus) use S3 API. Authentik OIDC for admin console. ILM tiering to Contabo S3 for cold/DR. |
 | 10.15 | **Nextcloud** | 2 | 2048 | 20 | NAS NFS + MinIO S3 | Human-facing file sharing. Authentik OIDC SSO. Users see their shares on login. Backend: NAS (NFS) for personal files + MinIO S3 for object storage. |
@@ -349,8 +349,8 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 >
 > | Environment | Traefik VM | Domain scope | TLS source | Public IP |
 > |---|---|---|---|---|
-> | poc | `vm-traefik-poc-01` | `*.poc.by-systems.arpa` | Vault PKI | ❌ internal only |
-> | test | `vm-traefik-test-01` | `*.test.by-systems.arpa` | Vault PKI | ❌ internal only |
+> | poc | `vm-traefik-poc-01` | `*.poc.poc.by-systems.be` | Vault PKI | ❌ internal only |
+> | test | `vm-traefik-test-01` | `*.test.poc.by-systems.be` | Vault PKI | ❌ internal only |
 > | staging | `vm-traefik-staging-01` | `*.staging.by-systems.be` | Let's Encrypt | ✅ shared via OPNsense SNI |
 > | prod | `vm-traefik-prod-01` | `*.by-systems.be` | Let's Encrypt | ✅ shared via OPNsense SNI |
 >
@@ -364,7 +364,7 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 >         (*.staging.by-systems.be)        (*.by-systems.be)
 > ```
 >
-> poc and test are never exposed externally — internal DNS (`by-systems.arpa`) only, Vault PKI, no internet dependency.
+> poc and test are never exposed externally — internal DNS (`poc.by-systems.be`) only, Vault PKI, no internet dependency.
 >
 > **Ingress flow — OPNsense port forward (no NAT 1:1 needed):**
 > ```
@@ -392,7 +392,7 @@ Baseline: sync with `odoo-install` SSH hardening. Extend from there.
 > Internal DNS (OPNsense resolver)
 >   by-systems.be      → internal Traefik IP  (split horizon)
 >   by-management.be   → internal Traefik IP
->   *.poc.by-systems.arpa → internal (Vault PKI, never public)
+>   *.poc.poc.by-systems.be → internal (Vault PKI, never public)
 >
 > Public DNS (provider API)
 >   by-systems.be      → public IP (A/AAAA)

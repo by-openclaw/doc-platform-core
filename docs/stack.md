@@ -1,5 +1,5 @@
-# ORG Platform — Technology Stack
-**Last updated:** 2026-03-25  
+# BY-SYSTEMS Platform — Technology Stack
+**Last updated:** 2026-04-01  
 **Status:** Locked (PoC phase)  
 **Philosophy:** Open source, self-hosted, free tier — no vendor lock-in
 
@@ -41,12 +41,12 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 | WireGuard | Site-to-site + road warrior VPN | GPLv2 | ✅ | ✅ | — |
 | NetBird | Zero-config mesh VPN (SSO OIDC) | BSD-3 | ✅ Self-hosted | ✅ | ✅ |
 | Traefik v3 | Reverse proxy + TLS (everywhere) | MIT | ✅ | ✅ | ✅ Helm |
-| step-ca (Smallstep) | Internal CA (*.org.internal) | Apache 2.0 | ✅ | ✅ | ✅ Helm |
+| step-ca (Smallstep) | Internal CA (*.{env}.by-systems.be) | Apache 2.0 | ✅ | ✅ | ✅ Helm |
 | Cloudflare | Public DNS + DNS-01 ACME | Proprietary | ✅ Free tier | — | — |
 
 > **Rule:** Traefik is the only edge proxy. No Apache/Nginx at edge. Internal services (e.g. GitLab Nginx) are kept on localhost port only.
 
-> **Internal TLD:** `.internal` (e.g. `vault.org.internal`) — avoids mDNS `.local` conflict (RFC 6762).
+> **FQDN pattern:** `{service}.{env}.by-systems.be` (e.g. `vault.poc.by-systems.be`) — split DNS, Pi-hole/OPNsense Unbound internal + Cloudflare external.
 
 ---
 
@@ -216,7 +216,7 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 
 ### Screenshot & Media Tooling (workstation)
 
-Standardized tooling for all ORG workstations. Ensures screenshots are consistent size, annotated, and redacted before sharing.
+Standardized tooling for all BY-SYSTEMS workstations. Ensures screenshots are consistent size, annotated, and redacted before sharing.
 
 | Tool | Role | License | Platform |
 |---|---|---|---|

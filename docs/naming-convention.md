@@ -1,10 +1,10 @@
-# ORG — Naming Convention
-**Last updated:** 2026-03-25  
+# BY-SYSTEMS — Naming Convention
+**Last updated:** 2026-04-01  
 **Status:** Draft — living document  
 **Scope:** All projects (internal + customer deployments)
 
-> **Key principle:** One slug, three systems.  
-> A service named `gitlab` in NetBox = FQDN `gitlab.org.internal` = repo `platform-gitlab-core`.  
+> **Key principle:** One slug, three systems.
+> A service named `gitlab` in NetBox = FQDN `gitlab.poc.by-systems.be` = repo `platform-gitlab-core`.
 > All names use the same format: **lowercase, hyphens, no spaces, no special characters, English only.**
 
 ---
@@ -297,43 +297,40 @@ docs/diagrams/
 
 ## 6. FQDN and DNS Naming
 
-### Internal (private — org.internal)
+### Canonical pattern — split DNS
 ```
-{service}.{org}.internal
-{service}.{env}.{org}.internal    (per environment)
-{service}.{site}.{org}.internal   (per site)
+{service}.{env}.by-systems.be
 ```
 
-> **Note:** `.internal` TLD used (not `.local` — avoids mDNS conflict per RFC 6762).
-
-### Public (org.example)
-```
-{service}.{org}.be               (only public-facing services)
-```
+> **Decision (2026-04-01):** All service FQDNs use `{service}.{env}.by-systems.be` with split DNS.
+> Internal: Pi-hole/OPNsense Unbound resolves to private IP.
+> External: Cloudflare resolves to public IP.
+> Cert: `*.{env}.by-systems.be` via Let's Encrypt Cloudflare DNS-01.
+> NO `.internal`, NO `.arpa` for service FQDNs.
 
 ### Examples
 ```
-vault.org.internal
-gitlab.org.internal
-authentik.org.internal
-netbox.org.internal
-grafana.org.internal
-prometheus.org.internal
-guacamole.org.internal
-kamailio.org.internal
+vault.poc.by-systems.be
+gitlab.poc.by-systems.be
+authentik.poc.by-systems.be
+netbox.poc.by-systems.be
+grafana.poc.by-systems.be
+prometheus.poc.by-systems.be
+guacamole.poc.by-systems.be
+kamailio.poc.by-systems.be
 
-gitlab.prod.org.internal       (production environment scoped)
-gitlab.staging.org.internal    (staging)
-gitlab.dev.org.internal        (dev)
+gitlab.prod.by-systems.be        (production environment scoped)
+gitlab.staging.by-systems.be     (staging)
+gitlab.dev.by-systems.be         (dev)
 
-gitlab.org.example                  (public — external Git access)
-vpn.org.example                     (public — VPN entry)
+vault.prod.by-systems.be         (public — external access)
+vpn.by-systems.be                (public — VPN entry)
 ```
 
 ### DNS ownership
-- `*.org.internal` → pfSense Unbound (internal resolver)
-- `*.org.example` → Cloudflare (public DNS + DNS-01 ACME)
-- Split DNS: same FQDN can resolve differently inside vs outside
+- `*.{env}.by-systems.be` → Pi-hole/OPNsense Unbound (internal resolver)
+- `*.{env}.by-systems.be` → Cloudflare DNS-01 (external / cert issuance)
+- Split DNS: same FQDN resolves differently inside vs outside
 
 ---
 
@@ -379,10 +376,10 @@ Matches FQDN prefix and Prometheus job label.
 
 | NetBox service name | Repo | FQDN | Prometheus job |
 |---|---|---|---|
-| `gitlab` | `platform-gitlab-core` | `gitlab.org.internal` | `gitlab` |
-| `vault` | `platform-vault-config` | `vault.org.internal` | `vault` |
-| `kamailio` | `mod-voip-kamailio` | `kamailio.org.internal` | `kamailio` |
-| `netbox` | `platform-netbox-config` | `netbox.org.internal` | `netbox` |
+| `gitlab` | `platform-gitlab-core` | `gitlab.poc.by-systems.be` | `gitlab` |
+| `vault` | `platform-vault-config` | `vault.poc.by-systems.be` | `vault` |
+| `kamailio` | `mod-voip-kamailio` | `kamailio.poc.by-systems.be` | `kamailio` |
+| `netbox` | `platform-netbox-config` | `netbox.poc.by-systems.be` | `netbox` |
 
 ### NetBox custom fields per service
 - `repo_url` — GitLab/GitHub repo link
@@ -403,15 +400,15 @@ Matches FQDN prefix and Prometheus job label.
 
 ### Registry
 ```
-registry.org.internal/{scope}/{component}
+registry.poc.by-systems.be/{scope}/{component}
 ```
-(GitLab built-in registry, accessible at `gitlab.org.internal/registry`)
+(GitLab built-in registry, accessible at `gitlab.poc.by-systems.be/registry`)
 
 ### Examples
 ```
-registry.org.internal/platform/gitlab-core:1.2.3-prod
-registry.org.internal/mod/voip-kamailio:2.0.1-staging
-registry.org.internal/svc/virtual-sip-codec:0.3.0
+registry.poc.by-systems.be/platform/gitlab-core:1.2.3-prod
+registry.poc.by-systems.be/mod/voip-kamailio:2.0.1-staging
+registry.poc.by-systems.be/svc/virtual-sip-codec:0.3.0
 ```
 
 ### CI tags
@@ -456,9 +453,9 @@ labels:
   app.kubernetes.io/component: core
   app.kubernetes.io/version: "1.2.3"
   app.kubernetes.io/managed-by: helm
-  org.io/scope: platform
-  org.io/env: prod
-  org.io/service: gitlab
+  by-systems.be/scope: platform
+  by-systems.be/env: prod
+  by-systems.be/service: gitlab
 ```
 
 ---
@@ -530,8 +527,8 @@ Automated via release-please GitHub/GitLab Action:
 
 Examples:
 ```
-Youssef Boujraf (ORG DevOps) <y.boujraf@org.example>
-GitLab CI Runner (platform-gitlab-prod-01) <ci@org.example>
+Youssef Boujraf (BY-SYSTEMS DevOps) <y.boujraf@by-systems.be>
+GitLab CI Runner (platform-gitlab-prod-01) <ci@by-systems.be>
 ```
 
 ### GPG Key policy
@@ -553,7 +550,7 @@ All lowercase, underscores (SSH convention), no hyphens in filename.
 
 #### Examples
 ```
-id_ed25519_personal_org        # personal workstation → ORG infra
+id_ed25519_personal_by-systems # personal workstation → BY-SYSTEMS infra
 id_ed25519_deploy_platform_gitlab    # deploy key for platform-gitlab-core repo
 id_ed25519_ci_runner_prod            # GitLab CI runner (prod)
 id_ed25519_ansible_infra             # Ansible service account
@@ -707,7 +704,7 @@ Relative paths only. No absolute paths, no external image URLs in committed docs
 | `prod` | External provider | real domain | Microsoft Exchange, Google Workspace, or equivalent |
 
 > **Why `example.com` for non-prod?**  
-> RFC 2606 reserves `example.com` — safe to use internally with no risk of leaking mail externally. Mailcow is configured to be authoritative for this domain on the internal DNS (`*.org.internal`).
+> RFC 2606 reserves `example.com` — safe to use internally with no risk of leaking mail externally. Mailcow is configured to be authoritative for this domain on the internal DNS (`*.poc.by-systems.be`).
 
 ---
 

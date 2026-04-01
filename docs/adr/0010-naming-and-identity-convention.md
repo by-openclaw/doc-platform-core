@@ -34,8 +34,8 @@ Six environment tiers, always explicit:
 | Hostname | `{function}-{type}-{env}-{seq:02d}` | `srv-proxmox-poc-01` | `srv-proxmox-prod-01` |
 | VM | `vm-{service}-{env}-{seq:02d}` | `vm-netbox-poc-01` | `vm-netbox-prod-01` |
 | LXC | `lxc-{service}-{env}-{seq:02d}` | `lxc-pihole-poc-01` | `lxc-pihole-prod-01` |
-| FQDN | `{service}.{env}.{domain}` | `netbox.poc.by-systems.arpa` | `netbox.prod.by-systems.arpa` |
-| Certificate | `*.{env}.{domain}` | `*.poc.by-systems.arpa` | `*.prod.by-systems.arpa` |
+| FQDN | `{service}.{env}.{domain}` | `netbox.poc.by-systems.be` | `netbox.prod.by-systems.be` |
+| Certificate | `*.{env}.{domain}` | `*.poc.by-systems.be` | `*.prod.by-systems.be` |
 | Secret file | `{scope}-{service}-{env}.json` | `infra-proxmox-poc.json` | `infra-proxmox-prod.json` |
 | Vault path | `secret/{scope}/{service}/{env}` | `secret/infra/proxmox/poc` | `secret/infra/proxmox/prod` |
 | Service account | `svc-{function}-{env}` | `svc-terraform-poc` | `svc-terraform-prod` |
@@ -155,3 +155,4 @@ Until Authentik (Layer 3) provides policy-as-code, naming is enforced by CI chec
 - Environment tier standard extracted to ADR-0012 for independent referenceability
 - Credential storage convention extracted to ADR-0011
 - GRC tool: CISO Assistant (open source) — compliance dashboard when deployed
+- Domain: `by-systems.arpa` was original placeholder. Decision 2026-04-01: use `{service}.{env}.by-systems.be` with split DNS.

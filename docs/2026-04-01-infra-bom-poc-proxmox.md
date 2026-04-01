@@ -19,22 +19,22 @@
 | VM | Tool | Source / Repo | Docker Image |
 |---|---|---|---|
 | vm-opnsense-poc-01 | OPNsense 24.x | <https://github.com/opnsense/core> · <https://opnsense.org/download/> | ISO - bare VM, not Docker |
-| vm-pihole-poc-01 | Pi-hole v6 | <https://github.com/pi-hole/pi-hole> · <https://pi-hole.net> | `pihole/pihole:latest` |
+| vm-pihole-poc-01 | Pi-hole v6 | <https://github.com/pi-hole/pi-hole> · <https://pi-hole.net> | `pihole/pihole:2025.03.0` |
 | vm-traefik-poc-01 | Traefik v3 | <https://github.com/traefik/traefik> · <https://traefik.io> | `traefik:v3` |
-| vm-vault-poc-01 | HashiCorp Vault | <https://github.com/hashicorp/vault> · <https://developer.hashicorp.com/vault> | `hashicorp/vault:latest` |
-| vm-vaultwarden-poc-01 | Vaultwarden | <https://github.com/dani-garcia/vaultwarden> | `vaultwarden/server:latest` |
-| vm-authentik-poc-01 | Authentik | <https://github.com/goauthentik/authentik> · <https://goauthentik.io> | `ghcr.io/goauthentik/server:latest` |
-| vm-gitlab-poc-01 | GitLab CE | <https://gitlab.com/gitlab-org/gitlab> · <https://about.gitlab.com/install/> | `gitlab/gitlab-ce:latest` |
-| vm-gitlab-runner-poc-01 | GitLab Runner | <https://gitlab.com/gitlab-org/gitlab-runner> | `gitlab/gitlab-runner:latest` |
-| vm-nextcloud-poc-01 | Nextcloud | <https://github.com/nextcloud/server> · <https://nextcloud.com> | `nextcloud:fpm-alpine` |
-| vm-netbox-poc-01 | NetBox | <https://github.com/netbox-community/netbox> · <https://netbox.dev> | `ghcr.io/netbox-community/netbox:latest` |
-| vm-nexus-poc-01 | Nexus OSS | <https://github.com/sonatype/nexus-public> · <https://www.sonatype.com/products/sonatype-nexus-oss> | `sonatype/nexus3:latest` |
-| vm-observability-poc-01 | Prometheus | <https://github.com/prometheus/prometheus> | `prom/prometheus:latest` |
-| vm-observability-poc-01 | Grafana | <https://github.com/grafana/grafana> | `grafana/grafana:latest` |
-| vm-observability-poc-01 | Loki | <https://github.com/grafana/loki> | `grafana/loki:latest` |
-| vm-postgres-poc-01 | PostgreSQL 16 | <https://github.com/postgres/postgres> | `postgres:16-alpine` |
+| vm-vault-poc-01 | HashiCorp Vault | <https://github.com/hashicorp/vault> · <https://developer.hashicorp.com/vault> | `hashicorp/vault:1.19.0` |
+| vm-vaultwarden-poc-01 | Vaultwarden | <https://github.com/dani-garcia/vaultwarden> | `vaultwarden/server:1.33.2-alpine` |
+| vm-authentik-poc-01 | Authentik | <https://github.com/goauthentik/authentik> · <https://goauthentik.io> | `ghcr.io/goauthentik/server:2025.2.4` |
+| vm-gitlab-poc-01 | GitLab CE | <https://gitlab.com/gitlab-org/gitlab> · <https://about.gitlab.com/install/> | `gitlab/gitlab-ce:17.10.1-ce.0` |
+| vm-gitlab-runner-poc-01 | GitLab Runner | <https://gitlab.com/gitlab-org/gitlab-runner> | `gitlab/gitlab-runner:alpine-v17.10.1` |
+| vm-nextcloud-poc-01 | Nextcloud | <https://github.com/nextcloud/server> · <https://nextcloud.com> | `nextcloud:31.0.4-fpm-alpine` |
+| vm-netbox-poc-01 | NetBox | <https://github.com/netbox-community/netbox> · <https://netbox.dev> | `ghcr.io/netbox-community/netbox:v4.2.6` |
+| vm-nexus-poc-01 | Nexus OSS | <https://github.com/sonatype/nexus-public> · <https://www.sonatype.com/products/sonatype-nexus-oss> | `sonatype/nexus3:3.79.0` |
+| vm-observability-poc-01 | Prometheus | <https://github.com/prometheus/prometheus> | `prom/prometheus:v3.2.1` |
+| vm-observability-poc-01 | Grafana | <https://github.com/grafana/grafana> | `grafana/grafana:11.5.2` |
+| vm-observability-poc-01 | Loki | <https://github.com/grafana/loki> | `grafana/loki:3.4.2` |
+| vm-postgres-poc-01 | PostgreSQL 16 | <https://github.com/postgres/postgres> | `postgres:16.8-alpine` |
 | vm-redis-poc-01 | Redis ≤7.2 (BSD-3) | <https://github.com/redis/redis> | `redis:7.2.7-alpine` ⚠️ pin — do not upgrade to 7.4+ (RSALv2/SSPL) |
-| vm-unifi-poc-01 | Unifi Network App | <https://github.com/linuxserver/docker-unifi-network-application> | `lscr.io/linuxserver/unifi-network-application:latest` |
+| vm-unifi-poc-01 | Unifi Network App | <https://github.com/linuxserver/docker-unifi-network-application> | `lscr.io/linuxserver/unifi-network-application:9.0.114` |
 
 ---
 
@@ -47,7 +47,7 @@
 | **OPNsense** | Community | BSD 2-clause | No commercial support. Business Edition adds ZenArmor NGFW, netdata plugin, config sync. All routing/FW/WireGuard/VPN features included free. | ✅ Full fit |
 | **Pi-hole** | Free / OSS | EUPL 1.2 | No paid tier exists. Fully free forever. Phase 2 → BIND9. | ✅ Full fit |
 | **Traefik** | OSS (v3) | MIT | Traefik Enterprise adds distributed rate-limiting, multi-cluster, RBAC, WAF. OSS has everything needed: TLS, Let's Encrypt, middleware, routing. | ✅ Full fit |
-| **HashiCorp Vault** | Community | BSL 1.1 | **BSL since Aug 2023.** Free for internal use + non-competing products. Missing vs Enterprise: Namespaces, HSM auto-unseal, DR replication, Secrets Sync, SAML auth, FIPS 140-2, Sentinel, Transform secrets engine. Core secrets management fully functional. | ✅ Full fit for PoC. Note BSL for prod compliance review. |
+| **HashiCorp Vault** | Community | BUSL-1.1 | **BSL since Aug 2023.** Free for internal use + non-competing products. Missing vs Enterprise: Namespaces, HSM auto-unseal, DR replication, Secrets Sync, SAML auth, FIPS 140-2, Sentinel, Transform secrets engine. Core secrets management fully functional. | ✅ Full fit for PoC. Note BSL for prod compliance review. |
 | **Vaultwarden** | Free / OSS | AGPL 3.0 | Unofficial Bitwarden API reimplementation. Not Bitwarden official. No paid tier. All Bitwarden client features work (passwords, 2FA, collections). | ✅ Full fit |
 | **Authentik** | OSS (self-hosted) | MIT | Enterprise adds: support SLA, FIPS compliance, volume pricing. **All protocols free: OIDC, SAML, LDAP, SCIM, RADIUS, Kerberos, RAC (RDP/SSH - moved to OSS in 2025.2).** No feature gating on OSS self-hosted. Confirmed: no features will ever be moved from OSS to Enterprise. | ✅ Full fit |
 | **GitLab CE** | Community Edition | MIT | Missing vs EE: SAML SSO, LDAP group sync, Merge Trains, Code Owners (enforcement), Audit Events (advanced), Container Scanning, DAST, Compliance Frameworks, Epics, Portfolio Mgmt. **No user/project/pipeline limits on CE.** Repos, CI/CD, Registry all unlimited. | ✅ Full fit for PoC. Note: SAML SSO handled by Authentik (OIDC) - not a gap. |
@@ -66,7 +66,7 @@
 **All tools fit PoC on free/community editions. Zero blockers.**
 
 Two items to note for Phase 2 / prod compliance:
-- **Vault BSL:** review BSL 1.1 terms before production deployment in customer-facing context. Internal use is unambiguously permitted.
+- **Vault BSL:** review BUSL-1.1 terms before production deployment in customer-facing context. Internal use is unambiguously permitted.
 - **Redis 7.4+ license:** pin Docker image to `redis:7.2-alpine` (BSD-licensed). No functional impact.
 
 ---

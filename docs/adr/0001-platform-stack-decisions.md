@@ -2,15 +2,15 @@
 
 **Date:** 2026-03-25  
 **Status:** Accepted  
-**Scope:** ORG internal DevOps PoC platform (Tier 1 base + Tier 2 optional modules)  
-**Authors:** ORG platform team  
+**Scope:** BY-SYSTEMS internal DevOps PoC platform (Tier 1 base + Tier 2 optional modules)
+**Authors:** BY-SYSTEMS platform team  
 **Related docs:** `docs/stack.md`, `docs/naming-convention.md`, `docs/archive/brainstorm-2026-03-25.md`
 
 ---
 
 ## Context
 
-ORG is a broadcast/telecom system integrator building an internal DevOps PoC platform. Goals:
+BY-SYSTEMS is a broadcast/telecom system integrator building an internal DevOps PoC platform. Goals:
 
 - Replace legacy/manual workflows with proper DevOps tooling
 - Serve as reference architecture for SME customers
@@ -89,7 +89,7 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 | pfSense CE + pfBlockerNG | Firewall, DHCP, DNS, VPN, threat blocking |
 | Bind 9 | Authoritative internal DNS |
 | Traefik v3 | Edge reverse proxy + TLS termination |
-| step-ca (Smallstep) | Internal CA for `*.org.internal` |
+| step-ca (Smallstep) | Internal CA for `*.{env}.by-systems.be` |
 | WireGuard (pfSense) | Site-to-site + road warrior VPN |
 | NetBird | Zero-config mesh VPN for user devices (SSO via Authentik) |
 | Cloudflare | Public DNS + DNS-01 ACME challenge |
@@ -97,7 +97,7 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 **Key rules:**
 - **Traefik is the only edge proxy.** No Apache/Nginx at the network edge. Internal service reverse proxies (e.g., GitLab's built-in Nginx) run on localhost only (`listen_port 8080`, `listen_https false`).
 - **Internal TLD is `.internal`** — avoids mDNS `.local` conflicts per RFC 6762.
-- **Split DNS:** `*.org.internal` → pfSense Unbound; `*.org.example` → Cloudflare.
+- **Split DNS:** `*.{env}.by-systems.be` → Pi-hole/OPNsense Unbound (internal); `*.{env}.by-systems.be` → Cloudflare DNS-01 (external).
 - **Dual-stack everywhere:** IPv4 + IPv6, A + AAAA DNS records.
 
 **Rationale:**
@@ -352,12 +352,11 @@ Full details in `docs/naming-convention.md`. Key rules:
 | Repository | `{scope}-{component}-{qualifier}` | `platform-gitlab-core` |
 | Branch | `{type}/{issue-id}-{short-description}` | `feat/42-add-vault-integration` |
 | Commit | `{type}({scope}): {description}` | `feat(platform): add vault compose stack` |
-| FQDN (internal) | `{service}.{org}.internal` | `vault.org.internal` |
-| FQDN (public) | `{service}.{org}.be` | `gitlab.org.example` |
+| FQDN | `{service}.{env}.by-systems.be` | `vault.poc.by-systems.be` |
 | Device | `{function}-{vendor}-{env}-{number}` | `sw-arista-prod-01` |
 | VM | `vm-{service}-{env}-{number}` | `vm-gitlab-prod-01` |
 | K8S namespace | `{scope}-{env}` | `platform-prod` |
-| Container image | `{registry}/{scope}/{component}:{version}-{env}` | `registry.org.internal/platform/gitlab-core:1.2.3-prod` |
+| Container image | `{registry}/{scope}/{component}:{version}-{env}` | `registry.poc.by-systems.be/platform/gitlab-core:1.2.3-prod` |
 
 ---
 
