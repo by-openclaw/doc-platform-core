@@ -255,6 +255,7 @@ OPNsense Unbound (DoT terminator)
 | Tool | Reason |
 |---|---|
 | step-ca | Deferred — LE via Cloudflare DNS-01 covers PoC. step-ca for internal mTLS later. CT log exposure acceptable for PoC (wildcard cert hides subdomains). |
+| DNS → BIND9 | **Deferred to Phase 2.** Pi-hole covers PoC (blocklists + local overrides). Phase 2: replace with BIND9 — authoritative zones, split-horizon views, TSIG, DNSSEC. CISO-grade DNS. `vm-pihole-poc-01` → `vm-bind-poc-01`. Zone files versioned in git, Ansible-managed. |
 | Wazuh | **Deferred to Phase 2.** stack.md lists as CISO Tier 1. PoC proceeds without SIEM — acceptable risk for internal-only PoC. Must be first service added in Phase 2. |
 | Teleport | **Deferred to Phase 2.** stack.md designates as primary bastion (cert SSH + session recording). SSH is direct to VMs for PoC. Acceptable for controlled single-operator environment. Add before multi-operator phase. |
 | MinIO | **Removed from PoC.** Contabo S3 (250 GB) is available — use directly. No self-hosted S3 needed. |
@@ -378,7 +379,7 @@ Compose files written with Swarm compatibility in mind (`deploy:` blocks comment
 |---|---|
 | RAM | **188 GB — no constraints.** |
 | NFS shares | `poc-iso` + `poc-backup` — existing on NAS. |
-| DNS | VMs → OPNsense NAT :53 redirect → Pi-hole (10.1.1.60) → OPNsense Unbound :853 → DoT 1.1.1.1. No Unbound sidecar on Pi-hole. OPNsense Unbound = DoT terminator (enabled). |
+| DNS (Phase 1 — PoC) | Pi-hole (10.1.1.60) — blocklists + local overrides. OPNsense NAT enforces :53 redirect. OPNsense Unbound = DoT terminator :853. **Phase 2 migration: replace Pi-hole → BIND9** (authoritative, split-horizon, TSIG, DNSSEC — CISO-grade). Pi-hole is PoC-only. |
 | Domain | `{service}.by-systems.be` confirmed. |
 | Cloudflare token | In `infra/secrets/` — confirm key name before Traefik deploy. |
 | Contabo S3 creds | In `infra/secrets/` — confirm bucket names before GitLab/Nexus/Loki deploy. |
