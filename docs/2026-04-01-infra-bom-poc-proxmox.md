@@ -296,7 +296,7 @@ Compose files written with Swarm compatibility in mind (`deploy:` blocks comment
 3.  vm-netbox-poc-01          (IPAM — source of truth, register all IPs before further deploys)
 4.  vm-vault-poc-01           (secrets — needed by Authentik)
 5.  vm-vaultwarden-poc-01     (human credentials — standalone, deploy alongside Vault)
-6.  vm-authentik-poc-01       (identity — needed by all services; ADR-0011 must exist before this step)
+6.  vm-authentik-poc-01       (identity — needed by all services; ADR-0004 covers identity federation architecture)
 7.  vm-gitlab-poc-01          (VCS — needed by CI)
 8.  vm-gitlab-runner-poc-01   (CI — depends on GitLab)
 9.  vm-nexus-poc-01           (registry — standalone)

@@ -1,6 +1,6 @@
 # ORG Platform — RAID Log
 
-**Last updated:** 2026-03-30
+**Last updated:** 2026-04-01
 **Status:** Active — PoC phase
 **Related docs:** `docs/stack.md`, `docs/roadmap.md`, `docs/architecture.md`
 
@@ -56,6 +56,7 @@
 | A-12 | ORG team has Ansible and Terraform skills for Phase 1 IaC | Phase 1 delayed | Skills assessment before start |
 | A-13 | Nexus OSS (Apache 2.0) remains free for all required formats | Forced migration to paid tier | Monitor Sonatype licensing changes; Nexus pinned to current OSS version |
 | A-14 | Customer production mail (Exchange/Google) will be available for SMTP relay config | Platform notification emails fail in prod | Collect SMTP relay credentials during customer onboarding |
+| A-15 | Telenet provides a /32 static IP (not a subnet) on the WAN interface | OPNsense WAN config wrong — gateway unreachable, PoC internet blocked | Verify actual IP allocation (IPv4 /32 vs routed subnet) with ISP docs or pfSense WAN config before Phase 2 migration |
 
 ---
 
@@ -63,6 +64,8 @@
 
 | ID | Issue | Severity | Date raised | Resolution | Status |
 |---|---|---|---|---|---|
+| I-25 | Cloudflare API token rotation runbook missing — no procedure for expiry or compromise rotation before PoC go-live | High | 2026-04-01 | Write runbook: locate token in Vault, issue new token in Cloudflare, update Vault secret, rolling Traefik restart, verify cert renewal. Add Grafana cert-expiry alert. | Open |
+| I-26 | NFS routing from scratch PoC VM to NAS (10.6.224.6) via OPNsense untested — mount may fail silently | High | 2026-04-01 | Spin up scratch VM on `vnet-poc-mgmt` after OPNsense deploy, attempt NFS mount to 10.6.224.6:/volume1/poc-iso. Verify routing, firewall rules, and NFS export ACLs before Terraform runs. | Open |
 | I-23 | `FileStation.upload()` return dict returns `{"skipped": bool}` — violates ADR-0007 `{"changed": bool, "action": str}` contract | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: return `{"changed": bool, "action": "created"\|"skipped"\|"overwritten"}` | Open |
 | I-24 | `client.py` timeout hardcoded at 30s — no per-operation timeout, no streaming upload support | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: per-op timeout param with sensible defaults | Open |
 | I-17 | Terraform scaffold incomplete — no OPNsense VM, no vmbrPOC bridge, PoC VMs on vmbrOOB (prod bridge) | High | 2026-03-28 | Deploy OPNsense VM + vmbrPOC. Move all PoC VMs to vmbrPOC. See platform-setup#58. | Open |
