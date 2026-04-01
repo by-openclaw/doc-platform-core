@@ -4,7 +4,7 @@
 > **Author:** Rune
 > **Status:** DRAFT — @yboujraf reviews + approves → Opus validates → ADR
 > **Hardware:** srv-proxmox-poc-01 — 12 cores, **188 GB RAM**, NAS storage (Synology DS1513+)
-> **Network:** `10.1.0.0/20` PoC supernet — **isolated from prod `10.6.0.0/20`**. OOB dependency limited to: NAS NFS mounts (10.6.224.6) routed via OPNsense, and Proxmox host management. No PoC traffic routed into prod `10.6.0.0/20`.
+> **Network:** `10.1.0.0/20` PoC supernet — **isolated from prod `10.6.0.0/20`**. OOB dependency: Proxmox host management + NAS NFS host-level mounts (`poc-iso`, `poc-backup`) only. VMs do NOT mount NFS directly. No PoC VM traffic routes to OOB NAS at runtime.
 > **WAN:** OPNsense connects directly to both ISPs via 3com OOB switch — Proximus (PPPoE VLAN 10) + Telenet (static VLAN 999). Primary OOB prod confirmed working. Telenet as PoC WAN is **untested** — two firewalls (prod pfSense + PoC OPNsense) sharing same Telenet gateway is unknown territory. Must verify before relying on it. WireGuard endpoint on Telenet fixed IP is the target, not confirmed.
 > **VLAN IDs 300-series (PoC infra), 400-series (PoC users). Verified against live switch configs (2026-04-01).**
 > **Rules:** Docker-only, Traefik as reverse proxy, no Apache/nginx. Cluster-ready (Docker Swarm → K3s path). Minimum VM sizes set conservatively — bump as needed (167 GB free RAM, no constraints).
@@ -37,8 +37,8 @@ No physical switch between VMs — all networking is **Proxmox SDN** (VNets + Zo
 | **310** | `vnet-poc-mgmt` | 10.1.1.0/24 | MGMT — Rune VM (.5), Terraform, Ansible | WireGuard only |
 | **320** | `vnet-poc-dmz` | 10.1.2.0/24 | DMZ — Traefik (.10), WireGuard (.61) | Traefik :443, WG :51820 |
 | **330** | `vnet-poc-svc` | 10.1.3.0/24 | SVC — all service VMs | Via Traefik only |
-| **340** | `vnet-poc-storage` | 10.1.4.0/24 | **TBD** — NAS is on OOB (10.6.224.6), not on PoC VLANs. Routing via OPNsense not yet verified. Reserved, not assigned. | None |
-| **350** | `vnet-poc-backup` | 10.1.5.0/24 | **TBD** — depends on 340 decision. May be removed or repurposed. Verify when OPNsense is up. | None |
+| **340** | `vnet-poc-storage` | 10.1.4.0/24 | **RESERVED / NOT USED** — NAS NFS is host-level only (`poc-iso`, `poc-backup`). VMs never mount NFS directly. 340 has no current use case. Remove from Arista trunk allowed list until repurposed. | None |
+| **350** | `vnet-poc-backup` | 10.1.5.0/24 | **RESERVED / NOT USED** — same rationale as 340. No VM-level backup network needed. Proxmox backup jobs use host-level NFS directly. | None |
 | **400** | `vnet-poc-wifi` | 10.1.6.0/24 | WIFI — Unifi AP users | None |
 | **410** | `vnet-poc-users` | 10.1.7.0/24 | USERS — workstations (future) | None |
 
@@ -83,7 +83,7 @@ HTTP/S:    Internet → OPNsense dual-WAN → Traefik (10.1.2.10 DMZ) → SVC (1
 VPN:       Rune VM → WireGuard@OPNsense (Telenet fixed IP) → MGMT/SVC zones
            @yboujraf → WireGuard@OPNsense (Telenet fixed IP) → MGMT/SVC zones
 DNS:       VMs → Pi-hole (10.1.1.60) → Unbound → DoT upstream
-Storage:   VMs → NAS via vnet-poc-storage (10.1.4.x) / vnet-poc-backup (10.1.5.x)
+Storage:   Proxmox host → NAS (host-level NFS: poc-iso, poc-backup). VMs → Contabo S3 (runtime data).
 Isolation: prod OOB (10.6.224.x) NEVER touched by PoC traffic
 Migration: WireGuard endpoint = Telenet fixed IP — stable, no DDNS
 ```
@@ -147,12 +147,11 @@ Deploy in order: Vault first → Authentik depends on it for secrets.
 
 | VM name | Tool | vCPU | RAM | Disk | IP | Notes |
 |---|---|---|---|---|---|---|
-| vm-nextcloud-poc-01 | Nextcloud | 2 | 2 GB | 20 GB | 10.1.3.35 | Docker (nextcloud-fpm + nginx sidecar + PostgreSQL + Redis). Primary storage: Contabo S3. NAS exposed via External Storage app (SMB/NFS — users see it as a folder). SSO via Authentik (OIDC). `nextcloud.by-systems.be`. |
+| vm-nextcloud-poc-01 | Nextcloud | 2 | 2 GB | 20 GB | 10.1.3.35 | Docker (nextcloud-fpm + nginx sidecar + PostgreSQL + Redis). Primary storage: Contabo S3. SSO via Authentik (OIDC). `nextcloud.by-systems.be`. |
 
 **Storage layout for Nextcloud:**
 - User files → Contabo S3 (primary storage, unlimited scale within 250 GB quota)
-- NAS shares → External Storage app — mounted per user/group, appears as "NAS" folder in their drive
-- Result: OneDrive-equivalent UX with both cloud and NAS visible in one interface
+- NAS via External Storage app: deferred — Nextcloud VM does not mount NFS at PoC stage. Revisit if NAS browsing is needed.
 
 **nginx sidecar note:** Nextcloud-fpm requires a web server sidecar for PHP-FPM. This is a Nextcloud-internal component (fpm process manager), not a general-purpose reverse proxy. Traefik remains the external entry point. This is not a violation of the no-nginx rule — same pattern as GitLab's bundled components.
 
@@ -223,11 +222,11 @@ Colocated on one VM for PoC (separate later in prod).
 
 *Sizing bumps from Opus audit (2026-04-01): Traefik 512 MB → 1 GB, GitLab 4 GB → 8 GB, Observability 2 GB → 4 GB.*
 | Disk (VM OS) | ~260 GB | Proxmox local (thin) | — |
-| Persistent data | Contabo S3 + NAS NFS | 250 GB S3 + NAS | — |
+| Persistent data | Contabo S3 | 250 GB S3 | — |
 
 **CPU:** 20 vCPU across 12 physical cores — overcommit ~1.7x. Fine for these workloads (mostly idle services, I/O-bound not CPU-bound). No pinning needed for PoC.
 **RAM:** 21 GB allocated out of 188 GB physical = **11% used. No constraints.** Minimum sizes set now — trivial to bump any VM later without redesign.
-**Disk:** VM OS disks on `poc-data` ZFS pool. NAS NFS for persistent app data. ZFS gives native snapshotting — use for VM backups before major changes.
+**Disk:** VM OS disks on `poc-data` ZFS pool. Persistent app data on Contabo S3 (not NAS). ZFS gives native snapshotting — use for VM backups before major changes.
 
 ---
 
@@ -235,15 +234,17 @@ Colocated on one VM for PoC (separate later in prod).
 
 | Data type | Where | How |
 |---|---|---|
-| VM OS disks | **`poc-data` ZFS pool** (Proxmox) | Terraform `datastore_id = "poc-data"`. ZFS, not LVM-thin. |
-| Persistent app data | NAS NFS mounts (10.6.224.6) | Docker volumes → NFS |
-| GitLab repos | NAS NFS | Git data — dedicated NFS share |
+| VM OS disks | **`poc-data` ZFS pool** (Proxmox local) | Terraform `datastore_id = "poc-data"`. ZFS, not LVM-thin. |
+| Persistent app data | **Contabo S3** | Docker volumes → S3. All runtime data. No VM-level NFS. |
+| GitLab repos | **`poc-data` ZFS** (VM local disk, 50 GB) | Git data lives on VM disk. Large repos scale to S3 object storage. |
 | GitLab CI artifacts / backups | `by-poc-gitlab` (Contabo S3) | GitLab object storage config (S3-compatible) |
 | Nexus blob store | `by-poc-nexus` (Contabo S3) | Nexus S3 blob store config |
 | Loki log chunks | `by-poc-loki` (Contabo S3) | Loki S3 backend |
 | Nextcloud user files | `by-poc-nextcloud` (Contabo S3) | Nextcloud primary storage backend |
-| Prometheus TSDB | Local VM disk (fast I/O needed) | Keep on VM, not NAS |
+| Prometheus TSDB | Local VM disk (fast I/O) | Keep on VM — latency sensitive |
 | General backups | `by-poc-backups` (Contabo S3) | Restic — versioning enabled |
+| Proxmox ISOs | **NAS NFS host-level** (`poc-iso`) | Proxmox storage config — host mounts NFS, VMs don't see it |
+| Proxmox VM backups | **NAS NFS host-level** (`poc-backup`) | Proxmox backup jobs — host-level NFS mount, not VM traffic |
 
 ---
 
@@ -276,7 +277,7 @@ Compose files written with Swarm compatibility in mind (`deploy:` blocks comment
 - [ ] Debian 12 cloud-init template exists on Proxmox (confirm VMID + stored on `poc-data`)
 - [ ] `poc-data` ZFS pool confirmed healthy (`zpool status poc-data` on Proxmox)
 - [ ] Terraform `datastore_id = "poc-data"` set in all VM modules (not `local-lvm`)
-- [ ] NFS exports on NAS configured for `10.1.0.0/16 (NFS exports for all PoC VLANs) poc-iso, poc-backup)
+- [ ] NFS exports on NAS configured for Proxmox host IP (10.6.224.105): `poc-iso` + `poc-backup` shares. No PoC VLAN export needed — host-level mounts only.
 - [ ] Proxmox SDN configured: `vnet-mgmt`, `vnet-dmz` VNets created
 - [ ] Rune VM second NIC added to `vnet-mgmt` (`10.1.1.5`)
 - [ ] IP plan confirmed (no conflicts with DHCP pool `10.6.239.101-199`)
