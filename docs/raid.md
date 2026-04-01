@@ -65,7 +65,7 @@
 | ID | Issue | Severity | Date raised | Resolution | Status |
 |---|---|---|---|---|---|
 | I-25 | Cloudflare API token rotation runbook missing — no procedure for expiry or compromise rotation before PoC go-live | High | 2026-04-01 | Write runbook: locate token in Vault, issue new token in Cloudflare, update Vault secret, rolling Traefik restart, verify cert renewal. Add Grafana cert-expiry alert. | Open |
-| I-26 | NFS routing from scratch PoC VM to NAS (10.6.224.6) via OPNsense untested — mount may fail silently | High | 2026-04-01 | Spin up scratch VM on `vnet-poc-mgmt` after OPNsense deploy, attempt NFS mount to 10.6.224.6:/volume1/poc-iso. Verify routing, firewall rules, and NFS export ACLs before Terraform runs. | Open |
+| I-26 | NFS routing from scratch PoC VM to NAS (10.6.224.6) via OPNsense untested | High | 2026-04-01 | **CLOSED 2026-04-01** — Storage architecture corrected. VMs never mount NFS. NAS is host-level only (poc-iso + poc-backup on Proxmox host). Risk eliminated. GitHub #69 closed. | Closed |
 | I-23 | `FileStation.upload()` return dict returns `{"skipped": bool}` — violates ADR-0007 `{"changed": bool, "action": str}` contract | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: return `{"changed": bool, "action": "created"\|"skipped"\|"overwritten"}` | Open |
 | I-24 | `client.py` timeout hardcoded at 30s — no per-operation timeout, no streaming upload support | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: per-op timeout param with sensible defaults | Open |
 | I-17 | Terraform scaffold incomplete — no OPNsense VM, no vmbrPOC bridge, PoC VMs on vmbrOOB (prod bridge) | High | 2026-03-28 | Deploy OPNsense VM + vmbrPOC. Move all PoC VMs to vmbrPOC. See platform-setup#58. | Open |
