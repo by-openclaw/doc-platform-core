@@ -17,7 +17,7 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 | k3s | Lightweight Kubernetes | Apache 2.0 | ✅ | ✅ | ✅ Helm |
 | k9s | K8S terminal UI | Apache 2.0 | ✅ | — | — |
 | Headlamp | K8S web UI | Apache 2.0 | ✅ | ✅ | ✅ Helm |
-| Packer | Golden VM image builder (bare metal / Proxmox) | MPL 2.0 | ✅ | ✅ | — |
+| Packer | Golden VM image builder (bare metal / Proxmox) | BUSL 1.1 ⚠️ | ✅ | ✅ | — |
 
 ---
 
@@ -25,7 +25,7 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 
 | Tool | Role | License | Free Plan | Docker | K8S |
 |---|---|---|---|---|---|
-| Terraform (Proxmox provider) | VM/LXC provisioning | MPL 2.0 | ✅ | ✅ | — |
+| Terraform (Proxmox provider) | VM/LXC provisioning | BUSL 1.1 ⚠️ | ✅ | ✅ | — |
 | Ansible | Config management | GPL v3 | ✅ | ✅ | — |
 | arista.eos (collection) | Arista switch automation | Apache 2.0 | ✅ | — | — |
 | netbox.netbox (collection) | NetBox dynamic inventory | Apache 2.0 | ✅ | — | — |

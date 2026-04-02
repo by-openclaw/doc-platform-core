@@ -143,5 +143,6 @@ NetBox (source of truth)
 ## References
 
 - [Naming conventions](../naming-convention.md)
+- [ADR-0010: Naming & Identity Convention](0010-naming-and-identity-convention.md) — **authoritative source for all naming decisions** (FQDN patterns, repo naming, branch/commit conventions). This ADR defers to ADR-0010 for naming; only repository structure decisions are recorded here.
 - [NetBox source of truth](../netbox.md)
 - [Platform stack](../stack.md)
