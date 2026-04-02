@@ -82,34 +82,37 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 
 ## 3. Networking
 
-### Decision: pfSense + Traefik + step-ca + NetBird
+### Decision: OPNsense + Pi-hole + Traefik + step-ca + NetBird
+
+> **Updated 2026-04-02:** pfSense CE replaced by OPNsense. See ADR-0015 for full network/VLAN architecture.
 
 | Tool | Role |
 |---|---|
-| pfSense CE + pfBlockerNG | Firewall, DHCP, DNS, VPN, threat blocking |
-| Bind 9 | Authoritative internal DNS |
+| OPNsense | Firewall, DHCP, routing, VPN — PoC gateway (ADR-0015) |
+| Pi-hole | DNS resolver + ad/threat blocking — MGMT zone (ADR-0015) |
 | Traefik v3 | Edge reverse proxy + TLS termination |
-| step-ca (Smallstep) | Internal CA for `*.{env}.by-systems.be` |
-| WireGuard (pfSense) | Site-to-site + road warrior VPN |
+| step-ca (Smallstep) | Internal CA for `*.by-systems.be` internal services |
+| WireGuard (OPNsense) | Site-to-site + road warrior VPN |
 | NetBird | Zero-config mesh VPN for user devices (SSO via Authentik) |
 | Cloudflare | Public DNS + DNS-01 ACME challenge |
 
 **Key rules:**
-- **Traefik is the only edge proxy.** No Apache/Nginx at the network edge. Internal service reverse proxies (e.g., GitLab's built-in Nginx) run on localhost only (`listen_port 8080`, `listen_https false`).
-- **Internal TLD is `.internal`** — avoids mDNS `.local` conflicts per RFC 6762.
-- **Split DNS:** `*.{env}.by-systems.be` → Pi-hole/OPNsense Unbound (internal); `*.{env}.by-systems.be` → Cloudflare DNS-01 (external).
+- **Traefik is the only edge proxy.** No Apache/Nginx at the network edge. Internal service reverse proxies run on localhost only.
+- **Split DNS:** `*.by-systems.be` → Pi-hole Unbound (internal); public records → Cloudflare DNS-01 (external).
 - **Dual-stack everywhere:** IPv4 + IPv6, A + AAAA DNS records.
+- Network VLAN architecture, IP ranges, and zone definitions: see ADR-0015.
 
 **Rationale:**
-- pfSense provides a single, auditable firewall/gateway — mature, widely deployed in SME/telecom environments
-- pfBlockerNG replaces Pi-Hole for DNS-level threat blocking — consolidated into the firewall
-- Traefik centralises TLS management and integrates natively with Docker and Kubernetes; no Nginx Proxy Manager needed
+- OPNsense: open-source BSD firewall, HardenedBSD base, active development, FreeBSD ports available — replaced pfSense CE
+- Pi-hole: DNS-level threat blocking in MGMT zone — separate from firewall, integrates with Unbound
+- Traefik centralises TLS management and integrates natively with Docker and Kubernetes
 - step-ca provides a proper internal CA — avoids self-signed cert sprawl
-- NetBird simplifies zero-trust mesh VPN for developer devices without complex Tailscale infrastructure
+- NetBird simplifies zero-trust mesh VPN for developer devices
 
 **Alternatives considered:**
+- **pfSense CE**: Replaced by OPNsense — OPNsense has a cleaner API, more active open-source development, HardenedBSD base
+- **pfBlockerNG**: Replaced by dedicated Pi-hole in MGMT zone — better observability, cleaner separation of concerns
 - **Nginx Proxy Manager**: Replaced by Traefik — better K8S/Docker native integration, API-driven config
-- **Pi-Hole**: Replaced by pfBlockerNG — consolidates DNS threat blocking into existing firewall
 - **Headscale (self-hosted Tailscale)**: Viable alternative to NetBird — pending final decision, functionally equivalent
 - **mDNS `.local`**: Rejected for service FQDNs — conflicts with RFC 6762; mDNS (Avahi) kept only for IoT/printer discovery
 
@@ -181,12 +184,12 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 | **Teleport CE** | **Primary bastion**: certificate SSH, K8S access, DB access, session recording, audit trail, MFA, OIDC |
 | Apache Guacamole | Secondary OOB gateway: browser RDP/VNC for Windows VMs and non-technical users |
 
-**Access flow:** External → WireGuard/NetBird → pfSense → Traefik → Authentik SSO → Service
+**Access flow:** External → WireGuard/NetBird → OPNsense → Traefik → Authentik SSO → Service
 
 **Bastion access flow:**
 - Engineers/DevOps → **Teleport CE** → certificate-based SSH (no shared keys, no `authorized_keys`) + K8S `kubectl` + DB
 - Windows/VNC/non-technical → **Guacamole** → browser RDP/VNC behind Authentik SSO
-- Direct SSH to production blocked at pfSense — all access flows through Teleport
+- Direct SSH to production blocked at OPNsense — all access flows through Teleport
 
 **Rationale:**
 - Authentik provides OIDC/SAML SSO with self-hosted control and integrates with NetBird, Teleport, Guacamole, and all platform services
@@ -401,7 +404,7 @@ Full details in `docs/naming-convention.md`. Key rules:
 
 | Control | Title | Status | Notes |
 |---|---|---|---|
-| A.8.20 | Networks security | ⚠ Partial | pfSense + Traefik + step-ca defined; OPNsense deployment pending |
+| A.8.20 | Networks security | ⚠ Partial | OPNsense + Traefik + step-ca defined (ADR-0015); deployment pending |
 | A.5.23 | Information security for use of cloud services | ✓ Covered | All tools self-hosted; no mandatory SaaS dependencies |
 | A.8.8 | Management of technical vulnerabilities | ⚠ Partial | Trivy + OWASP DC + Gitleaks in CI defined; Lynis + OpenSCAP pending Phase 3 |
 | A.8.15 | Logging | ⚠ Partial | Loki + Prometheus stack defined; Wazuh SIEM pending Phase 3 |

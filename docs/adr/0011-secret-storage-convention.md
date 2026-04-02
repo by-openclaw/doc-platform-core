@@ -141,63 +141,10 @@ Not applicable — this ADR governs infrastructure credentials, not personal dat
 
 ## Vault KV Path Convention
 
-> **Source:** `brainstorming/2026-04-01-vault-kv-standard.md` (Opus, 2026-04-01) — promoted into this ADR.
-> **Vault path standard:** The full Vault KV path structure is documented in a separate platform decision record.
+> **Authoritative source:** `doc-platform-core/docs/adr/0016-vault-kv-path-convention.md`
 
-### Path Structure
+Vault KV path structure is governed entirely by ADR-0016. Do not define or duplicate path structure here.
 
-```
-secret/{scope}/{tool}/{key-name}
-```
+**Path format (summary):** `secret/{env}/{service}/{key}` — e.g. `secret/poc/gitlab/admin-password`
 
-| Level | Values | Example |
-|---|---|---|
-| `secret/` | KV v2 mount point (default) | — |
-| `{scope}` | `infra`, `svc`, `ci`, `app`, `user` | `infra` |
-| `{tool}` | Tool name (lowercase, from naming convention) | `postgresql` |
-| `{key-name}` | Credential or config name | `admin-password` |
-
-### Scopes
-
-| Scope | Purpose | Example path | Who reads |
-|---|---|---|---|
-| `infra` | Infrastructure credentials (Proxmox, NAS, switches) | `secret/infra/proxmox/svc-terraform-token` | Terraform, Ansible |
-| `svc` | Service credentials (inter-service auth) | `secret/svc/postgresql/svc-authentik` | Docker Compose (via env) |
-| `ci` | CI/CD tokens and credentials | `secret/ci/gitlab/runner-token` | GitLab Runner |
-| `app` | Application-level secrets (API keys, OIDC secrets) | `secret/app/authentik/oidc-gitlab-secret` | Application config |
-| `user` | Human user credentials (emergency access) | `secret/user/yboujraf/emergency-token` | Humans only |
-
-### Data Format
-
-Every Vault KV entry follows this JSON structure:
-
-```json
-{
-  "value": "the-actual-secret-value",
-  "description": "PostgreSQL password for Authentik service account",
-  "owner": "authentik",
-  "created": "2026-04-01",
-  "rotation": "90d",
-  "type": "password"
-}
-```
-
-**Required fields:** `value`, `description`, `owner`, `created`, `rotation`, `type`
-
-**Secret types:** `password`, `token`, `key`, `certificate`, `api-key`, `oidc-secret`, `connection-string`
-
-### Vault ACL Policies
-
-| Policy | Paths | Who |
-|---|---|---|
-| `infra-admin` | `secret/infra/*` | Terraform, Ansible |
-| `svc-{tool}` | `secret/svc/{tool}/*` + `secret/app/{tool}/*` | Each tool (least privilege) |
-| `ci-runner` | `secret/ci/*` | GitLab Runner |
-| `human-admin` | `secret/*` (read) | @yboujraf |
-| `audit` | `secret/*` (read, list) | Opus (audit only) |
-
-> **Principle of least privilege:** Each tool gets a policy that reads only its own secrets.
-
-### Path Examples (reference)
-
-See `brainstorming/2026-04-01-vault-kv-standard.md` (archived to `docs/archive/`) for full path table covering infra, svc, app, and ci scopes.
+See ADR-0016 for the full path table, ACL policies, and access control model.
