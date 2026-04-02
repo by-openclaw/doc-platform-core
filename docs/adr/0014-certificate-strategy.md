@@ -20,9 +20,20 @@ Two CA paths are available: Let's Encrypt (LE) via ACME for public certs, and st
 
 **Traefik dashboard**: internal only, step-ca cert. Not exposed publicly.
 
-**Decision rule:**
-- Service has a public FQDN under `*.by-systems.be` and is reachable externally → LE
-- Service is internal only (SVC/MGMT/DMZ, no public DNS) → step-ca
+**Decision rule (in priority order):**
+1. Domain is IANA-reserved (`example.com`, `test`, `localhost`, etc.) → **step-ca always** — LE cannot issue for IANA-reserved domains regardless of topology
+2. Service is internal only (SVC/MGMT/DMZ, no public DNS) → step-ca
+3. Service has a public FQDN and is reachable externally → LE
+
+**Env tier → CA mapping (practical reference):**
+
+| Env tier | Typical domain | CA |
+|---|---|---|
+| `poc`, `dev`, `test` | `example.com` (IANA-reserved) | step-ca |
+| `staging`, `acc` | `*.{domain}` (real domain, internal) | step-ca or LE depending on exposure |
+| `prod` | `*.{domain}` (real domain, public) | LE |
+
+`{domain}` is set per deployment in the deployment manifest (see ADR-0010 §10).
 
 **No-warning guarantee:**
 - LE: always valid in browsers and standard clients

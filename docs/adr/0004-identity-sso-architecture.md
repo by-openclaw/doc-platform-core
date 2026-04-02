@@ -1,6 +1,7 @@
-# ADR-0004: Identity & SSO Architecture — Authentik + EntraID
+# ADR-0004: Identity & SSO Architecture
 
 **Date:** 2026-03-27
+**Amended:** 2026-04-02
 **Status:** Accepted
 **Deciders:** yboujraf, Rune
 
@@ -9,8 +10,8 @@
 ## Context
 
 The platform needs a unified SSO layer that:
-- Works independently of cloud identity providers (resilience)
-- Optionally federates with Microsoft EntraID (Azure AD) for org users
+- Works standalone, with no dependency on any external identity provider
+- Optionally federates with external directories (EntraID, Google Workspace, LDAP) when the org has them
 - Provides break-glass access when SSO is unavailable
 
 ---
@@ -25,56 +26,107 @@ The platform needs a unified SSO layer that:
 - Credentials: stored in HashiCorp Vault (when deployed), bootstrap in `infra/secrets/`
 - Rule: never remove these accounts, never disable password auth without OOB alternative
 
-**Tier 2 — Authentik local accounts (service accounts)**
+**Tier 2 — Authentik local accounts (service accounts + Authentik-native users)**
 - All CI/CD runners, Ansible service accounts, automation tokens
-- Never federated with EntraID
+- External users (contractors, partners) without an org directory
 - Managed via Authentik API / GitLab CI
 
-**Tier 3 — EntraID + Authentik federated (human users)**
-- Synced via SCIM 2.0: EntraID → Authentik
-- Authentik stores local copy (username + local password set at first login)
-- EntraID = source of truth for group membership and user lifecycle
-- If EntraID is down → Authentik local copy continues to work
-- If user deleted in EntraID → SCIM deactivates in Authentik
-- Password sync: intentionally NOT synced (Authentik password is independent for resilience)
+**Tier 3 — Federated accounts (optional — org-dependent)**
+- If the org has an external directory (EntraID, Google Workspace, LDAP), it can be connected as an upstream
+- Authentik remains the platform IAM hub — external directory is a feed, not a dependency
+- If external directory is down → Authentik local copy continues to work
+- External directory sync is strictly opt-in, per org, per deployment
+
+---
+
+## Authentik is standalone — always
+
+Authentik operates fully without any external identity provider.
+External directory sync (AD, EntraID, Google Workspace, LDAP) is an **optional integration** — enabled per org on request, not a platform requirement.
+
+```
+Without external directory:          With external directory (optional):
+
+  Authentik                            EntraID / Google / LDAP
+  (manages all users natively)              │
+       │                                    │ SCIM or LDAP sync (one-way)
+       │ OIDC / SAML                        ▼
+       ▼                              Authentik (platform IAM hub)
+  Platform tools                           │
+                                           │ OIDC / SAML
+                                           ▼
+                                      Platform tools
+```
+
+In both cases: platform tools only ever talk to Authentik. The upstream directory is invisible to them.
 
 ---
 
 ## Architecture
 
 ```
-EntraID (Microsoft 365)
-    │
-    │ SCIM 2.0 (user/group sync, one-way push)
-    ▼
-Authentik (internal SSO broker — always available)
-    │
-    │ OIDC / SAML
-    ▼
-Platform services:
-  GitLab CE → OIDC
-  HashiCorp Vault → OIDC
-  Proxmox VE → OIDC (future)
-  NetBox → OIDC
-  Grafana → OIDC
-  Teleport CE → OIDC
-  Guacamole → OIDC
-  NetBird/WireGuard → OIDC
+[Optional upstreams — one or more, per org]
+  EntraID / Azure AD  ──SCIM 2.0──────────────────────┐
+  Google Workspace    ──OIDC / Google Social Login─────┤
+  On-prem AD / LDAP   ──LDAP sync──────────────────────┤
+  GitHub              ──OAuth 2.0──────────────────────┤
+  GitLab (self-hosted)──OIDC──────────────────────────►│
+                                                        │
+                                               Authentik (platform IAM hub)
+                                               — always available
+                                               — local auth always enabled
+                                                        │
+                                               OIDC / SAML
+                                                        │
+                                          ┌─────────────┴────────────┐
+                                     GitLab CE                  NetBox
+                                     HashiCorp Vault             Grafana
+                                     Proxmox VE                  Teleport CE
+                                     Guacamole                   NetBird
+                                     (all platform tools)
 ```
 
 ---
 
-## EntraID federation (SCIM sync config)
+## User population model
 
-| Setting | Value |
-|---|---|
-| Sync direction | EntraID → Authentik (one-way) |
-| Protocol | SCIM 2.0 |
-| Sync scope | Users in `BY-SYSTEMS Platform` group |
-| Group mapping | EntraID groups → Authentik groups |
-| Auto-provision | Authentik account created on first SCIM push |
-| Auto-deprovision | Authentik account deactivated on EntraID delete |
-| Password sync | None — Authentik password set independently at first login |
+| User type | Identity source | Auth method | Managed by |
+|---|---|---|---|
+| Org employee (with EntraID/Google) | External directory | Social login (OIDC) + Authentik local fallback | External directory / IT |
+| Org employee (no external directory) | Authentik-native | Username + Authentik password | Authentik admin |
+| Customer / freelancer / partner | Authentik-native | Username + Authentik password | Authentik admin |
+| Service account (CI, Ansible, automation) | Authentik-native | API token / client credentials | Authentik / Vault |
+| Break-glass (emergency ops) | OS local | SSH key / console | Vault / infra team |
+
+---
+
+## External directory sync — optional, per org
+
+When an org has an external directory and wants to sync it:
+
+| Directory | Protocol | Sync direction | Group mapping |
+|---|---|---|---|
+| Microsoft EntraID | SCIM 2.0 | EntraID → Authentik (one-way) | EntraID group names → Authentik platform group names (mapping table in Ansible vars) |
+| Google Workspace | OIDC / Google Social Login | Login-time only (no SCIM) | Manual group assignment in Authentik post-login |
+| On-prem AD / LDAP | LDAP sync | AD → Authentik (one-way) | LDAP group DN → Authentik groups |
+| GitHub / GitLab | OAuth 2.0 / OIDC | Login-time only | No group sync — Authentik groups assigned manually |
+
+**Key rules:**
+- Sync direction is always inbound to Authentik — never the reverse
+- External directory down → Authentik local auth continues to work (non-blocking)
+- Password sync: never — Authentik password is always independent
+- MFA: enforced in Authentik regardless of upstream provider
+- All users must complete Authentik enrollment (set local password) at first login — prevents lockout when upstream is unavailable
+
+**Group naming bridge (EntraID):**
+EntraID group names are controlled by the org's IT department and will not follow the Authentik platform naming convention. A mapping table is maintained in Ansible vars:
+```yaml
+entraid_group_mapping:
+  "BY-SYSTEMS Platform Developers": tool-gitlab-developers
+  "BY-SYSTEMS Platform Admins":     org-admins
+  "BY-SYSTEMS GitLab Owners":       tool-gitlab-owners
+```
+Authentik only ever sees the mapped platform group names. EntraID naming is isolated to the sync adapter.
 
 ---
 
@@ -82,7 +134,7 @@ Platform services:
 
 | Scenario | Result |
 |---|---|
-| EntraID down | Authentik local users continue to work normally |
+| External directory down | Authentik local users continue to work normally |
 | Authentik down | Break-glass: local OS accounts on each server |
 | Both down | SSH key auth to each server (keys in `~/.ssh/authorized_keys`) |
 | All auth down | Physical console / iLO access |
@@ -91,52 +143,11 @@ Platform services:
 
 ## Consequences
 
-- Users have two passwords: EntraID (for M365) and Authentik (for platform)
-- Password rotation must be done in both systems independently
+- Authentik is the only mandatory identity component. No external directory required.
+- If external directory is connected: users have two credentials (org password + Authentik local). Authentik local is always the fallback.
 - When Vault is deployed: Authentik service account credentials managed via Vault dynamic secrets
-- MFA: enforced in Authentik (TOTP), independent of EntraID MFA
+- MFA: enforced in Authentik (TOTP), independent of any upstream provider
 - Authentik HA (Phase 2.5): 2-node deployment to eliminate Authentik as SPOF
-
----
-
-## References
-- Authentik SCIM source: https://docs.goauthentik.io/docs/providers/scim/
-- NIS2 requirement: user lifecycle management, access revocation within 24h
-- ISO 27001: A.9.2 (user access management), A.9.4 (system access control)
-
----
-
-## Password flow clarification
-
-**EntraID available (normal):**
-- User clicks "Login with Microsoft" → redirected to EntraID → EntraID validates password → token returned to Authentik
-- Authentik never sees or stores the EntraID password
-- EntraID password changes take effect immediately with no sync needed
-
-**EntraID unavailable (fallback):**
-- User clicks "Login with password" → Authentik validates local password
-- This is a separate credential set at first login via Authentik enrollment flow
-
-**Risk mitigation:**
-- All users MUST complete Authentik enrollment (set local password) at first login
-- Enforced via Authentik enrollment flow — users cannot access platform services until local password is set
-- Prevents lockout when EntraID is unavailable
-
----
-
-## User population model
-
-| User type | Identity source | Auth method | Managed by |
-|---|---|---|---|
-| BY-SYSTEMS employee | EntraID | "Login with Microsoft" (OIDC) | EntraID / IT |
-| Customer / freelancer / partner | Authentik local | Username + Authentik password | Authentik admin |
-| Service account (CI, Ansible, automation) | Authentik local | API token / client credentials | Authentik / Vault |
-| Break-glass (emergency ops) | OS local | SSH key / console | Vault / infra team |
-
-**Onboarding flows:**
-- Employee: add to EntraID `BY-SYSTEMS Platform` group → SCIM pushes to Authentik → login via Microsoft
-- Customer/freelancer: create Authentik account manually → invite email → set password → login with Authentik credentials
-- No Microsoft 365 license required for external users
 
 ---
 

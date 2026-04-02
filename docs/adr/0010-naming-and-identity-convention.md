@@ -18,7 +18,7 @@ Six environment tiers, always explicit:
 
 | Env | Full name | When to use |
 |---|---|---|
-| `poc` | Proof of concept | Lab / sandbox — pre-pipeline |
+| `poc` | Proof of concept | Interoperability validation — new hardware, network config, multi-component concept testing. Used before writing project plan. Not used for single-library work. |
 | `dev` | Development | Active development |
 | `test` | Test | Automated testing |
 | `staging` | Staging | Pre-prod validation |
@@ -34,9 +34,9 @@ Six environment tiers, always explicit:
 | Hostname | `{function}-{type}-{env}-{seq:02d}` | `srv-proxmox-poc-01` | `srv-proxmox-prod-01` |
 | VM | `vm-{service}-{env}-{seq:02d}` | `vm-netbox-poc-01` | `vm-netbox-prod-01` |
 | LXC | `lxc-{service}-{env}-{seq:02d}` | `lxc-pihole-poc-01` | `lxc-pihole-prod-01` |
-| VM FQDN | `{hostname}.by-systems.be` | `vm-netbox-poc-01.by-systems.be` | `vm-netbox-prod-01.by-systems.be` |
-| Service URL | `{alias}.by-systems.be` (config) | `netbox.by-systems.be` (defined in Traefik) | `netbox.by-systems.be` (defined in Traefik) |
-| Certificate | `*.by-systems.be` | `*.by-systems.be` | `*.by-systems.be` |
+| VM FQDN | `{hostname}.{domain}` | `vm-netbox-poc-01.{domain}` | `vm-netbox-prod-01.{domain}` |
+| Service URL | `{alias}.{domain}` (config) | `netbox.poc.{domain}` (defined in Traefik) | `netbox.{domain}` (defined in Traefik) |
+| Certificate | `*.{domain}` | `*.{domain}` (see ADR-0014 for CA selection) | `*.{domain}` (see ADR-0014 for CA selection) |
 | Secret file | `{scope}-{service}-{env}.json` | `infra-proxmox-poc.json` | `infra-proxmox-prod.json` |
 | Vault path | `secret/{scope}/{service}/{env}` | `secret/infra/proxmox/poc` | `secret/infra/proxmox/prod` |
 | Service account | `svc-{function}-{env}` | `svc-terraform-poc` | `svc-terraform-prod` |
@@ -103,7 +103,59 @@ Only `adm_*` accounts in `grp-break-glass`. Password auth + SSH key from OOB/MGM
 | Service (permanent) | Never | Credential rotation (Vault) | Rotate credential, keep account |
 | Temporary | Fixed date at creation | Authentik auto-disable | Quarterly review, keep disabled for audit |
 
-### 9. Revision triggers
+### 9. Authentik platform group naming (additive namespace)
+
+Authentik groups for platform tool access follow a separate naming convention from OS/infra groups. These are two distinct namespaces — no collision, no replacement.
+
+**OS/infra groups** (Proxmox, LDAP, OS — existing):
+```
+grp-admins       ← OS/Proxmox admin group (env-agnostic — the machine hostname is the env context)
+grp-readonly     ← OS read-only group
+grp-ops          ← Ops/automation accounts
+grp-break-glass  ← Emergency OOB access only
+```
+
+Note: OS group names do NOT include env prefix. The VM hostname already carries env context (`vm-netbox-poc-01`). One group name, deployed on env-specific machines.
+
+**Authentik platform groups** (new, Authentik-managed):
+
+| Prefix | Meaning | Example |
+|---|---|---|
+| `tool-` | Access to a specific platform tool | `tool-gitlab-developers`, `tool-netbox-admins` |
+| `svc-` | Service account groups | `svc-ansible-sync`, `svc-vault-agent` |
+| `prj-` | Project-scoped groups (contractors, specific repos) | `prj-client-xyz-developers` |
+| `org-` | Org-wide platform roles | `org-admins`, `org-readonly` |
+
+Full pattern: `{prefix}{tool}-{role}` for tool groups, `{prefix}{project}-{role}` for project groups.
+All lowercase, hyphen-separated. No uppercase, no underscores.
+
+These groups are defined and managed in Authentik. They map to tool-specific roles via the identity-sync Ansible framework (ADR-0024).
+
+Ad-hoc groups (e.g., for a specific PoC project) are created on demand — not part of the standard convention unless they recur.
+
+### 10. `{domain}` — deployment variable
+
+VM FQDNs, service URLs, and certificates use `{domain}` as a placeholder. The actual domain is set per deployment in the deployment manifest:
+
+```yaml
+# deployments/{org}-{env}/deployment.yml
+org:
+  domain: by-systems.be   # resolves {domain} for this deployment
+  env: prod
+```
+
+Examples of how `{domain}` resolves:
+
+| Deployment | `{domain}` | VM FQDN example | Service URL example |
+|---|---|---|---|
+| BY-SYSTEMS poc | `example.com` | `vm-netbox-poc-01.example.com` | `netbox.poc.example.com` |
+| BY-SYSTEMS prod | `by-systems.be` | `vm-netbox-prod-01.by-systems.be` | `netbox.by-systems.be` |
+| Client XYZ prod | `client-xyz.com` | `vm-netbox-prod-01.client-xyz.com` | `netbox.client-xyz.com` |
+
+No ADR changes required when a domain changes — update the deployment manifest only.
+
+### 11. Revision triggers
+
 
 Revise this ADR when: Vault deployed (Layer 2), Authentik deployed (Layer 3), NetBox deployed (Layer 5), first prod environment, first external user/contractor, NIS2/ISO audit preparation.
 
@@ -169,4 +221,5 @@ Until Authentik (Layer 3) provides policy-as-code, naming is enforced by CI chec
 - Environment tier standard independently defined in a separate ADR for independent referenceability
 - Credential storage convention independently defined in a separate ADR
 - GRC tool: CISO Assistant (open source) — compliance dashboard when deployed
-- **DNS domain:** VM FQDNs use `{hostname}.by-systems.be` (forward DNS). `.arpa` is used only for reverse DNS (PTR records) — NOT for forward-facing service or VM FQDNs. Service URLs are defined in Traefik config; split DNS is handled via Pi-hole/Unbound internally. Single `*.by-systems.be` wildcard cert via LE Cloudflare DNS-01.
+- **DNS domain:** VM FQDNs use `{hostname}.{domain}` (forward DNS). `.arpa` is used only for reverse DNS (PTR records) — NOT for forward-facing service or VM FQDNs. Service URLs are defined in Traefik config; split DNS is handled via Pi-hole/Unbound internally. Wildcard cert: `*.{domain}` — CA selection per ADR-0014.
+- **`{domain}` resolution:** Set per deployment in `deployments/{org}-{env}/deployment.yml`. See section 10.
