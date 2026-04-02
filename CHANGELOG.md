@@ -15,6 +15,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `docs/adr/0014-certificate-strategy.md`: Certificate strategy — LE for public, step-ca for internal, no self-signed, root CA in cloud-init mandatory
+- `docs/adr/0015-network-vlan-architecture.md`: VLAN architecture — active VLANs 300/310/320/330/400/410, VLAN 340/350 removed from Arista trunk, OPNsense alias-first firewall rule standard
+- `docs/adr/0016-vault-kv-path-convention.md`: Vault KV path convention — `secret/{env}/{service}/{key}`, no root-level paths, per-service least-privilege policies
+- `docs/adr/0017-logging-standard.md`: Logging standard — Prometheus+Grafana+Loki on vm-observability-poc-01, 30d log / 90d metric retention, Zabbix Phase 2 only
+- `docs/adr/0018-centralized-database-strategy.md`: Centralized DB strategy — single vm-postgres-poc-01 instance, per-service databases, single Redis for cache only
+- `docs/adr/0019-git-workflow-approval-process.md`: Git workflow — trunk-based, Conventional Commits enforced, agents open PRs only, no force-push to main
+
 ## [0.5.0] — 2026-03-29
 
 ### Added

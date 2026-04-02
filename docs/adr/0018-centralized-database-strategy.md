@@ -12,7 +12,7 @@ Redis is similarly required by multiple services (Authentik, GitLab) for caching
 
 ## Decision
 
-**Single PostgreSQL instance:** `vm-postgresql-poc-01`, `10.1.3.19` (SVC zone).
+**Single PostgreSQL instance:** `vm-postgres-poc-01`, `10.1.3.19` (SVC zone).
 
 All platform services share this instance. Each service gets its own **database** (not schema). No schema-sharing between services.
 
@@ -34,7 +34,7 @@ Per-service database users with least-privilege grants. Credentials stored in Va
 
 ## Consequences
 
-- `vm-postgresql-poc-01` and `vm-redis-poc-01` are critical path — all dependent services fail if either is unavailable.
+- `vm-postgres-poc-01` and `vm-redis-poc-01` are critical path — all dependent services fail if either is unavailable.
 - Backup strategy must cover both VMs. PostgreSQL: `pg_dump` per database + WAL archiving (Phase 2). Redis: `BGSAVE` or RDB snapshot.
 - A PostgreSQL failure affects all services simultaneously — acceptable for PoC, must be mitigated in Phase 2 with Patroni.
 - Simplified ops: one PostgreSQL to monitor, tune, and back up.
