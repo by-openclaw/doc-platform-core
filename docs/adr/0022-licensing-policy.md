@@ -36,9 +36,9 @@ BUSL-1.1, SSPL-1.0, AGPL-3.0, any commercial or proprietary license.
 
 Assessment basis for flagged licenses: **internal deployment and operation only** — redistribution and SaaS clauses do not apply to BY-SYSTEMS's use model.
 
-**Redis license flag:** Redis ≥ 7.4 uses SSPL-1.0. The platform currently pins Redis below 7.4. Any upgrade to ≥ 7.4 requires @yboujraf sign-off with a confirmed internal-use assessment.
+**Redis license flag:** Redis ≥ 7.4 uses SSPL-1.0. No version pinning — latest version is used. SSPL permits internal deployment and operation; no redistribution or SaaS offering is involved. License terms are respected as-is.
 
-**Vault license flag:** HashiCorp Vault uses BUSL-1.1. Internal production deployment requires @yboujraf sign-off. The 4-year conversion clause is tracked — check conversion date for the deployed Vault version before each upgrade.
+**Vault license flag:** HashiCorp Vault uses BUSL-1.1. No version pinning. Internal production deployment is within BUSL-1.1 terms for an integrator operating its own infrastructure. License terms are respected as-is.
 
 **Review process:** Self-assessment by @yboujraf sufficient for internal-use flagged licenses. No external legal review required unless a tool is being evaluated for customer-facing deployment.
 
@@ -67,9 +67,8 @@ Not applicable — this ADR does not touch personal data processing.
 
 | Tool / Service | SPDX license | Status | Notes |
 |---|---|---|---|
-| Redis (current, < 7.4) | BSD-3-Clause | ✅ Approved | |
-| Redis (≥ 7.4) | SSPL-1.0 | ⚠ Flagged | Internal-use assessment required before upgrade |
-| HashiCorp Vault | BUSL-1.1 | ⚠ Flagged | Internal production use — sign-off required |
+| Redis (any version) | BSD-3-Clause / SSPL-1.0 | ✅ Accepted | SSPL permits internal deployment; no SaaS/redistribution involved |
+| HashiCorp Vault | BUSL-1.1 | ✅ Accepted | Internal production use within BUSL terms; integrator context |
 | OpenTofu | MPL-2.0 | ✅ Approved | OSS fork of Terraform; use if Vault BUSL concern grows |
 
 ## Consequences
@@ -80,9 +79,8 @@ Not applicable — this ADR does not touch personal data processing.
 - Audit trail for future compliance (ISO 27001, customer audits)
 
 **Constrains:**
-- Redis must not be upgraded to ≥ 7.4 without sign-off
-- Vault internal production deployment requires sign-off (one-time, already acknowledged)
 - Every new tool adoption requires a license check before PR merge
+- Flagged licenses (BUSL/SSPL/AGPL) require a documented internal-use assessment — not a block, but must be on record
 
 **Known risks:**
 - BoM license field completeness depends on per-tool `docs/licensing.md` being filled in — not yet complete for all 29 tools
