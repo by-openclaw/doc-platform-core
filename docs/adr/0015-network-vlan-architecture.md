@@ -1,59 +1,66 @@
 # ADR-0015: Network VLAN Architecture
 
-- **Status:** Draft
+- **Status:** Accepted
 - **Date:** 2026-04-02
 - **Deciders:** @yboujraf
 
 ## Context
 
-The PoC platform spans multiple network segments (OOB, POC-MGMT, POC-SVC, POC-DHCP) defined in ADR-0006. A formal decision record is needed to capture VLAN IDs, Proxmox SDN zone configuration, and OPNsense firewall rules so that the network is reproducible and auditable.
+The PoC platform spans multiple network segments managed via Arista 7060/7020 switches and OPNsense as the virtual router. A formal VLAN registry is required to ensure the topology is reproducible, auditable, and aligned with Proxmox SDN zone configuration. Earlier planning introduced VLAN IDs 340 and 350 that were subsequently removed; this ADR captures the authoritative active set.
 
 ## Decision
 
-TODO: pending @yboujraf review
+### Active VLANs (PoC)
 
-### OPNsense Firewall Rules Standard (decided 2026-04-02)
-
-**All firewall rules use named aliases. Hardcoded IPs, ports, and URLs are banned in rules.**
-
-Alias types and naming convention:
-
-| Type | Naming pattern | Example | Contains |
+| VLAN ID | Name | Subnet | Purpose |
 |---|---|---|---|
-| Host | `alias_host_{service}` | `alias_host_vault` | IP(s) of the VM/service |
-| Port | `alias_port_{service}_{proto}` | `alias_port_vault_api` | Port or port range |
-| Network | `alias_net_{vlan}` | `alias_net_mgmt` | VLAN subnet CIDR |
-| URL/feed | `alias_url_{feed}` | `alias_url_spamhaus` | Threat feed / blocklist URL |
+| 300 | OOB | — | Out-of-band management (physical infra access) |
+| 310 | MGMT | 10.1.1.0/24 | Platform management — Pi-hole, Unifi, jumphost |
+| 320 | DMZ | 10.1.2.0/24 | Public-facing — Traefik ingress |
+| 330 | SVC | 10.1.3.0/24 | Internal platform services |
+| 400 | PROD-MGMT | — | Production management (reserved, not yet active) |
+| 410 | PROD-SVC | — | Production services (reserved, not yet active) |
 
-Rule format:
-```
-pass in on {interface} from {alias_net_src} to {alias_host_dst} port {alias_port_dst}
-```
+**Supernet:** `10.1.0.0/20` covers all PoC segments.
 
-Example — allow management zone to reach Vault API:
-```
-pass in on VLAN_PLATFORM from alias_net_mgmt to alias_host_vault port alias_port_vault_api
-```
+### Removed VLANs
 
-Never:
-```
-pass in on VLAN300 from 10.6.225.0/24 to 10.6.225.10 port 8200
-```
+**VLAN 340 and 350 are RESERVED/NOT USED.** They have been removed from the Arista trunk allowed list. Do not re-allocate these IDs without a new ADR.
 
-Alias definitions live in `tools/opnsense/config/aliases.conf` (exported from OPNsense). All alias names follow the platform naming convention.
+### Storage and Backup Networks
+
+No dedicated VM-level storage or backup VLAN. Storage traffic (NAS, Proxmox backup) uses the OOB/MGMT network. A dedicated storage VLAN is a Phase 2 consideration only.
+
+### WAN Uplinks
+
+| Uplink | Status | Role |
+|---|---|---|
+| OOB prod primary | Active | Primary WAN |
+| Proximus | Active | Secondary WAN (failover) |
+| Telenet | Untested | Not in active rotation |
+
+### OPNsense Firewall Rule Standard
+
+All firewall rules use named aliases. Hardcoded IPs, ports, and URLs are banned in rules.
+
+| Alias type | Naming pattern | Example |
+|---|---|---|
+| Host | `alias_host_{service}` | `alias_host_vault` |
+| Port | `alias_port_{service}_{proto}` | `alias_port_vault_api` |
+| Network | `alias_net_{vlan}` | `alias_net_mgmt` |
+| URL/feed | `alias_url_{feed}` | `alias_url_spamhaus` |
+
+Alias definitions are exported to `tools/opnsense/config/aliases.conf` and version-controlled.
 
 ## Consequences
 
-TODO: pending full decision
-- Rules become self-documenting — alias names communicate intent
-- IP changes require updating one alias, not hunting through rules
-- Alias file becomes source of truth for firewall topology
-- All tool `docs/network.md` files must document rules using alias format
+- VLAN 340 and 350 must not appear in switch configs, Proxmox SDN zones, or OPNsense interfaces.
+- All VM provisioning uses the `10.1.x.x` runtime addressing from the BoM. The `10.6.225.x` range is a temporary bootstrap-only range (pre-SDN) and must not be used as canonical service addressing.
+- Firewall rule reviews must verify alias coverage before any new service is deployed.
+- OPNsense alias file is the source of truth for firewall topology.
 
 ## References
 
-- ADR-0006 §2 — IP addressing plan and VLAN table
+- ADR-0006 §2 — IP addressing plan and layer model
 - `docs/stack.md` — OPNsense, Proxmox SDN entries
-- `docs/2026-04-01-infra-bom-poc-proxmox.md` — PoC deployment snapshot
-- `brainstorming/2026-04-02-doc-matrix.md` — missing ADR identified here
-</content>
+- `brainstorming/2026-04-02-opus-batch1-feedback.md` — bootstrap vs runtime IP clarification
