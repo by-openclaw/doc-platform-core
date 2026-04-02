@@ -140,27 +140,9 @@ NetBox (source of truth)
 
 ---
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.9 | Configuration management | ✓ Covered | All infrastructure and service config is version-controlled in structured repos |
-| A.5.12 | Classification of information | ✓ Covered | Repo naming pattern encodes scope and component; no ambiguity on what a repo contains |
-
-### NIS2 (Directive 2022/2555)
-
-Not applicable — repository structure is an internal governance decision with no direct NIS2 article mapping.
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR covers repository structure, not personal data processing.
-
 ## References
 
-- [Naming conventions](../naming-convention.md) — naming patterns for hostnames, FQDNs, branches, commits, and credentials are defined in the naming & identity convention
+- [Naming conventions](../naming-convention.md)
+- [ADR-0010: Naming & Identity Convention](0010-naming-and-identity-convention.md) — **authoritative source for all naming decisions** (FQDN patterns, repo naming, branch/commit conventions). This ADR defers to ADR-0010 for naming; only repository structure decisions are recorded here.
 - [NetBox source of truth](../netbox.md)
 - [Platform stack](../stack.md)

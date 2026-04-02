@@ -32,30 +32,6 @@ Per-service database users with least-privilege grants. Credentials stored in Va
 
 **HA roadmap (Phase 2):** Patroni for PostgreSQL HA, Redis Sentinel for Redis HA. Not in scope for PoC.
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.6 | Capacity management | ⚠ Partial | Single PostgreSQL instance is a PoC trade-off; Patroni HA planned for Phase 2 |
-| A.8.13 | Information backup | ⚠ Partial | `pg_dump` and Redis RDB snapshot strategy defined; automation not yet implemented |
-| A.8.27 | Secure system architecture | ✓ Covered | Per-service databases; least-privilege users; no schema-sharing between services |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(c) | Business continuity | ⚠ Partial | Single PostgreSQL is a known single point of failure in PoC; Patroni HA deferred to Phase 2 |
-
-### GDPR (Regulation 2016/679)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 32(1)(b) | Integrity, confidentiality of processing | ✓ Covered | Per-service DB users with least-privilege grants; no cross-service data access |
-
 ## Consequences
 
 - `vm-postgres-poc-01` and `vm-redis-poc-01` are critical path — all dependent services fail if either is unavailable.
@@ -67,6 +43,6 @@ Per-service database users with least-privilege grants. Credentials stored in Va
 ## References
 
 - `docs/stack.md` — PostgreSQL (Patroni), Redis (Sentinel) entries
-- Secret storage convention defines per-service DB credential format (Phase 1 JSON)
-- Vault KV path convention defines the target path format: `secret/{env}/{service}/db-password`
+- ADR-0011 — Secret storage for per-service DB credentials
+- ADR-0016 — Vault KV path format for DB passwords
 - `brainstorming/2026-04-02-opus-batch1-feedback.md` — authoritative runtime IP mapping

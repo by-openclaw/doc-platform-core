@@ -72,28 +72,6 @@ gitlab.by-systems.arpa/
 
 ---
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.32 | Change management | ✓ Covered | Migration path and CI ownership are documented in phased form |
-| A.8.9 | Configuration management | ✓ Covered | Repos, templates, and CI are centrally organised and version-controlled |
-| A.5.23 | Information security for use of cloud services | ✓ Covered | GitHub is interim only; GitLab CE target is self-hosted |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(e) | Security in network and information systems acquisition, development and maintenance | ✓ Covered | CI/CD migration is controlled and template-driven |
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR covers VCS and CI strategy, not personal data processing.
-
 ## Consequences
 
 - No cost increase in either phase

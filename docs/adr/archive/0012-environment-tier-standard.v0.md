@@ -8,7 +8,7 @@
 
 The platform uses multiple environments for isolation (lab, development, testing, production). Without a formal tier standard, environment labels are inconsistent — some systems use `nonprod`, others `sandbox`, others omit the label entirely and assume "unlabeled = production." This is dangerous: an unlabeled resource could be treated as either throwaway or production depending on who's looking.
 
-The naming & identity convention defines six environment tiers. This ADR extracts the tier standard as an independently referenceable decision, since it applies to every layer of the platform: infrastructure, credentials, DNS, certificates, service accounts, and monitoring.
+The naming & identity convention (ADR-0010 §1) defines six environment tiers. This ADR extracts the tier standard as an independently referenceable decision, since it applies to every layer of the platform: infrastructure, credentials, DNS, certificates, service accounts, and monitoring.
 
 ## Decision
 
@@ -33,9 +33,9 @@ poc → dev → test → staging → acc → prod
 
 2. **No implicit environments.** If a resource does not have an env label, it is non-compliant. The only exception is infrastructure-global resources (e.g., a single NAS shared across all envs), which omit the env suffix and document the reason.
 
-3. **Environment label position is fixed.** The env label appears in the same position across all naming layers. Consistency over convenience.
+3. **Environment label position is fixed.** The env label appears in the same position across all naming layers (see ADR-0010 §2). Consistency over convenience.
 
-4. **Credentials are per-environment.** A `poc` token cannot access `prod` resources. Service accounts are `svc-{function}-{env}` — separate credentials per tier.
+4. **Credentials are per-environment.** A `poc` token cannot access `prod` resources. Service accounts are `svc-{function}-{env}` — separate credentials per tier (ADR-0010 §3.2).
 
 5. **No shortcutting the pipeline.** Code does not go from `dev` directly to `prod`. Each tier has a promotion gate. Skipping tiers requires explicit CAB approval and is logged as a risk in RAID.md.
 
@@ -65,34 +65,19 @@ poc → dev → test → staging → acc → prod
 - Not all tiers are needed immediately — `poc` and `prod` are sufficient for Phase 1. Intermediate tiers are activated as the platform matures.
 - Infrastructure-global resources (shared NAS, shared DNS) are exceptions that must be documented
 
-## CISO mapping
+## Compliance
 
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.31 | Separation of development, test and production environments | ✓ Covered | Six explicit tiers with defined promotion gates |
-| A.8.25 | Secure development lifecycle | ✓ Covered | Dev/test environments isolated from prod |
-| A.8.33 | Test information | ⚠ Partial | Policy defined (prod data anonymized for lower tiers); enforcement not yet automated |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(a) | Risk management | ✓ Covered | Environment separation is a primary blast-radius reduction control |
-| Art. 21(2)(e) | Security in network and information systems | ✓ Covered | Per-env credentials and certificates enforce separation at every layer |
-
-### GDPR (Regulation 2016/679)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 25 | Data protection by design and by default | ⚠ Partial | Test environments use synthetic data policy defined; no prod data yet to protect |
-| Art. 32 | Security of processing | ✓ Covered | Environment isolation prevents accidental data exposure across tiers |
+- **ISO A.12.1.4** (separation of development, testing, and operational environments) — six explicit tiers with defined promotion gates
+- **ISO A.14.2.6** (secure development environment) — dev/test environments isolated from prod
+- **ISO A.14.3.1** (protection of test data) — prod data anonymized before use in staging/acc
+- **NIS2 Art.21(2)(a)** (risk management) — env separation as risk mitigation control
+- **NIS2 Art.21(2)(e)** (security in network and information systems acquisition) — per-env credentials and certificates
+- **GDPR Art.25** (data protection by design) — test environments use synthetic data, prod data anonymized for lower tiers
+- **GDPR Art.32** (security of processing) — env isolation prevents accidental data exposure
 
 ## Notes
 
-- Source: naming & identity convention draft §1 (promoted to its own ADR for independent referenceability)
+- Source: naming & identity convention draft §1 (promoted via ADR-0010)
+- This ADR is extracted from ADR-0010 for independent referenceability — other ADRs and CLAUDE.md files reference it directly
 - Current state (Phase 1): only `poc` tier is active. `prod` tier activates with first production workload.
 - Environment pipeline: `poc → dev → test → staging → acc → prod` (OPERATING-STANDARD.md §9.4)

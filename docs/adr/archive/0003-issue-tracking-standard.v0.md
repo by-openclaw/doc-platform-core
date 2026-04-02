@@ -29,29 +29,8 @@ This applies to:
 
 ## Amendment (2026-03-30)
 
-Per-repo documentation standard was accepted. RAID tracking is now hybrid:
+ADR-0004 (per-repo documentation) was accepted. RAID tracking is now hybrid:
 - Repo-scoped items → each repo's own `RAID.md`
-- Cross-repo / platform items → `doc-platform-core/docs/raid.md` (this ADR's scope)
+- Cross-repo / platform items → `doc-platform-core/docs/raid.md` (this file's scope)
 
-Each repo's own per-repo documentation ADR defines its RAID scope independently.
-
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.5.27 | Learning from information security incidents | ✓ Covered | All findings tracked in RAID.md with severity and mitigation |
-| A.8.16 | Monitoring activities | ✓ Covered | GitHub Issues + Project board provide a live work queue visible to all contributors |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(b) | Incident handling | ✓ Covered | RAID.md is the compliance evidence log for all detected issues and gaps |
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR covers issue tracking process, not personal data.
+See: lib-synology-dsm ADR-0004 for the full decision record.

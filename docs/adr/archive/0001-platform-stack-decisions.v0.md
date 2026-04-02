@@ -392,35 +392,6 @@ Full details in `docs/naming-convention.md`. Key rules:
 
 ---
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-> ADR-0001 covers the full platform stack. Only top-level compliance posture is summarised here; per-tool compliance is documented in each tool's `docs/compliance.md`.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.20 | Networks security | ⚠ Partial | pfSense + Traefik + step-ca defined; OPNsense deployment pending |
-| A.5.23 | Information security for use of cloud services | ✓ Covered | All tools self-hosted; no mandatory SaaS dependencies |
-| A.8.8 | Management of technical vulnerabilities | ⚠ Partial | Trivy + OWASP DC + Gitleaks in CI defined; Lynis + OpenSCAP pending Phase 3 |
-| A.8.15 | Logging | ⚠ Partial | Loki + Prometheus stack defined; Wazuh SIEM pending Phase 3 |
-| A.8.2 | Privileged access rights | ⚠ Partial | Teleport CE defined for bastion; deployment pending Phase 3 |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(a) | Risk management | ✓ Covered | Full OSS stack with layered security from Day 1; RAID log tracks open risks |
-| Art. 21(2)(b) | Incident handling | ⚠ Partial | Wazuh SIEM defined; not yet deployed |
-| Art. 21(2)(e) | Security in network and information systems | ⚠ Partial | Defence-in-depth defined across code/container/runtime layers; pending Phase 3 deployment |
-
-### GDPR (Regulation 2016/679)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 32 | Security of processing | ⚠ Partial | Self-hosted, no data sovereignty issues; CISO Assistant for GRC pending Phase 3 |
-
 ## References
 
 - `docs/stack.md` — full tool inventory with license and deployment options

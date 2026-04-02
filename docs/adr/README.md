@@ -35,7 +35,11 @@ NNNN-short-title.md
 | [ADR-0006](0006-platform-charter.md) | Platform charter (layer model) | Accepted | 2026-03-30 |
 | [ADR-0007](0007-automation-scripting-standard.md) | Automation & scripting standard | Accepted | 2026-03-30 |
 | [ADR-0008](0008-terraform-state-management.md) | Terraform state management | Accepted | 2026-03-30 |
-| [ADR-0009](0009-netbox-as-cmdb-source-of-truth-and-intent-layer.md) | NetBox as CMDB source of truth and intent layer | Accepted | 2026-03-31 |
+| [ADR-0009](0009-netbox-cmdb.md) | NetBox as CMDB source of truth and intent layer | Accepted | 2026-03-31 |
+| [ADR-0020](0020-backup-strategy.md) | Platform backup strategy | Draft | 2026-04-02 |
+| [ADR-0021](0021-hardening-standard.md) | Platform hardening baseline | Draft | 2026-04-02 |
+| [ADR-0022](0022-licensing-policy.md) | Open source licensing policy | Draft | 2026-04-02 |
+| [ADR-0023](0023-monitoring-approach.md) | Monitoring approach (Prometheus + Grafana) | Accepted | 2026-04-02 |
 | [ADR-0010](0010-naming-and-identity-convention.md) | Naming & identity convention | Accepted | 2026-03-31 |
 | [ADR-0011](0011-secret-storage-convention.md) | Secret storage convention | Accepted | 2026-03-31 |
 | [ADR-0012](0012-environment-tier-standard.md) | Environment tier standard | Accepted | 2026-03-31 |

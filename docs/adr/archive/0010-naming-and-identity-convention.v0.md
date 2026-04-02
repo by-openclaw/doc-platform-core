@@ -130,43 +130,30 @@ Until Authentik (Layer 3) provides policy-as-code, naming is enforced by CI chec
 - Break-glass access bypasses SSO — must be tightly controlled and audited
 - Convention must be manually enforced until Authentik (Layer 3) provides policy-as-code
 
-## CISO mapping
+## Compliance
 
-> Applies only to controls directly relevant to this ADR's scope.
-> Do NOT list every ISO control — only those this ADR satisfies, partially satisfies, or gaps.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.5.15 | Access control | ✓ Covered | Group-based RBAC with env scoping defined |
-| A.5.16 | Identity management | ✓ Covered | Three account types with defined lifecycle |
-| A.5.17 | Authentication information | ✓ Covered | Per-env service account credentials; break-glass controls defined |
-| A.5.18 | Access rights | ✓ Covered | Least privilege; permissions enumerated per service account |
-| A.8.2 | Privileged access rights | ✓ Covered | Separate `adm_*` accounts; max 2-3 prod admins; quarterly review |
-| A.8.5 | Secure authentication | ✓ Covered | Break-glass restricted to OOB VLAN; SSO via Authentik for standard users |
-| A.8.18 | Use of privileged utility programs | ✓ Covered | Admin accounts restricted to OOB VLAN |
-| A.8.1 | User end point devices | ⚠ Partial | Asset inventory convention defined; NetBox not yet deployed |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(a) | Risk management policies | ✓ Covered | Env separation reduces blast radius; naming convention enforces it |
-| Art. 21(2)(b) | Incident handling | ✓ Covered | Scoped automation accounts with env isolation limit incident scope |
-| Art. 21(2)(i) | Human resources security | ✓ Covered | Account lifecycle tied to employment; disable never delete |
-
-### GDPR (Regulation 2016/679)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 17 | Right to erasure | ✓ Covered | Anonymise on explicit request + legal review; default = disabled (audit trail preserved) |
-| Art. 32 | Security of processing | ✓ Covered | Credential separation, least privilege, audit trail via account lifecycle rules |
+- **ISO A.8.1.1** (asset inventory) — consistent naming enables automated inventory
+- **ISO A.9.1.1** (access control policy) — group-based RBAC with env scoping
+- **ISO A.9.2.1** (user registration/deregistration) — three account types with defined lifecycle
+- **ISO A.9.2.2** (user access provisioning) — least privilege, permissions enumerated per service account
+- **ISO A.9.2.3** (privileged access management) — separate admin accounts (`adm_*`), max 2-3 prod admins
+- **ISO A.9.2.5** (review of user access rights) — quarterly review of disabled/expired accounts
+- **ISO A.9.2.6** (removal of access rights) — auto-disable on expiry, disable never delete
+- **ISO A.9.4.4** (use of privileged utility programs) — break-glass restricted to OOB VLAN
+- **ISO A.12.1.4** (separation of environments) — 6 explicit tiers, env label in every naming layer
+- **ISO A.13.1.1** (network controls) — standard vs OOB VLAN separation
+- **ISO A.13.1.3** (segregation in networks) — admin/automation on OOB only
+- **NIS2 Art.21(2)(a)** (risk management) — env separation reduces blast radius
+- **NIS2 Art.21(2)(b)** (incident handling) — automation re-enable with scoped permissions + audit log
+- **NIS2 Art.21(2)(c)** (business continuity) — break-glass access as last resort
+- **NIS2 Art.21(2)(i)** (human resources security) — account lifecycle tied to employment/contract
+- **GDPR Art.17** (right to erasure) — anonymize on explicit request + legal review; default = disabled
+- **GDPR Art.32** (security of processing) — credential separation, least privilege, audit trail
 
 ## Notes
 
 - Source: `docs/naming-and-identity-convention-draft.md` (promoted to this ADR)
-- Environment tier standard independently defined in a separate ADR for independent referenceability
-- Credential storage convention independently defined in a separate ADR
+- Environment tier standard extracted to ADR-0012 for independent referenceability
+- Credential storage convention extracted to ADR-0011
 - GRC tool: CISO Assistant (open source) — compliance dashboard when deployed
-- **DNS domain:** VM FQDNs use `{hostname}.by-systems.be` (forward DNS). `.arpa` is used only for reverse DNS (PTR records) — NOT for forward-facing service or VM FQDNs. Service URLs are defined in Traefik config; split DNS is handled via Pi-hole/Unbound internally. Single `*.by-systems.be` wildcard cert via LE Cloudflare DNS-01.
+- Domain: `by-systems.arpa` was original placeholder. Decision 2026-04-01: VM FQDNs = `{hostname}.by-systems.be`. Service URLs = defined in Traefik config, split DNS via Pi-hole/Unbound. Single `*.by-systems.be` wildcard cert via LE Cloudflare DNS-01.

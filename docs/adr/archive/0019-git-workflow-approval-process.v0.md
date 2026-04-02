@@ -10,7 +10,7 @@ Multiple agents (Rune, Opus) and human contributors interact with the same repos
 
 ## Decision
 
-**VCS:** GitHub now. Migration to GitLab CE self-hosted when GitLab is deployed. This ADR governs both phases — the workflow is the same regardless of host.
+**VCS:** GitHub now. Migration to GitLab CE self-hosted when GitLab is deployed (see ADR-0005). This ADR governs both phases — the workflow is the same regardless of host.
 
 **Branching model:** Trunk-based development. `main` is the single long-lived branch. No `develop`, no `release/*` branches in PoC. Feature branches are short-lived (PR → merge → delete).
 
@@ -28,28 +28,6 @@ Multiple agents (Rune, Opus) and human contributors interact with the same repos
 
 **Agent boundary:** Agents (Rune, Opus, sub-agents) may commit to feature branches and open PRs. Agents may not merge PRs to `main` or push directly to `main`. @yboujraf is the sole merge authority.
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.32 | Change management | ✓ Covered | PR review with human approval required; no direct push to main |
-| A.8.9 | Configuration management | ✓ Covered | All changes versioned; infrastructure snapshots tagged by date |
-| A.5.12 | Classification of information | ✓ Covered | Conventional Commits enables automated CHANGELOG and release traceability |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(e) | Security in network and information systems acquisition | ✓ Covered | Change management via PR; @yboujraf is sole merge authority |
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR covers git workflow, not personal data processing.
-
 ## Consequences
 
 - All agent work on `main` goes through a PR. No exceptions.
@@ -60,6 +38,6 @@ Not applicable — this ADR covers git workflow, not personal data processing.
 
 ## References
 
-- VCS & CI/CD strategy decision defines the GitLab CE migration target and rationale
-- Platform charter defines branch strategy and contribution flow principles
+- ADR-0005 — VCS & CI/CD Strategy
+- ADR-0006 §4 — Branch strategy and contribution flow
 - `brainstorming/2026-04-01-git-flow-approval-process.md` — source brainstorming doc

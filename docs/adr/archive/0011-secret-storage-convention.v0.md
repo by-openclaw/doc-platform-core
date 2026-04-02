@@ -4,20 +4,11 @@
 **Date:** 2026-03-31
 **Deciders:** @yboujraf
 
-<!--
-  SCOPE GUARD
-  ===========
-  This ADR governs infra/platform credential storage ONLY.
-  Scope: infrastructure services, platform tools, service accounts, CI/CD tokens.
-  NOT in scope: library-level credential handling (e.g., how lib-synology-dsm passes
-  credentials to its HTTP client — that is governed by lib-scoped ADRs in each library repo).
--->
-
 ## Context
 
 Platform credentials (NAS API tokens, Proxmox root passwords, GitHub PATs, Discord webhooks) were previously scattered across `.env` files with inconsistent naming and no metadata. When HashiCorp Vault is deployed (Phase 2), credentials must migrate with zero ambiguity — no reformatting, no guessing which env a credential belongs to.
 
-This ADR defines the platform-scoped credential storage convention for infrastructure services, platform tools, service accounts, and CI/CD tokens. It does NOT govern how software libraries (e.g., lib-synology-dsm) handle credentials internally — those decisions are governed by lib-scoped ADRs in each library repo.
+`lib-synology-dsm` ADR-0009 established a JSON schema for local secrets with Vault KV v2 migration paths. This ADR lifts that decision to platform scope: all repos, all services, all environments follow the same convention.
 
 ## Decision
 
@@ -105,30 +96,14 @@ OpenClaw agent secrets stay in OpenClaw's own config format. `workspace/infra/se
 - Local files have no encryption at rest during Phase 1 (Vault solves this in Phase 2)
 - Dual format (JSON + .env) during Phase 1 creates sync risk — mitigated by convention, not tooling
 
-## CISO mapping
+## Compliance
 
-> Applies only to controls directly relevant to this ADR's scope.
-> Do NOT list every ISO control — only those this ADR satisfies, partially satisfies, or gaps.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.24 | Use of cryptography | ⚠ Partial | Schema and paths defined; encryption at rest requires Vault (Phase 2 — not yet deployed) |
-| A.5.17 | Authentication information | ✓ Covered | One credential per file, owner tracked, access scoped |
-| A.8.12 | Prevention of data leakage | ✓ Covered | No plaintext in committed files; redaction enforced; detect-secrets pre-commit hooks |
-| A.8.15 | Logging | ⚠ Partial | Vault audit trail available in Phase 2; Phase 1 has no automated audit log |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(d) | Supply chain security | ✓ Covered | Credential isolation per env prevents cross-env blast radius |
-| Art. 21(2)(e) | Security in network and information systems | ✓ Covered | detect-secrets pre-commit hooks prevent credential leakage into git |
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR governs infrastructure credentials, not personal data processing.
+- **ISO A.10.1.1** (cryptographic controls policy) — credentials stored with defined schema, encrypted at rest in Phase 2 (Vault)
+- **ISO A.9.4.3** (password management) — no plaintext in committed files, redaction enforced
+- **ISO A.9.2.4** (management of secret authentication information) — one credential per file, owner tracked, access scoped
+- **ISO A.12.4.1** (event logging) — Vault provides full audit trail in Phase 2
+- **NIS2 Art.21(2)(d)** (supply chain security) — credential isolation per env prevents cross-env blast radius
+- **NIS2 Art.21(2)(e)** (security in network and information systems) — detect-secrets pre-commit hooks prevent credential leakage
 
 ## Notes
 
@@ -142,7 +117,7 @@ Not applicable — this ADR governs infrastructure credentials, not personal dat
 ## Vault KV Path Convention
 
 > **Source:** `brainstorming/2026-04-01-vault-kv-standard.md` (Opus, 2026-04-01) — promoted into this ADR.
-> **Vault path standard:** The full Vault KV path structure is documented in a separate platform decision record.
+> **Formal ADR:** See ADR-0016 (stub) for full decision record once approved.
 
 ### Path Structure
 

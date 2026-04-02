@@ -126,28 +126,6 @@ Workflow:
 
 ---
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.9 | Configuration management | ✓ Covered | Scripts are single-purpose, documented, and follow idempotent apply/absent pattern |
-| A.8.32 | Change management | ✓ Covered | Dry-run and verification are mandatory before apply |
-| A.8.15 | Logging | ✓ Covered | Standard output prefixes and meaningful exit codes are required |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(e) | Security in development and maintenance | ✓ Covered | Idempotency, dry-run, and rollback are mandatory for automation |
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR covers automation standards, not personal data processing.
-
 ## Reference
 
 - `by-systems/odoo-install` — reference implementation (proxy, cert, DNS, nginx, postgres)

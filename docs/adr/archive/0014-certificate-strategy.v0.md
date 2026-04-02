@@ -28,30 +28,6 @@ Two CA paths are available: Let's Encrypt (LE) via ACME for public certs, and st
 - LE: always valid in browsers and standard clients
 - step-ca: valid only if the step-ca root CA is in the system trust store. The cloud-init template **must** inject the root CA into `/usr/local/share/ca-certificates/` and run `update-ca-certificates`. This is non-negotiable — omitting it breaks all internal TLS clients silently.
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.24 | Use of cryptography | ✓ Covered | LE and step-ca provide valid, trusted TLS for all endpoints; self-signed forbidden |
-| A.8.23 | Web filtering | ✓ Covered | No-warning guarantee for internal and external services |
-| A.5.14 | Information transfer | ✓ Covered | All service communication uses TLS; no plaintext channels permitted |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(e) | Security in network and information systems | ✓ Covered | Automated cert renewal eliminates manual rotation risk; no self-signed certs |
-
-### GDPR (Regulation 2016/679)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 32(1)(a) | Encryption of personal data | ✓ Covered | All services use valid TLS; data in transit is encrypted |
-
 ## Consequences
 
 - Traefik is the single TLS termination point for all services. No per-service cert management.
@@ -65,4 +41,4 @@ Two CA paths are available: Let's Encrypt (LE) via ACME for public certs, and st
 
 - `docs/stack.md` — step-ca and Cloudflare entries
 - `docs/naming-convention.md` §6 — FQDN and DNS naming
-- Platform charter defines step-ca as a Layer 2 prerequisite before any internal service goes live
+- ADR-0006 — Layer 2 (step-ca) prerequisite for PKI mount

@@ -12,6 +12,26 @@ Before creating or editing anything in this repo:
 4. [`docs/stack.md`](docs/stack.md) — canonical platform stack reference
 5. [`docs/raid.md`](docs/raid.md) — risks, assumptions, issues, dependencies
 
+## Mandatory reading before acting
+
+Before writing, editing, or reviewing any file in this repo, read:
+
+### doc-platform-core repo:
+1. `/home/by-systems/.openclaw/workspace/repos/doc-platform-core/docs/standards/` — all standards files
+2. `/home/by-systems/.openclaw/workspace/repos/doc-platform-core/docs/adr/` — all Accepted ADRs
+3. The ADR template for your scope: `doc-platform-core/docs/templates/adr-template-infra.md`
+
+### lib repos (lib-synology-dsm etc.):
+1. `/home/by-systems/.openclaw/workspace/repos/lib-synology-dsm/docs/adr/` — lib-scoped ADRs only
+2. The ADR template for your scope: `doc-platform-core/docs/templates/adr-template-lib.md`
+3. Platform standards are NOT binding on lib repos — but lib CISO sections must reference them
+
+### Rules:
+- Do NOT infer. Do NOT invent policy. If a standard or ADR covers it — follow it.
+- If you would override a standard — flag it with `[OVERRIDE REQUIRED]`, do NOT do it silently.
+- Cross-ADR dependencies are FORBIDDEN. Each ADR is self-contained. Do not say "see ADR-XXXX".
+- If content is relevant to two ADRs — each states it independently within its own scope.
+
 ## Coding & Commit Standards
 
 - **Conventional Commits** — docs repo uses limited types only:

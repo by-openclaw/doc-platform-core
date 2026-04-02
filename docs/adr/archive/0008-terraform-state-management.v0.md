@@ -33,7 +33,7 @@ Manual sync available at any time: `python3 scripts/backup-state.py --env poc`
 
 ### Phase 2 — GitLab CE (planned)
 
-Migrate to **GitLab-managed Terraform state** when GitLab CE is deployed (Phase 5 in the platform rollout):
+Migrate to **GitLab-managed Terraform state** when GitLab CE is deployed (Phase 5, ADR-0005):
 - Backend: `terraform { backend "http" { ... } }` pointing to GitLab state API
 - Locking: built-in via GitLab
 - No more NAS backup required for state (NAS backup kept for DR only)
@@ -92,30 +92,8 @@ This is handled transparently by `lib-synology-dsm`. Do not bypass the lib.
 
 ---
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.13 | Information backup | ✓ Covered | Terraform state is backed up to Synology NAS after every apply/destroy |
-| A.8.6 | Capacity management | ⚠ Partial | Local + NAS copies reduce loss risk, but NAS is not HA |
-| A.8.32 | Change management | ✓ Covered | `tf.sh` wrapper enforces backup on state-changing commands |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(c) | Business continuity and backup management | ✓ Covered | State survives Rune VM loss; restore path is documented |
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR covers infrastructure state, not personal data processing.
-
 **References:**
 - [infra-terraform-proxmox/scripts/](https://github.com/by-openclaw/infra-terraform-proxmox/tree/main/scripts)
 - [lib-synology-dsm v0.6.1](https://github.com/by-openclaw/lib-synology-dsm/releases/tag/v0.6.1)
-- VCS & CI/CD strategy decision document
-- Platform charter document
+- [ADR-0005 — VCS & CI/CD strategy](0005-vcs-and-cicd-strategy.md)
+- [ADR-0006 — Platform charter](0006-platform-charter.md)

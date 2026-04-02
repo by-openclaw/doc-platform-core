@@ -52,29 +52,6 @@ All firewall rules use named aliases. Hardcoded IPs, ports, and URLs are banned 
 
 Alias definitions are exported to `tools/opnsense/config/aliases.conf` and version-controlled.
 
-## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
-
-### ISO/IEC 27001:2022
-
-| Control | Title | Status | Notes |
-|---|---|---|---|
-| A.8.20 | Networks security | ⚠ Partial | VLAN topology and OPNsense rules defined; enforcement pending OPNsense deployment |
-| A.8.22 | Segregation of networks | ✓ Covered | OOB / MGMT / DMZ / SVC VLANs enforce separation; admin/automation on OOB only |
-| A.8.21 | Security of network services | ⚠ Partial | Firewall alias standard defined; rule implementation pending |
-
-### NIS2 (Directive 2022/2555)
-
-| Article | Requirement | Status | Notes |
-|---|---|---|---|
-| Art. 21(2)(a) | Risk management — network controls | ⚠ Partial | Network topology designed for separation; OPNsense not yet deployed |
-| Art. 21(2)(e) | Security in network and information systems | ✓ Covered | Named alias standard prevents hardcoded IP sprawl; VLAN registry is version-controlled |
-
-### GDPR (Regulation 2016/679)
-
-Not applicable — this ADR covers network topology, not personal data.
-
 ## Consequences
 
 - VLAN 340 and 350 must not appear in switch configs, Proxmox SDN zones, or OPNsense interfaces.
@@ -84,6 +61,6 @@ Not applicable — this ADR covers network topology, not personal data.
 
 ## References
 
-- IP addressing plan and layer model are defined in the platform charter document
+- ADR-0006 §2 — IP addressing plan and layer model
 - `docs/stack.md` — OPNsense, Proxmox SDN entries
 - `brainstorming/2026-04-02-opus-batch1-feedback.md` — bootstrap vs runtime IP clarification
