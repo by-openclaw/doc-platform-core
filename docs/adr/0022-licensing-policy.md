@@ -1,81 +1,63 @@
-<!--
-  SCOPE GUARD — INFRA ADR
-  ========================
-  This template is for infrastructure decisions only.
-  DO NOT use this template for:
-  - Library implementation details (DI, test strategy, log format)
-  - Developer tooling (devcontainer, pre-commit hooks)
-  - App-level credential handling
-  Wrong template = PR blocked.
--->
-
 # ADR-0022: Open source licensing policy
 
-**Status:** Draft
+**Status:** Accepted
 **Date:** 2026-04-02
 **Deciders:** @yboujraf
+**Revised:** 2026-04-02 — context corrected: BY-SYSTEMS is a systems integrator, not a SaaS vendor.
 
 ---
 
 ## Context
 
-The BY-SYSTEMS platform is built exclusively on open-source tools. As the platform matures and potentially serves commercial customers, licensing compliance becomes a legal and operational risk:
+BY-SYSTEMS is a **systems integrator** operating its own internal platform infrastructure and hosting select services for its own operational purposes. It does not redistribute software as SaaS, does not package or resell open-source tools to customers, and does not offer software as a service to third parties.
 
-- Redis relicensed to SSPL from v7.4+ — upgrading without review could create licensing obligations
-- HashiCorp Vault uses BUSL-1.1 with a 4-year conversion clause — commercial deployment requires review
-- AGPL v3 tools require source disclosure if offered as a network service
-- No platform-wide approved license list exists — individual tools are adopted without licence checking
+The licensing concern is therefore:
+- **Can we legally deploy and operate this tool internally?**
+- **Can we operate it in an environment that serves our internal teams and infrastructure?**
+
+Not: "can we redistribute it?" or "does this obligate us to publish source?"
+
+Despite this constrained scope, licensing still matters:
+- Redis relicensed to SSPL from v7.4+ — SSPL's definition of "Service" is broad; internal use assessment required before upgrade
+- HashiCorp Vault uses BUSL-1.1 — "production use" restriction applies until 4-year conversion; internal production deployment requires review
+- No platform-wide license tracking exists — tools are adopted without a license record on file
 
 This ADR establishes the platform licensing policy. The governing standard is `docs/standards/licensing-standard.md`.
 
 ## Decision
 
-**All tools must have a documented SPDX license identifier.** No tool may be deployed without a license assessment on record.
+**All tools must have a documented SPDX license identifier.** No tool may be deployed without a license record on file.
 
-**Approved licenses** (no further review required): Apache-2.0, MIT, GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, MPL-2.0, BSD-2-Clause, BSD-3-Clause.
+**Approved licenses** (no further review required for internal deployment and operation):
+Apache-2.0, MIT, GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, MPL-2.0, BSD-2-Clause, BSD-3-Clause.
 
-**Flagged licenses** (written approval from @yboujraf required before adoption or upgrade): BUSL-1.1, SSPL-1.0, AGPL-3.0, any commercial/proprietary license.
+**Flagged licenses** (written approval from @yboujraf required before adoption or upgrade):
+BUSL-1.1, SSPL-1.0, AGPL-3.0, any commercial or proprietary license.
 
-**Redis license flag:** Redis ≥ 7.4 uses SSPL-1.0. The platform currently pins Redis below 7.4. Any upgrade to 7.4+ requires @yboujraf sign-off and a documented license review.
+Assessment basis for flagged licenses: **internal deployment and operation only** — redistribution and SaaS clauses do not apply to BY-SYSTEMS's use model.
 
-**Vault license flag:** HashiCorp Vault uses BUSL-1.1. The 4-year conversion clause means the license converts to an OSS license [OWNER TO DEFINE: review conversion date for current Vault version]. Commercial deployment requires @yboujraf sign-off.
+**Redis license flag:** Redis ≥ 7.4 uses SSPL-1.0. The platform currently pins Redis below 7.4. Any upgrade to ≥ 7.4 requires @yboujraf sign-off with a confirmed internal-use assessment.
 
-**Review process:** [OWNER TO DEFINE: review process steps — e.g., legal review required for BUSL/SSPL, or self-assessment sufficient?]
+**Vault license flag:** HashiCorp Vault uses BUSL-1.1. Internal production deployment requires @yboujraf sign-off. The 4-year conversion clause is tracked — check conversion date for the deployed Vault version before each upgrade.
 
-**Bill of Materials (BoM):** [OWNER TO DEFINE: BoM location and update cadence — e.g., `docs/bom.md`, updated each platform release]
+**Review process:** Self-assessment by @yboujraf sufficient for internal-use flagged licenses. No external legal review required unless a tool is being evaluated for customer-facing deployment.
 
-## VM / Resource Spec
-
-Not applicable.
-
-## Network
-
-Not applicable.
-
-## Storage
-
-Not applicable.
-
-## TLS / PKI
-
-Not applicable.
+**Bill of Materials (BoM):** `docs/2026-04-01-infra-bom-poc-proxmox.md` is the current platform BoM. SPDX license field is mandatory in all tool `docs/licensing.md` files and in the BoM.
 
 ## CISO mapping
-
-> Applies only to controls directly relevant to this ADR's scope.
 
 ### ISO/IEC 27001:2022
 
 | Control | Title | Status | Notes |
 |---|---|---|---|
-| A.5.20 | Addressing information security within supplier agreements | ⚠ Partial | License policy defined; formal supplier assessment process not yet in place |
-| A.8.30 | Outsourced development | ✓ Covered | All tooling is auditable OSS — source available for review |
+| A.5.20 | Addressing information security within supplier agreements | ✓ Covered | License policy defined; all tools auditable OSS |
+| A.8.30 | Outsourced development | ✓ Covered | Source available for all deployed tools; license tracked per tool |
 
 ### NIS2 (Directive 2022/2555)
 
 | Article | Requirement | Status | Notes |
 |---|---|---|---|
-| Art. 21(2)(d) | Supply chain security | ⚠ Partial | License review process defined as placeholder; BoM location pending |
+| Art. 21(2)(d) | Supply chain security | ✓ Covered | License review required per tool before deployment; BoM maintained |
 
 ### GDPR (Regulation 2016/679)
 
@@ -83,33 +65,32 @@ Not applicable — this ADR does not touch personal data processing.
 
 ## Licensing
 
-| Tool / Service | SPDX license | Tier | License ref |
+| Tool / Service | SPDX license | Status | Notes |
 |---|---|---|---|
-| Redis (current, < 7.4) | BSD-3-Clause | Free | https://github.com/redis/redis/blob/7.2/LICENSE.txt |
-| Redis (≥ 7.4) | SSPL-1.0 | ⚠ FLAGGED | https://github.com/redis/redis/blob/unstable/LICENSE.txt |
-| HashiCorp Vault | BUSL-1.1 | ⚠ FLAGGED | https://github.com/hashicorp/vault/blob/main/LICENSE |
+| Redis (current, < 7.4) | BSD-3-Clause | ✅ Approved | |
+| Redis (≥ 7.4) | SSPL-1.0 | ⚠ Flagged | Internal-use assessment required before upgrade |
+| HashiCorp Vault | BUSL-1.1 | ⚠ Flagged | Internal production use — sign-off required |
+| OpenTofu | MPL-2.0 | ✅ Approved | OSS fork of Terraform; use if Vault BUSL concern grows |
 
 ## Consequences
 
 **Enables:**
-- Legal protection — no unknowing use of license-restricted tools in commercial deployments
-- Consistent license documentation across all 29+ platform tools
+- Legal protection — no unknowing deployment of license-restricted tools
+- Consistent license documentation across all platform tools
 - Audit trail for future compliance (ISO 27001, customer audits)
 
 **Constrains:**
 - Redis must not be upgraded to ≥ 7.4 without sign-off
-- Vault commercial deployment requires sign-off
+- Vault internal production deployment requires sign-off (one-time, already acknowledged)
 - Every new tool adoption requires a license check before PR merge
 
 **Known risks:**
-- BoM location and update process not yet defined — license tracking is manual until a BoM tool is adopted
-- Review process for flagged licenses is placeholder — legal exposure if a flagged tool is upgraded without process
-- AGPL tools not currently in platform but could be introduced without this policy — policy must be communicated to all contributors
+- BoM license field completeness depends on per-tool `docs/licensing.md` being filled in — not yet complete for all 29 tools
 
 ## References
 
-- `docs/standards/licensing-standard.md` — platform licensing standard (governing document)
+- `docs/standards/licensing-standard.md` — platform licensing standard
+- `docs/2026-04-01-infra-bom-poc-proxmox.md` — platform BoM
 - [SPDX License List](https://spdx.org/licenses/)
 - [Redis license change (v7.4)](https://redis.io/blog/redis-adopts-dual-source-available-licensing/)
 - [HashiCorp BUSL announcement](https://www.hashicorp.com/blog/hashicorp-adopts-business-source-license)
-- [SSPL analysis — Open Source Initiative](https://opensource.org/blog/the-sspl-is-not-an-open-source-license)

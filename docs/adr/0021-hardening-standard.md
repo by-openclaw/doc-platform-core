@@ -11,7 +11,7 @@
 
 # ADR-0021: Platform hardening baseline
 
-**Status:** Draft
+**Status:** Draft — thresholds defined per-tool during deployment phase
 **Date:** 2026-04-02
 **Deciders:** @yboujraf
 

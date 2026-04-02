@@ -11,7 +11,7 @@
 
 # ADR-0020: Platform backup strategy
 
-**Status:** Draft
+**Status:** Draft — thresholds defined per-tool during deployment phase
 **Date:** 2026-04-02
 **Deciders:** @yboujraf
 
