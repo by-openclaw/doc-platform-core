@@ -15,13 +15,51 @@ The platform needs a structured email infrastructure that:
 - Provides outbound SMTP for all tools through Exchange
 - Requires zero per-tool M365 licenses
 
-Two layers, two connectors — no per-tool Mail Flow Rules needed.
+Two deployment phases:
+
+| Phase | Mail provider | Exchange involved? | Purpose |
+|---|---|---|---|
+| **PoC** | Mailcow standalone | ❌ No | Validate stack in isolation. Prod is never touched. No third-party relay. |
+| **Prod** | Mailcow + Exchange hybrid | ✅ Yes | Full model: Exchange as public MX + relay, Mailcow as mail host. |
+
+**PoC decision:** Mailcow is the sole MX. All inbound and outbound goes through Mailcow directly. No Exchange connector, no relay dependency. Platform is fully self-contained.
+
+**Migration trigger:** When PoC stack is validated end-to-end → add Exchange hybrid (two connectors) without changing any tool config. Tool mailboxes, credentials, and IMAP access remain identical.
 
 Reference: https://docs.mailcow.email/third_party/exchange_onprem/third_party-exchange_onprem/
 
 ---
 
 ## Architecture
+
+### Phase 1 — PoC: Mailcow standalone
+
+```
+External sender → <anyaddress>@{domain}
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Mailcow (sole MX)                             │
+│               Public MX record → Mailcow IP                 │
+│                                                             │
+│  Known mailbox (gitlab@, grafana@, vault@, ...)?            │
+│  └── YES → deliver to tool mailbox                          │
+│            Tool reads via IMAP (credential from Vault)      │
+│                                                             │
+│  Unknown (virtual address)?                                 │
+│  └── NO  → catchall@{domain}                                │
+│            Consumer reads via IMAP, inspects To:            │
+│                                                             │
+│  Outbound: Tool → Mailcow SMTP → direct delivery            │
+│            No relay. No third party.                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+No Exchange. No relay dependency. Prod is never touched.
+
+---
+
+### Phase 2 — Prod: Mailcow + Exchange hybrid (target)
 
 ### Inbound (RX) + Outbound (TX)
 
@@ -279,11 +317,19 @@ playbooks/identity-sync/
 ## Deployment variables
 
 ```yaml
-# deployments/{org}-{env}/deployment.yml
+# PoC
+org:
+  domain: by-systems.be
+  env: poc
+  mail_provider: mailcow-only    # Mailcow is sole MX, no Exchange
+  mailcow_host: mail.poc.by-systems.be
+  mailcow_ip: 10.1.3.55
+
+# Prod (target — when PoC validated)
 org:
   domain: by-systems.be
   env: prod
-  mail_provider: hybrid          # hybrid | mailcow-only
+  mail_provider: hybrid          # Mailcow + Exchange two-connector model
   exchange_gateway: contoso-com.mail.protection.outlook.com
   mailcow_host: mail.by-systems.be
   mailcow_ip: 10.6.225.80
