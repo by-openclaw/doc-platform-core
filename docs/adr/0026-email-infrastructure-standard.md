@@ -99,47 +99,66 @@ Reference: [ventor.tech/guides/how-to-configure-emails-to-work-with-office-365-a
 
 ---
 
-## Platform tool mailboxes (M365 shared)
+## Catch-all routing pattern (provider-agnostic)
 
-Tool mailboxes are Exchange shared mailboxes. No per-tool license required (shared mailboxes are free up to 50 GB). Email is routed directly to them.
+The inbound routing model is the same regardless of mail provider. Odoo reads a catch-all mailbox via IMAP and inspects the original `To:` field to route to the correct internal object.
 
-**The only access challenge is programmatic read.** Shared mailboxes have no password — tools cannot do a direct IMAP login. Two solutions exist, both requiring zero additional licenses.
+```
+External user sends to <anyaddress>@{domain}
+        │
+        ▼
+Mail provider receives it
+  ├── Known real address (john@{domain}, gitlab@{domain})?
+  │     → deliver normally
+  │
+  └── Unknown address (sales@, accounting@, project-xyz@, ...)?
+        → catch-all mailbox (catchall@{domain})
+        → Odoo reads mailbox via IMAP
+        → Odoo inspects original To: field
+        → routes to correct object (Sales Team, Project, Accounting, ...)
+```
 
-### Tool email access model
+Odoo is **provider-agnostic**. Any mail provider that supports catch-all routing works:
 
-| Tool | Inbound needed? | Access method | License? |
-|---|---|---|---|
-| GitLab | ✅ Yes (incoming_email, Service Desk) | Graph API app registration | None |
-| NetBox | ❌ No — send only | SMTP relay (IP connector) | None |
-| Grafana | ❌ No — send only | SMTP relay (IP connector) | None |
-| Vault | ❌ No — send only | SMTP relay (IP connector) | None |
-| Odoo | ✅ Yes (catchall) | Licensed mailbox (required by Odoo) | 1 × Exchange Online |
-
-**Tools that only send** use the M365 SMTP relay connector (IP-allowlisted). No credential, no mailbox, no license.
-
-**Tools that need to read** (currently only GitLab) use an Azure app registration with Graph API permissions on the shared mailbox — no license required.
-
-**Naming convention:** `{tool}@{domain}`
-
-| Mailbox | Type | Purpose |
+| Provider | Catch-all mechanism | Odoo reads via |
 |---|---|---|
-| `gitlab@{domain}` | Shared | GitLab outbound notifications, system email |
-| `gitlab-incoming@{domain}` | Shared | GitLab inbound (incoming_email, Service Desk) |
-| `netbox@{domain}` | Shared | NetBox outbound notifications |
-| `grafana@{domain}` | Shared | Grafana alert emails |
-| `vault@{domain}` | Shared | Vault notification emails |
-| `noreply@{domain}` | Shared | Transactional no-reply sender |
-| `catchall@{domain}` | **Licensed** | Odoo inbound receiver (Exchange Online required) |
+| M365 | Mail Flow Rule + Internal Relay domain | IMAP or Graph API |
+| Google Workspace | Catch-all routing in Admin console | IMAP |
+| Mailcow (PoC/internal) | Native catch-all alias per domain | IMAP |
+| Any IMAP server | Catch-all alias | IMAP |
+
+For **Mailcow**: set `catchall@{domain}` as the domain catch-all alias. Odoo reads via IMAP. Identical behaviour to M365, no app registration required.
 
 ---
 
-### GitLab inbound — Graph API (no license)
+## Platform tool mailboxes
 
-GitLab v16+ supports Microsoft Graph API natively for incoming email. This is the preferred method over IMAP basic auth (which M365 is deprecating).
+Platform tools that **send notifications** (Grafana, NetBox, Vault, etc.) use the mail provider SMTP relay. They do not receive inbound email — inbound is not applicable to them.
 
-**Azure app registration required:**
-- Permissions: `Mail.Read`, `Mail.Send` scoped to `gitlab-incoming@{domain}` shared mailbox
-- Credentials: Vault at `secret/{env}/gitlab/graph-api`
+Platform tools that **receive email** have a dedicated mailbox:
+
+| Mailbox | Type | Purpose |
+|---|---|---|
+| `catchall@{domain}` | **Licensed** (M365) / mailbox (Mailcow) | Odoo inbound receiver |
+| `gitlab-incoming@{domain}` | Shared (M365) / mailbox (Mailcow) | GitLab inbound (incoming_email, Service Desk) |
+| `gitlab@{domain}` | Shared | GitLab outbound system notifications |
+| `netbox@{domain}` | Shared | NetBox outbound notifications |
+| `grafana@{domain}` | Shared | Grafana alert emails (send only) |
+| `vault@{domain}` | Shared | Vault notification emails (send only) |
+| `noreply@{domain}` | Shared | Transactional no-reply sender |
+
+**M365 shared mailboxes:** free up to 50 GB, no per-tool license. Email routes directly to them. Tools access them via IMAP (with OAuth 2.0) or Graph API — not via password.
+
+**Odoo catch-all mailbox on M365:** requires one Exchange Online license. Odoo needs authenticated IMAP/Graph access with read permissions. A shared mailbox (no license) is insufficient for Odoo's connection model.
+
+---
+
+### GitLab inbound — Graph API (M365)
+
+GitLab v16+ supports Microsoft Graph API natively for incoming email. Preferred over IMAP basic auth (deprecated by Microsoft).
+
+**Azure app registration:** `Mail.Read` + `Mail.Send` scoped to `gitlab-incoming@{domain}`.
+Credentials: Vault at `secret/{env}/gitlab/graph-api`.
 
 ```ruby
 # gitlab.rb — Microsoft Graph API incoming email
@@ -152,12 +171,28 @@ gitlab_rails['incoming_email_client_id']     = ENV['AZURE_CLIENT_ID']     # from
 gitlab_rails['incoming_email_client_secret'] = ENV['AZURE_CLIENT_SECRET'] # from Vault
 ```
 
+### GitLab inbound — IMAP (Mailcow / any provider)
+
+```ruby
+# gitlab.rb — IMAP incoming email (Mailcow or any IMAP provider)
+gitlab_rails['incoming_email_enabled']  = true
+gitlab_rails['incoming_email_address']  = 'gitlab-incoming+%{key}@{domain}'
+gitlab_rails['incoming_email_email']    = 'gitlab-incoming@{domain}'
+gitlab_rails['incoming_email_password'] = ENV['GITLAB_INCOMING_EMAIL_PASSWORD'] # from Vault
+gitlab_rails['incoming_email_host']     = 'mail.{domain}'
+gitlab_rails['incoming_email_port']     = 993
+gitlab_rails['incoming_email_ssl']      = true
+```
+
 ### Subaddressing (plus addressing)
 
-M365 supports `+` subaddressing — enabled org-wide via one PowerShell command. Required for GitLab inbound email.
+Required for GitLab `incoming_email` to route replies to the correct issue/MR thread.
+
+- **M365:** enable org-wide via one PowerShell command
+- **Mailcow:** supported natively, no configuration needed
 
 ```
-gitlab-incoming+{token}@{domain}  →  delivers to gitlab-incoming shared mailbox
+gitlab-incoming+{token}@{domain}  →  delivers to gitlab-incoming mailbox
 ```
 
 GitLab routes by `+token` to the correct issue/MR thread or Service Desk queue.
