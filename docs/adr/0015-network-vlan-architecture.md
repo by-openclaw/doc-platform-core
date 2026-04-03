@@ -31,20 +31,32 @@ The PoC platform spans multiple network segments managed via Arista 7060/7020 sw
 
 No dedicated VM-level storage or backup VLAN. Storage traffic (NAS, Proxmox backup) uses the OOB/MGMT network. A dedicated storage VLAN is a Phase 2 consideration only.
 
+### Proxmox SDN — Zone and VNet Naming Standard
+
+> **Decided 2026-04-03**
+
+**Rule:** VNet names are environment-agnostic. The environment context lives in the VM hostname, FQDN, and certificate — not in network primitives. One Proxmox node = one environment; bridge name collision does not apply.
+
+| Zone | VNet | VLAN | Subnet | Uplink | Purpose |
+|---|---|---|---|---|---|
+| `poc` | `mgmt` | 310 | 10.1.1.0/24 | `vmbrAPPS` | Management — Pi-hole, Unifi, jumphost |
+| `poc` | `dmz` | 320 | 10.1.2.0/24 | `vmbrAPPS` | DMZ — Traefik ingress |
+| `poc` | `svc` | 330 | 10.1.3.0/24 | `vmbrAPPS` | Internal platform services |
+
+Future environments (`dev`, `prod`) get dedicated Proxmox nodes with their own zones using the same agnostic VNet names (`mgmt`, `dmz`, `svc`).
+
 ### Proxmox Linux Bridges (srv-proxmox-poc-01)
 
-> **Updated 2026-04-03** — bridge rename completed.
+> **Updated 2026-04-03**
 
 | Bridge | Status | IP | Purpose |
 |---|---|---|---|
 | `vmbrWAN1` | Active | — | WAN1 Proximus PPPoE |
 | `vmbrWAN2` | Active | — | WAN2 Telenet (untested) |
-| `vmbrWAN3` | Active | 10.6.224.105/20 | Internet access via OOB path — temporary during ISP migration (renamed from vmbrOOB 2026-04-03) |
-| `vmbrOOB` | Created ✅ | 10.1.0.x/24 (post-SDN) | Break-glass / Proxmox host OOB — VLAN 300 (`vnet-poc-oob`). No IP until OPNsense SDN deployed. autostart=off. Created 2026-04-03. |
-| `vmbrFAB` | Disabled | — | Fabric supervision — disabled until PoC fabric physically wired (renamed from vmbrMGMT 2026-04-01) |
-| `vmbrAPPS` | Active | — | VM trunk — VLAN-aware, no IP. Each VM tags its own VLAN in NIC config (SDN VNets: mgmt/dmz/svc). OPNsense LAN attaches as trunk. Name confirmed correct 2026-04-03. |
-
-> `vmbrPOC` was removed 2026-04-03 — was not in any ADR or design decision.
+| `vmbrWAN3` | Active | 10.6.224.105/20 | Internet access via OOB path — temporary during ISP migration |
+| `vmbrOOB` | Created | — | Break-glass only — no IP, isolated, emergency console. autostart=off. |
+| `vmbrFAB` | Disabled | — | Fabric supervision — disabled until PoC fabric physically wired |
+| `vmbrAPPS` | Active | — | VM trunk — VLAN-aware, no IP. SDN zone `poc` uplink. OPNsense LAN attaches as trunk. |
 
 ### WAN Uplinks
 

@@ -33,10 +33,10 @@ No physical switch between VMs — all networking is **Proxmox SDN** (VNets + Zo
 
 | VLAN | VNet name | Subnet | Purpose | External access |
 |---|---|---|---|---|
-| **300** | `vnet-poc-oob` | 10.1.0.0/24 | OOB — Proxmox IPMI, switch mgmt ports | Physical uplink |
-| **310** | `vnet-poc-mgmt` | 10.1.1.0/24 | MGMT — Rune VM (.5), Terraform, Ansible | WireGuard only |
-| **320** | `vnet-poc-dmz` | 10.1.2.0/24 | DMZ — Traefik (.10), WireGuard (.61) | Traefik :443, WG :51820 |
-| **330** | `vnet-poc-svc` | 10.1.3.0/24 | SVC — all service VMs | Via Traefik only |
+| **300** | `oob` | 10.1.0.0/24 | OOB — Proxmox IPMI, switch mgmt ports | Physical uplink |
+| **310** | `mgmt` | 10.1.1.0/24 | MGMT — Rune VM (.5), Terraform, Ansible | WireGuard only |
+| **320** | `dmz` | 10.1.2.0/24 | DMZ — Traefik (.10), WireGuard (.61) | Traefik :443, WG :51820 |
+| **330** | `svc` | 10.1.3.0/24 | SVC — all service VMs | Via Traefik only |
 | **340** | `vnet-poc-storage` | 10.1.4.0/24 | **RESERVED / NOT USED** — NAS NFS is host-level only (`poc-iso`, `poc-backup`). VMs never mount NFS directly. 340 has no current use case. Remove from Arista trunk allowed list until repurposed. | None |
 | **350** | `vnet-poc-backup` | 10.1.5.0/24 | **RESERVED / NOT USED** — same rationale as 340. No VM-level backup network needed. Proxmox backup jobs use host-level NFS directly. | None |
 | **400** | `vnet-poc-wifi` | 10.1.6.0/24 | WIFI — Unifi AP users | None |
@@ -71,7 +71,7 @@ switchport trunk allowed vlan 300,310,320,330,340,350,400,410
 **Rune VM access:**
 - **Phase 1:** WireGuard over internet to Proximus WAN (DHCP — use DDNS or OPNsense DynDNS). Peer IP: `10.1.1.5`.
 - **Phase 2:** WireGuard endpoint migrated to Telenet fixed IP. Stable, no DDNS.
-- **Phase 3 (Rune migrates to PoC):** Rune VM native on `vnet-poc-mgmt` `10.1.1.5`. WireGuard peer retired. Direct L2. This gives Rune direct access to all MGMT zone VMs without traversing OPNsense firewall rules. Rune is trusted infra, not a remote user — it belongs in MGMT zone, not behind a firewall hop.
+- **Phase 3 (Rune migrates to PoC):** Rune VM native on `mgmt` `10.1.1.5`. WireGuard peer retired. Direct L2. This gives Rune direct access to all MGMT zone VMs without traversing OPNsense firewall rules. Rune is trusted infra, not a remote user — it belongs in MGMT zone, not behind a firewall hop.
 
 **Rule:** VMs in `vnet-mgmt` are invisible to WAN by default. OPNsense firewall rules control what crosses zones. Traefik is the only HTTP/S gateway.
 

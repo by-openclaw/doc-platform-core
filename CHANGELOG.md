@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/adr/0015-network-vlan-architecture.md`: locked Proxmox SDN naming standard — zone = environment, VNet names environment-agnostic (`mgmt`, `dmz`, `svc`), removed stale `vmbrPOC` concept from active docs
+- `docs/status.md`, `docs/raid.md`: replaced stale `vmbrPOC` blockers with SDN zone/VNet language
+- `AGENTS.md`, `CLAUDE.md`: added explicit agent rule to stop inventing env-prefixed VNet names
+
 ### Added
 
 - `docs/adr/0014-certificate-strategy.md`: Certificate strategy — LE for public, step-ca for internal, no self-signed, root CA in cloud-init mandatory

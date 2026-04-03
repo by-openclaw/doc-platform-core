@@ -11,7 +11,7 @@
 | Layer | Name | Status | Completion | Blockers |
 |---|---|---|---|---|
 | 0 | Standards & Templates | ✅ In progress | ~90% | RAID location hybrid model (ADR-0004 adopted, ADR-0003 amended) |
-| 1 | Proxmox Base | ✅ In progress | ~85% | OPNsense VM not deployed, vmbrPOC bridge missing |
+| 1 | Proxmox Base | ✅ In progress | ~85% | OPNsense VM not deployed, SDN zone `poc` + VNets `mgmt`/`dmz`/`svc` not yet deployed |
 | 2 | Vault | ❌ Not started | 0% | Blocked on Layer 1 completion |
 | 3 | Identity (Authentik) | ❌ Not started | 0% | Blocked on Layer 2 |
 | 4 | Storage (Synology) | 🔄 Active | ~95% | lib-synology-dsm: integration tests pending live NAS run, then v1.0 |
@@ -27,7 +27,7 @@
 | Repo | Version | Tests | Key Blockers |
 |---|---|---|---|
 | lib-synology-dsm | v0.9.3 → v1.0 pending | 345 unit, 100% coverage, ruff+mypy clean | Integration tests pending live NAS run — **awaiting team approval** |
-| infra-terraform-proxmox | — | n/a | OPNsense VM scaffold, vmbrPOC bridge |
+| infra-terraform-proxmox | — | n/a | OPNsense VM scaffold, SDN-backed LAN not yet deployed |
 | ansible-platform | — | n/a | Hardening roles only — NetBox/Vault roles not started |
 | doc-platform-core | — | n/a (docs only) | Layer 0 gap: RAID hybrid model |
 | platform-setup | — | n/a | Tracks issues only |
@@ -49,6 +49,7 @@
 | Date | What changed |
 |---|---|
 | 2026-03-31 | lib-synology-dsm: SharePermissionManager + SystemManager — 345 unit tests, ruff+mypy clean. Awaiting integration run + approval. Review: `docs/open-status.md` |
+| 2026-04-03 | ADR-0015 clarified Proxmox SDN naming: zone = environment, VNets are environment-agnostic (`mgmt`, `dmz`, `svc`); stale `vmbrPOC` references removed from active docs |
 | 2026-03-30 | Full Tier 1 audit remediation applied — CLAUDE.md, AGENTS.md, CONTRIBUTING.md, ADRs 0004/0005/0007, SOUL.md cleaned, status.md created, gap report archived, RAID.md updated |
 | 2026-03-30 | project-board-sync workflow live on all 5 repos, GH_TOKEN rotated and set org-wide |
 | 2026-03-30 | lib-synology-dsm audit (16 files, 68 action items) completed by team |

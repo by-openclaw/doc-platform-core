@@ -55,6 +55,13 @@ Before writing, editing, or reviewing any file in this repo, read:
 - ❌ Do NOT skip ADR sequence numbers — check the highest existing ADR first
 - ❌ Do NOT write in future tense — use present tense in all documentation
 
+## Network Naming Rule (locked 2026-04-03)
+
+- Proxmox SDN **zone = environment** (`poc`, later `dev`, `prod` on their own nodes)
+- Proxmox SDN **VNet names are environment-agnostic**: `mgmt`, `dmz`, `svc` (and `oob` only where explicitly needed)
+- Do **not** invent env-prefixed VNets such as `vnet-poc-svc`, `pocmgmt`, or `vmbrPOC`
+- Environment context belongs in VM hostnames, FQDNs, and certificates — not in SDN VNet names
+
 ## GitHub Repo
 
 <https://github.com/by-openclaw/doc-platform-core>
@@ -93,4 +100,3 @@ This ensures any AI agent (or human) picking up the project always has accurate,
 | YAML/Ansible files | 1 |
 | ADR decisions | 13 |
 | CI workflows | 1 |
-

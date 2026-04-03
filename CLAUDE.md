@@ -72,6 +72,7 @@ Do **not** add source code, Dockerfiles, CI pipelines, or build tooling to this 
 
 - Naming convention: see `docs/adr/0010-naming-and-identity-convention.md`
 - Environment tiers: poc/dev/test/staging/acc/prod — always explicit. See `docs/adr/0012-environment-tier-standard.md`
+- Network VLAN + Proxmox SDN naming: see `docs/adr/0015-network-vlan-architecture.md` — zone = environment, VNets = `mgmt`/`dmz`/`svc`
 
 ---
 
