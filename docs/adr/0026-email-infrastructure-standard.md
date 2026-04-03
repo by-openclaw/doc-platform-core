@@ -355,3 +355,94 @@ _smtp._tcp.{domain}   → SRV record
 - ADR-0014: Certificate strategy
 - ADR-0010 §10: `{domain}` deployment variable
 - Tool-specific email configs: `platform-setup/tools/{tool}/docs/setup.md`
+
+---
+
+## Tool email address registry
+
+One mailbox per tool on Mailcow. No ambiguity — each address has exactly one owner, one purpose.
+
+Naming rule: `{tool}@{domain}` for send-only / general. `{tool}-incoming@{domain}` only when the tool needs a dedicated inbound with subaddressing (+token routing).
+
+| Tool | Mailbox | RX | TX | Purpose |
+|---|---|---|---|---|
+| GitLab | `gitlab@{domain}` | ❌ | ✅ | System notifications (CI, MR, pipeline) — send-only |
+| GitLab | `gitlab-incoming@{domain}` | ✅ | ❌ | Inbound replies to issues/MRs/Service Desk via +token subaddressing |
+| Grafana | `grafana@{domain}` | ❌ | ✅ | Alert emails — send-only |
+| Vault | `vault@{domain}` | ❌ | ✅ | Seal/unseal alerts, expiry notifications — send-only |
+| Authentik | `authentik@{domain}` | ❌ | ✅ | User invites, password reset, MFA — send-only |
+| NetBox | `netbox@{domain}` | ❌ | ✅ | Change notifications, webhook alerts — send-only |
+| Nextcloud | `nextcloud@{domain}` | ❌ | ✅ | Share notifications, user invites — send-only |
+| Nexus | `nexus@{domain}` | ❌ | ✅ | Artifact/repo alerts — send-only |
+| Vaultwarden | `vaultwarden@{domain}` | ❌ | ✅ | User invites, emergency access — send-only |
+| Odoo | `catchall@{domain}` | ✅ | ✅ | Catch-all consumer — virtual addresses (sales@, accounting@, etc.) |
+| Odoo | `odoo@{domain}` | ❌ | ✅ | Odoo system outbound sender — send-only alias |
+| Zabbix | `zabbix@{domain}` | ❌ | ✅ | Monitoring alerts — send-only |
+| Unifi | `unifi@{domain}` | ❌ | ✅ | Network alerts — send-only |
+| Platform | `noreply@{domain}` | ❌ | ✅ | Generic transactional no-reply sender |
+| Platform | `admin@{domain}` | ✅ | ✅ | Platform admin — human-monitored |
+
+**Total Mailcow mailboxes:** 15 (no license cost, no Exchange object for any of them)
+
+### Tools with NO email requirement
+
+The following tools do not send or receive email — excluded from the registry:
+
+- OPNsense — syslog/SNMP, no email
+- Traefik — logs to Loki, no email
+- Pi-hole — no email
+- PostgreSQL — no email (Grafana alerts cover DB metrics)
+- Redis — no email
+- step-ca — no email (cert expiry → Vault alerts)
+- GitLab Runner — no email (GitLab handles notifications)
+- Prometheus / Loki — Grafana handles alerting
+
+---
+
+## Reference: Mailcow Exchange Hybrid setup
+
+```
+External sender → <anyaddress>@{domain}
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│               M365 Exchange (public MX)                     │
+│               Domain type: Internal Relay                   │
+│                                                             │
+│  Known Exchange mailbox (licensed user)?                    │
+│  └── YES → deliver directly to user Exchange mailbox        │
+│                                                             │
+│  Unknown recipient (tool address or virtual address)?       │
+│  └── NO  → Connector 1: Exchange → Mailcow                  │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Connector 1 (inbound relay)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Mailcow (internal mail host)                  │
+│               Forwarding host: Exchange gateway             │
+│               Mode: Relay non-existing mailboxes only       │
+│                                                             │
+│  Known Mailcow mailbox (gitlab@, grafana@, vault@, ...)?    │
+│  └── YES → deliver to tool mailbox                          │
+│            Tool reads via IMAP (credential from Vault)      │
+│                                                             │
+│  Unknown (virtual address: sales@, accounting@, ...)?       │
+│  └── NO  → catchall@{domain}                                │
+│            Consumer reads via IMAP                          │
+│            Inspects original To: → routes internally        │
+│                                                             │
+│  Outbound (tool sends email):                               │
+│  Tool → Mailcow SMTP → relayhost = Exchange gateway         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Connector 2 (outbound relay)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│               M365 Exchange (outbound relay)                │
+│               Auth: TLS cert or static IP                   │
+│               Delivers to external recipient                │
+│               From: tool@{domain}                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Official source:** https://docs.mailcow.email/third_party/exchange_onprem/third_party-exchange_onprem/
+**Microsoft connector guide:** https://docs.microsoft.com/exchange/mail-flow-best-practices/use-connectors-to-configure-mail-flow/set-up-connectors-to-route-mail
