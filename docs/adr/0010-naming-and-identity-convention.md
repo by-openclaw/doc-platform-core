@@ -30,6 +30,12 @@ Six environment tiers, always explicit:
 
 > **Rationale:** Prod hostnames are clean and short (`vm-netbox-01`). Non-prod carries env to prevent cross-env confusion. The prod tag in NetBox, Proxmox, secret file paths, and Vault paths still carries `prod` explicitly.
 
+> **CRITICAL — env is per-VM/LXC, not per-node (added 2026-04-03):**
+> Proxmox node names (e.g. `srv-proxmox-poc-01`) are hardware labels — they do NOT set the environment tier of VMs running on that node.
+> A node named `poc-01` can host `env=prod` VMs, `env=dev` VMs, and `env=test` VMs simultaneously.
+> `env` is declared explicitly in each VM/LXC definition (Terraform `env` variable, Proxmox tag `env-{tier}`, Ansible host_var `env: tier`).
+> Never infer env from the Proxmox node name, folder name, storage pool name, or inventory folder name.
+
 ### 2. Environment label placement — consistent position across all layers
 
 | Layer | Pattern | Example (poc) | Example (prod) |
