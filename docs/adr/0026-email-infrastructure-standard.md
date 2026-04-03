@@ -18,38 +18,63 @@ This ADR defines the architecture of both tiers, the inbound routing model, outb
 
 ---
 
-## M365 + Odoo inbound routing model
+## M365 inbound routing model
 
 ### Architecture
+
+M365 acts as **inbound MX + router**. Mail Flow Rules route each address to the correct destination in priority order. Odoo catchall is the last resort — it only receives what no other rule matched.
 
 ```
 Inbound to @{domain}
         │
         ▼
-M365 Mail Flow Rule: "Catchall for Odoo"
-  ├── Recipient is in Dynamic All Users group?
-  │     (real licensed mailboxes + known shared mailboxes)
-  │     → deliver normally — rule does not apply
-  │
-  └── Recipient is anything else?
-        (Odoo virtual addresses: sales@, support@, project-xyz@, etc.)
-        → NOT a real M365 address
-        → redirected to Odoo catchall mailbox
-        → Odoo reads via IMAP/Graph API
-        → routes to correct Sales Team / Project / Support Queue in Odoo
+M365 Mail Flow Rules — evaluated top to bottom, first match wins
+
+  Rule 1: recipient = gitlab-incoming@ OR gitlab-incoming+*@
+          → deliver to gitlab-incoming shared mailbox (M365)
+          → OR forward to gitlab-incoming@{mail-host} (Mailcow/external)
+          → GitLab mail_room reads it, routes by +token
+
+  Rule 2: recipient = netbox@{domain}
+          → deliver to netbox shared mailbox
+
+  Rule 3: recipient = grafana@{domain}
+          → deliver to grafana shared mailbox
+
+  Rule N: one rule per tool that receives inbound
+
+  Rule LAST: recipient matches no rule above
+             (Odoo virtual addresses: sales@, accounting@, support@, ...)
+          → redirect to catchall@{domain}
+          → Odoo reads catchall via IMAP
+          → routes to correct Sales Team / Project / Accounting queue
 ```
 
-### Why this works
+### Why Internal Relay is required
 
-M365 domain type is set to **Internal Relay** for `{domain}`. Without this setting, M365 would bounce email to unknown addresses before the Mail Flow Rule can act. Internal Relay allows unknown recipients to pass through the rule.
+M365 domain type must be set to **Internal Relay** for `{domain}`. Without this, M365 bounces email to unknown addresses (Odoo virtual addresses) before any Mail Flow Rule can act. Internal Relay passes them through to the rules.
+
+### Routing to external destinations (non-M365 tools)
+
+When a tool mailbox is not hosted on M365 (e.g. Mailcow for PoC tier), the Mail Flow Rule action is **forward to external address** instead of deliver to shared mailbox:
+
+```
+Rule 1: recipient = gitlab-incoming+*@by-systems.be
+        → forward to gitlab-incoming@mail.poc.example.com  (Mailcow)
+
+Rule 2: recipient = netbox@by-systems.be
+        → forward to netbox@mail.poc.example.com  (Mailcow)
+
+Rule LAST: no match → catchall@by-systems.be → Odoo
+```
+
+M365 is the inbound router only. Delivery destination can be any valid email address — M365 shared mailbox, Mailcow, or any external IMAP host.
 
 ### Dynamic Distribution Group: "Dynamic All Users"
 
-Automatically includes: all Exchange-licensed mailboxes + all mail-enabled groups + shared mailboxes.
-
-This group is the exception condition in the Mail Flow Rule. Any recipient who is a member of this group is **not** redirected to catchall — they receive email normally.
-
-Platform tool mailboxes (`gitlab@{domain}`, `netbox@{domain}`, etc.) are Exchange shared mailboxes. They appear in the Dynamic All Users group automatically. Their email is never forwarded to Odoo catchall.
+Includes: all Exchange-licensed mailboxes + all mail-enabled groups + shared mailboxes.
+Used as the exception list in the Rule LAST (catchall) to ensure licensed users never get redirected to Odoo.
+Shared tool mailboxes appear in this group automatically — they are delivered by their explicit rule, not by Rule LAST.
 
 ---
 
