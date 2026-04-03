@@ -66,7 +66,16 @@ Odoo requires a **licensed Exchange Online mailbox** as its catchall receiver. A
 | Connection method | IMAP or Graph API (OAuth 2.0) |
 | Credentials | Vault at `secret/{env}/odoo/catchall-mailbox` |
 
-Odoo virtual addresses (Sales Teams, Projects, Support queues) are **defined in Odoo only**. They are never created in Exchange. When someone emails `sales@{domain}`, M365 does not know that address — it forwards to catchall — Odoo processes it and routes to the correct Sales Team.
+Odoo virtual addresses (Sales Teams, Projects, Support queues, Accounting) are **defined in Odoo only**. They are never created in Exchange. When someone emails one of these addresses, M365 does not know the address — it forwards to catchall — Odoo processes it and routes to the correct team/queue.
+
+**Examples of Odoo virtual addresses (Odoo-only, never in Exchange):**
+- `sales@{domain}` → Sales Team
+- `support@{domain}` → Helpdesk queue
+- `accounting@{domain}` → Accounting / Invoicing inbox
+- `info@{domain}` → General enquiries
+- `project-xyz@{domain}` → Project-specific inbox
+
+Odoo virtual addresses are created/managed entirely in Odoo. No Exchange admin required.
 
 ---
 
