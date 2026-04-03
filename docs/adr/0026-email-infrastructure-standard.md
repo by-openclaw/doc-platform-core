@@ -34,26 +34,50 @@ Mail Flow Rules route each recipient address to its target mailbox on Mailcow.
 External sender → <anyaddress>@{domain}
         │
         ▼
-M365 — public MX (Internal Relay mode)
-Mail Flow Rules — evaluated top to bottom, first match wins
-
-  Rule 1: recipient = toolA@{domain}
-          → forward to toolA@{mailcow-host}
-          → Mailcow delivers to toolA mailbox
-          → Tool A reads via IMAP
-
-  Rule 2: recipient = toolB+*@{domain}    ← subaddressing supported
-          → forward to toolB@{mailcow-host}
-          → Mailcow delivers to toolB mailbox
-          → Tool B reads via IMAP, extracts +token for internal routing
-
-  Rule N: one rule per tool that needs inbound
-
-  Rule LAST: recipient matches no rule above
-          → forward to catchall@{mailcow-host}
-          → Mailcow delivers to catch-all mailbox
-          → Any tool reading catch-all inspects original To: field
-          → Routes internally based on To: value
+┌───────────────────────────────────────────────────────────┐
+│                    M365 (public MX)                        │
+│               Internal Relay mode                          │
+│                                                            │
+│  Mail Flow Rules — top to bottom, first match wins         │
+│                                                            │
+│  Rule 1: recipient = toolA@{domain}                        │
+│          ┌──────────────────────────────────┐             │
+│          │  M365 Shared Mailbox             │             │
+│          │  toolA@{domain}  (no license)    │             │
+│          └───────────────┬──────────────────┘             │
+│                          │ forward to external address     │
+│                                                            │
+│  Rule 2: recipient = toolB+*@{domain}  (subaddressing)     │
+│          ┌──────────────────────────────────┐             │
+│          │  M365 Shared Mailbox             │             │
+│          │  toolB@{domain}  (no license)    │             │
+│          └───────────────┬──────────────────┘             │
+│                          │ forward to external address     │
+│                                                            │
+│  Rule N: ... (one per tool needing inbound)                │
+│                                                            │
+│  Rule LAST: no match above                                 │
+│          ┌──────────────────────────────────┐             │
+│          │  M365 Shared Mailbox             │             │
+│          │  catchall@{domain}  (no license) │             │
+│          └───────────────┬──────────────────┘             │
+│                          │ forward to external address     │
+└──────────────────────────┼────────────────────────────────┘
+                           │
+                           ▼
+┌───────────────────────────────────────────────────────────┐
+│                 Mailcow (internal mail host)                │
+│                                                            │
+│  toolA@{mailcow-host}    ← Rule 1 forward                  │
+│  toolB@{mailcow-host}    ← Rule 2 forward                  │
+│  catchall@{mailcow-host} ← Rule LAST forward               │
+│                                                            │
+└──────┬─────────────────────────────────┬──────────────────┘
+       │ IMAP                            │ IMAP
+       ▼                                 ▼
+    Tool A                          Catch-all consumer
+    reads toolA mailbox             reads catchall mailbox
+                                    inspects To: → routes internally
 ```
 
 ### Why Internal Relay is required
