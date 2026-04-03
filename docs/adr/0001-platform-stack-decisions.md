@@ -84,7 +84,7 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 
 ### Decision: OPNsense + Pi-hole + Traefik + step-ca + NetBird
 
-> **Updated 2026-04-02:** pfSense CE replaced by OPNsense. See ADR-0015 for full network/VLAN architecture.
+> Network VLAN architecture, IP ranges, and zone definitions: **ADR-0015**.
 
 | Tool | Role |
 |---|---|
@@ -103,15 +103,13 @@ The following toolchain decisions are locked for the PoC phase. All tools are op
 - Network VLAN architecture, IP ranges, and zone definitions: see ADR-0015.
 
 **Rationale:**
-- OPNsense: open-source BSD firewall, HardenedBSD base, active development, FreeBSD ports available — replaced pfSense CE
+- OPNsense: open-source BSD firewall, HardenedBSD base, active development, FreeBSD ports available
 - Pi-hole: DNS-level threat blocking in MGMT zone — separate from firewall, integrates with Unbound
 - Traefik centralises TLS management and integrates natively with Docker and Kubernetes
 - step-ca provides a proper internal CA — avoids self-signed cert sprawl
 - NetBird simplifies zero-trust mesh VPN for developer devices
 
 **Alternatives considered:**
-- **pfSense CE**: Replaced by OPNsense — OPNsense has a cleaner API, more active open-source development, HardenedBSD base
-- **pfBlockerNG**: Replaced by dedicated Pi-hole in MGMT zone — better observability, cleaner separation of concerns
 - **Nginx Proxy Manager**: Replaced by Traefik — better K8S/Docker native integration, API-driven config
 - **Headscale (self-hosted Tailscale)**: Viable alternative to NetBird — pending final decision, functionally equivalent
 - **mDNS `.local`**: Rejected for service FQDNs — conflicts with RFC 6762; mDNS (Avahi) kept only for IoT/printer discovery
