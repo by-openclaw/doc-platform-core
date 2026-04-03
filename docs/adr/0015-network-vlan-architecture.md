@@ -40,7 +40,7 @@ No dedicated VM-level storage or backup VLAN. Storage traffic (NAS, Proxmox back
 | `vmbrWAN1` | Active | — | WAN1 Proximus PPPoE |
 | `vmbrWAN2` | Active | — | WAN2 Telenet (untested) |
 | `vmbrWAN3` | Active | 10.6.224.105/20 | Internet access via OOB path — temporary during ISP migration (renamed from vmbrOOB 2026-04-03) |
-| `vmbrOOB` | Created ✅ | none | Break-glass emergency access — isolated, no IP, autostart=off. Created 2026-04-03. |
+| `vmbrOOB` | Created ✅ | 10.1.0.x/24 (post-SDN) | Break-glass / Proxmox host OOB — VLAN 300 (`vnet-poc-oob`). No IP until OPNsense SDN deployed. autostart=off. Created 2026-04-03. |
 | `vmbrFAB` | Disabled | — | Fabric supervision — disabled until PoC fabric physically wired (renamed from vmbrMGMT 2026-04-01) |
 | `vmbrAPPS` | Active | — | VM trunk — VLAN-aware, no IP. Each VM tags its own VLAN in NIC config (SDN VNets: mgmt/dmz/svc). OPNsense LAN attaches as trunk. Name confirmed correct 2026-04-03. |
 
