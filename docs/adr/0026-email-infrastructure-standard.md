@@ -9,255 +9,209 @@
 
 ## Context
 
-The platform needs a structured, provider-aware email infrastructure that:
+The platform needs a structured email infrastructure that:
 - Receives inbound email for all platform addresses under `@{domain}`
-- Routes each address to the correct tool mailbox
-- Falls back to a catch-all mailbox for addresses not explicitly routed
-- Provides outbound SMTP for all tools
+- Routes to the correct tool mailbox on Mailcow, or falls back to catch-all
+- Provides outbound SMTP for all tools through Exchange
 - Requires zero per-tool M365 licenses
 
-Two layers are used together:
-- **M365** — public MX, inbound router (Mail Flow Rules), outbound SMTP relay
-- **Mailcow** — internal mail host, stores all tool mailboxes and the catch-all
+Two layers, two connectors — no per-tool Mail Flow Rules needed.
+
+Reference: https://docs.mailcow.email/third_party/exchange_onprem/third_party-exchange_onprem/
 
 ---
 
 ## Architecture
 
-### Inbound (RX)
-
-M365 is the public MX. It receives all inbound email for `@{domain}`.
-Mail Flow Rules route each recipient address to its target mailbox on Mailcow.
-**Rule LAST** catches anything not explicitly routed — forwarded to the catch-all mailbox.
+### Inbound (RX) + Outbound (TX)
 
 ```
 External sender → <anyaddress>@{domain}
         │
         ▼
-┌───────────────────────────────────────────────────────────┐
-│                    M365 (public MX)                        │
-│               Internal Relay mode                          │
-│                                                            │
-│  Mail Flow Rules — top to bottom, first match wins         │
-│                                                            │
-│  Rule 1: recipient = toolA@{domain}                        │
-│          ┌──────────────────────────────────┐             │
-│          │  M365 Shared Mailbox             │             │
-│          │  toolA@{domain}  (no license)    │             │
-│          └───────────────┬──────────────────┘             │
-│                          │ forward to external address     │
-│                                                            │
-│  Rule 2: recipient = toolB+*@{domain}  (subaddressing)     │
-│          ┌──────────────────────────────────┐             │
-│          │  M365 Shared Mailbox             │             │
-│          │  toolB@{domain}  (no license)    │             │
-│          └───────────────┬──────────────────┘             │
-│                          │ forward to external address     │
-│                                                            │
-│  Rule N: ... (one per tool needing inbound)                │
-│                                                            │
-│  Rule LAST: no match above                                 │
-│          ┌──────────────────────────────────┐             │
-│          │  M365 Shared Mailbox             │             │
-│          │  catchall@{domain}  (no license) │             │
-│          └───────────────┬──────────────────┘             │
-│                          │ forward to external address     │
-└──────────────────────────┼────────────────────────────────┘
-                           │
-                           ▼
-┌───────────────────────────────────────────────────────────┐
-│                 Mailcow (internal mail host)                │
-│                                                            │
-│  toolA@{mailcow-host}    ← Rule 1 forward                  │
-│  toolB@{mailcow-host}    ← Rule 2 forward                  │
-│  catchall@{mailcow-host} ← Rule LAST forward               │
-│                                                            │
-└──────┬─────────────────────────────────┬──────────────────┘
-       │ IMAP                            │ IMAP
-       ▼                                 ▼
-    Tool A                          Catch-all consumer
-    reads toolA mailbox             reads catchall mailbox
-                                    inspects To: → routes internally
+┌─────────────────────────────────────────────────────────────┐
+│               M365 Exchange (public MX)                     │
+│               Domain type: Internal Relay                   │
+│                                                             │
+│  Known Exchange mailbox (licensed user)?                    │
+│  └── YES → deliver directly to user Exchange mailbox        │
+│                                                             │
+│  Unknown recipient (tool address or virtual address)?       │
+│  └── NO  → Connector 1: Exchange → Mailcow                  │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Connector 1 (inbound relay)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Mailcow (internal mail host)                  │
+│               Forwarding host: Exchange gateway             │
+│               Mode: Relay non-existing mailboxes only       │
+│                                                             │
+│  Known Mailcow mailbox (toolA@, toolB@, ...)?               │
+│  └── YES → deliver to tool mailbox                          │
+│            Tool reads via IMAP (credential from Vault)      │
+│                                                             │
+│  Unknown (virtual address: sales@, accounting@, ...)?       │
+│  └── NO  → catch-all mailbox on Mailcow                     │
+│            Consumer reads via IMAP                          │
+│            Inspects original To: → routes internally        │
+│                                                             │
+│  Outbound (tool sends email):                               │
+│  Tool → Mailcow SMTP → relayhost = Exchange gateway         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Connector 2 (outbound relay)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│               M365 Exchange (outbound relay)                │
+│               Auth: TLS cert or static IP                   │
+│               Delivers to external recipient                │
+│               From: tool@{domain}                           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Why Internal Relay is required
+---
 
-M365 domain type must be set to **Internal Relay** for `{domain}`.
-Without this, M365 bounces unknown recipients (those not in Exchange) before any Mail Flow Rule fires.
-Internal Relay suppresses the bounce and passes the message through the rules.
+## Two Exchange connectors
 
-### Outbound (TX)
+| Connector | Direction | Purpose |
+|---|---|---|
+| Connector 1 | Exchange → Mailcow | Route unknown recipients to Mailcow |
+| Connector 2 | Mailcow → Exchange | Allow Mailcow to relay outbound via Exchange |
 
-```
-Tool sends email (notification, reply, alert)
-        │
-        ▼
-Mailcow SMTP
-  → authenticated per-mailbox (credential from Vault)
-        │
-        ▼
-M365 SMTP relay connector
-  → validates: sender IP in allowlist? SPF valid?
-        │
-        ▼
-Delivered to external recipient
-From: tool@{domain}
-```
+**Connector 2 authentication:** TLS certificate (subject = accepted domain in Exchange) or static IP of Mailcow server. TLS cert is the recommended method.
 
-M365 relay connector is IP-based — no per-tool credential on M365 side.
-SPF record includes Mailcow server IP(s).
+---
+
+## M365 configuration
+
+| Setting | Value |
+|---|---|
+| Domain type | **Internal Relay** (required — otherwise M365 bounces unknowns before Connector 1 fires) |
+| MX record | `{org}.mail.protection.outlook.com` |
+| Mail Flow Rules | None per tool — two connectors handle everything |
+| Dynamic All Users group | Includes all licensed Exchange mailboxes — excluded from Connector 1 routing |
+
+---
+
+## Mailcow configuration
+
+| Setting | Value |
+|---|---|
+| Relayhost | Exchange personalized gateway (e.g. `contoso-com.mail.protection.outlook.com`) |
+| Forwarding host | Same Exchange gateway — accept relay from Exchange unconditionally |
+| Domain relay mode | Relay this domain ✅, Relay all recipients ✅, **Relay non-existing mailboxes only** ✅ |
+| Catch-all | `catchall@{domain}` mailbox — receives anything with no matching Mailcow mailbox |
+| Subaddressing | Native, no config needed |
+| DKIM | Configured per domain via Mailcow API |
+
+**"Relay non-existing mailboxes only"** is the critical setting: Mailcow only accepts relay for addresses it has no mailbox for. Prevents open relay. Unknown addresses go to catch-all.
 
 ---
 
 ## Catch-all mailbox
 
-The catch-all is a regular Mailcow mailbox: `catchall@{domain}` (or any alias).
+Regular Mailcow mailbox: `catchall@{domain}`.
 
-Any tool that needs to receive email for addresses that are **not** explicitly routed reads this mailbox via IMAP.
-The tool inspects the original `To:` field in the raw message to determine routing.
+Receives all email for virtual addresses — addresses that exist only inside a tool (not in Exchange, not in Mailcow).
 
 ```
-Rule LAST → catchall mailbox
+catchall@{domain} receives email for sales@, accounting@, project-xyz@, ...
         │
         ▼
-Tool polls catchall via IMAP
+Consumer tool polls via IMAP
         │
         ▼
-Reads original To: field
+Reads original To: field from raw message
         │
-      ┌─┴───────────────────────────────┐
-      ▼                                 ▼
-To: sales@{domain}            To: accounting@{domain}
-→ route to sales queue        → route to accounting queue
+      ┌─┴──────────────────────────────────┐
+      ▼                                    ▼
+To: sales@{domain}             To: accounting@{domain}
+→ route to sales queue         → route to accounting queue
 ```
 
-The catch-all tool defines its own internal routing logic — the email infrastructure is not involved.
-Virtual addresses (addresses that exist only inside the tool, never in M365 or Mailcow) are managed entirely within the tool.
-
----
-
-## Mail Flow Rules — full set
-
-Rules are ordered. Lower number = higher priority. First match wins, stop processing.
-
-| Priority | Rule name | Condition | Action |
-|---|---|---|---|
-| 10 | Tool A inbound | recipient = toolA@ | forward to toolA@{mailcow-host} |
-| 20 | Tool B inbound | recipient = toolB+*@ | forward to toolB@{mailcow-host} |
-| ... | ... | ... | ... |
-| 900 | Catch-all | Apply to all remaining | forward to catchall@{mailcow-host} |
-
-**Rule 900 exception:** recipient is external (NotInOrganization) — do not redirect.
-**Rule 900 exception:** recipient is member of Dynamic All Users group — deliver normally to their M365 mailbox.
-
----
-
-## Dynamic Distribution Group: "Dynamic All Users"
-
-Auto-includes: all Exchange-licensed mailboxes + all mail-enabled M365 groups.
-
-Used exclusively as the exception set for Rule LAST (Rule 900).
-Licensed M365 users receive their email directly — they never hit the catch-all.
-
-Tool mailboxes are **not** in this group (they are not Exchange objects).
-Tool email is handled by their explicit rule (Rule 10, 20, etc.), before Rule 900 ever fires.
-
----
-
-## Mailbox inventory
-
-All tool mailboxes live on Mailcow. Naming convention: `{tool}@{domain}`.
-
-| Mailbox | Inbound (RX) | Outbound (TX) | Notes |
-|---|---|---|---|
-| `toolA@{domain}` | ✅ Explicit rule | ✅ Mailcow SMTP | IMAP credential in Vault |
-| `toolB@{domain}` | ✅ Explicit rule + subaddressing | ✅ Mailcow SMTP | IMAP credential in Vault |
-| `noreply@{domain}` | ❌ Not monitored | ✅ Mailcow SMTP | Send-only alias |
-| `catchall@{domain}` | ✅ Rule LAST only | ✅ Mailcow SMTP | Read by catch-all consumer tool |
-
-All credentials: Vault at `secret/{env}/mail/{toolname}`.
+Virtual addresses are defined and managed entirely inside the tool. Zero Exchange or Mailcow admin to add/remove them.
 
 ---
 
 ## Subaddressing (plus addressing)
 
-M365: enable org-wide via one PowerShell command (`Set-OrganizationConfig -AllowPlusAddressInRecipients $true`).
-Mailcow: supported natively, no configuration needed.
+Enables tools to use `tool+{token}@{domain}` for thread/ticket routing.
 
-Enables tools to use `tool+{token}@{domain}` for internal thread/ticket routing.
-M365 Mail Flow Rule matches on `tool+*@{domain}` — delivers to the same `tool@{mailcow}` mailbox.
-Tool reads the `+token` from the `To:` field and routes internally.
+- **M365:** `Set-OrganizationConfig -AllowPlusAddressInRecipients $true`
+- **Mailcow:** native, no configuration needed
 
----
-
-## Outbound relay configuration (M365)
-
-| Setting | Value |
-|---|---|
-| Connector type | Your organization's email server → Office 365 |
-| Allowed senders | IP allowlist: Mailcow server IP(s) |
-| SPF record | `v=spf1 ip4:{mailcow_ip} include:spf.protection.outlook.com ~all` |
-| Anti-spam policy | Mailcow IPs added to M365 connection filter allowlist |
-| SMTP port | 25 (direct relay) or 587 (authenticated) |
+```
+toolB+abc123@{domain}
+  → Exchange: unknown recipient → Connector 1 → Mailcow
+  → Mailcow: toolB mailbox exists → deliver there
+  → Tool reads To: field, extracts +abc123 → routes to correct thread
+```
 
 ---
 
-## Email account lifecycle flows
+## Mailbox inventory
+
+All tool mailboxes on Mailcow. Naming: `{tool}@{domain}`.
+
+| Mailbox | RX | TX | Notes |
+|---|---|---|---|
+| `toolA@{domain}` | ✅ Via Connector 1 | ✅ Mailcow SMTP → Connector 2 | IMAP credential in Vault |
+| `toolB@{domain}` | ✅ Via Connector 1 + subaddressing | ✅ Mailcow SMTP → Connector 2 | IMAP credential in Vault |
+| `noreply@{domain}` | ❌ Not monitored | ✅ Mailcow SMTP → Connector 2 | Send-only alias |
+| `catchall@{domain}` | ✅ Fallback (no Mailcow mailbox match) | ✅ Mailcow SMTP → Connector 2 | Read by catch-all consumer |
+
+All credentials: Vault at `secret/{env}/mail/{toolname}`.
+
+---
+
+## Lifecycle flows
 
 ### Flow 1 — Add a new tool mailbox
 
 ```
-1. Ansible mailcow.yml adapter: create mailbox toolC@{domain} on Mailcow
-2. Ansible exchange.yml adapter: add Mail Flow Rule (priority N)
-      recipient = toolC@ → forward to toolC@{mailcow-host}
-3. Tool credentials written to Vault: secret/{env}/mail/toolC
-4. Tool deployment reads credentials from Vault → configures IMAP + SMTP
+1. Ansible mailcow.yml: create mailbox toolC@{domain} on Mailcow
+2. Credentials written to Vault: secret/{env}/mail/toolC
+3. Tool deployment reads credentials from Vault → configures IMAP + SMTP
 ```
 
-No manual Exchange admin. No M365 license. Zero downtime — rule activates immediately.
+No Exchange admin. No M365 license. No Mail Flow Rule. Mailcow routing is automatic.
 
 ---
 
-### Flow 2 — Add a virtual address (tool-internal, no mailbox)
+### Flow 2 — Add a virtual address (tool-internal only)
 
 ```
 1. Admin adds virtual address inside the tool (alias, team, queue, etc.)
-2. Nothing changes in M365 or Mailcow
+2. Nothing changes in Exchange or Mailcow
 3. External sender emails virtualaddr@{domain}
-4. M365: no explicit rule matches → Rule LAST (900) fires
-5. Forward to catchall@{mailcow-host}
-6. Tool reading catch-all sees To: virtualaddr@{domain}
-7. Tool routes internally to correct queue/team/object
+4. Exchange: unknown → Connector 1 → Mailcow
+5. Mailcow: no mailbox for virtualaddr → catch-all
+6. Consumer reads catch-all, sees To: virtualaddr@{domain} → routes internally
 ```
 
-Zero infrastructure change. Tool manages its own virtual address routing.
+Zero infrastructure change.
 
 ---
 
-### Flow 3 — Inbound with subaddressing (thread routing)
+### Flow 3 — Inbound with subaddressing
 
 ```
-1. Tool creates unique token per thread: abc123
+1. Tool generates token per thread: abc123
 2. Tool sets reply-to: toolB+abc123@{domain}
 3. External user replies
-4. M365 Rule 20 matches: toolB+*@ → forward to toolB@{mailcow-host}
-5. Mailcow delivers to toolB mailbox
-6. Tool polls toolB mailbox via IMAP
-7. Tool extracts +abc123 from To: field
-8. Tool appends reply to correct thread/ticket
+4. Exchange: unknown → Connector 1 → Mailcow
+5. Mailcow: toolB mailbox exists → deliver there
+6. Tool polls toolB via IMAP, extracts +abc123 → routes to correct thread
 ```
 
 ---
 
-### Flow 4 — Outbound notification
+### Flow 4 — Outbound from tool
 
 ```
-1. Tool triggers notification/alert/reply
-2. Tool connects to Mailcow SMTP (credential from Vault)
-3. Mailcow relays to M365 SMTP connector
-4. M365 validates sender IP → accepts
-5. M365 delivers to external recipient
-6. Recipient sees: From: toolA@{domain}
+1. Tool sends via Mailcow SMTP (credential from Vault)
+2. Mailcow relays via relayhost (Exchange gateway, Connector 2)
+3. Exchange delivers to external recipient
+4. From: tool@{domain}
 ```
 
 ---
@@ -265,11 +219,10 @@ Zero infrastructure change. Tool manages its own virtual address routing.
 ### Flow 5 — New human user
 
 ```
-1. Admin creates user in identity provider (ADR-0024 flow)
+1. Admin creates user in identity provider (ADR-0024)
 2. Ansible exchange.yml: create licensed M365 mailbox user@{domain}
-3. User auto-added to Dynamic All Users group
-4. Email to user@{domain} → delivered by M365 directly (not via rules)
-5. User configures mail client via M365 autodiscover
+3. User added to Dynamic All Users group → delivered by Exchange directly
+4. User configures mail client via M365 autodiscover
 ```
 
 ---
@@ -278,9 +231,9 @@ Zero infrastructure change. Tool manages its own virtual address routing.
 
 ```
 1. Admin disables user in identity provider
-2. Ansible exchange.yml: disable M365 mailbox (not deleted — audit trail preserved)
+2. Ansible exchange.yml: disable Exchange mailbox (not deleted — audit trail)
 3. User removed from Dynamic All Users group
-4. Email to user@{domain} → Rule LAST → catch-all
+4. Email to user@{domain} → no Exchange mailbox → Connector 1 → Mailcow catch-all
 5. Hard deletion: explicit manual action after audit confirmation (ADR-0024 policy)
 ```
 
@@ -288,30 +241,16 @@ Zero infrastructure change. Tool manages its own virtual address routing.
 
 ## TX/RX matrix
 
-| Mailbox type | Receives (RX) | Sends (TX) | How tool reads | How tool sends |
+| Mailbox type | RX | TX | How tool reads | How tool sends |
 |---|---|---|---|---|
-| M365 licensed user | ✅ Direct (M365) | ✅ Outlook / SMTP | Outlook / IMAP | Outlook / SMTP |
-| Mailcow tool mailbox | ✅ Forwarded from M365 rule | ✅ Mailcow SMTP → M365 relay | IMAP + password (Vault) | SMTP + password (Vault) |
-| Mailcow catch-all | ✅ Rule LAST only | ✅ Mailcow SMTP → M365 relay | IMAP + password (Vault) | SMTP + password (Vault) |
-| Virtual address (tool-internal) | ❌ Not a real mailbox | ✅ Tool sends as alias | N/A — tool internal | Tool SMTP via Mailcow |
+| M365 licensed user | ✅ Exchange direct | ✅ Outlook / SMTP | Outlook / IMAP | Outlook / SMTP |
+| Mailcow tool mailbox | ✅ Via Connector 1 | ✅ Mailcow → Connector 2 | IMAP + password (Vault) | SMTP + password (Vault) |
+| Mailcow catch-all | ✅ Fallback (no mailbox match) | ✅ Mailcow → Connector 2 | IMAP + password (Vault) | SMTP + password (Vault) |
+| Virtual address | ❌ Not a real mailbox | ✅ Tool sends as alias | N/A — tool internal | Tool SMTP via Mailcow |
 
 ---
 
-## Mailcow — configuration standard
-
-| Property | Value |
-|---|---|
-| Role | Internal mail host for all tool mailboxes |
-| Domain | `{domain}` — same domain as M365 |
-| MX | Not public — M365 is the only public MX |
-| Certs | step-ca (internal) or LE (if Mailcow web UI is public-facing) |
-| API | REST API, Bearer token |
-| Credentials | Vault at `secret/{env}/mailcow/api-key` |
-| Catch-all | One catch-all alias per domain, points to `catchall@{domain}` mailbox |
-| Subaddressing | Native, no config needed |
-| DKIM | Configured per domain via Mailcow API |
-
-### Mailcow API — supported operations
+## Mailcow — API operations
 
 | Object | CRUD |
 |---|---|
@@ -327,15 +266,13 @@ Zero infrastructure change. Tool manages its own virtual address routing.
 
 ```
 roles/identity-sync/adapters/
-  exchange.yml    ← M365: Mail Flow Rules, Dynamic All Users group, user mailboxes
-  mailcow.yml     ← Mailcow: domains, mailboxes, aliases, catch-all, DKIM
+  exchange.yml    ← M365: licensed mailboxes, Dynamic All Users group, Connector config
+  mailcow.yml     ← Mailcow: domains, mailboxes, aliases, catch-all, DKIM, relayhost
 
 playbooks/identity-sync/
   exchange.yml
   mailcow.yml
 ```
-
-Both adapters are driven by the same deployment manifest (`mail_provider` var selects adapter path).
 
 ---
 
@@ -346,20 +283,21 @@ Both adapters are driven by the same deployment manifest (`mail_provider` var se
 org:
   domain: by-systems.be
   env: prod
-  mail_provider: m365        # m365 | mailcow | both
+  mail_provider: hybrid          # hybrid | mailcow-only
+  exchange_gateway: contoso-com.mail.protection.outlook.com
   mailcow_host: mail.by-systems.be
   mailcow_ip: 10.6.225.80
 ```
 
 ---
 
-## Email client autoconfiguration (internal users on Mailcow)
+## Email client autoconfiguration
 
-Pi-hole provides DNS records for zero-touch mail client setup:
+Pi-hole DNS records for zero-touch client setup:
 
 ```
 autoconfig.{domain}   → Mailcow IP   (Thunderbird)
-autodiscover.{domain} → Mailcow IP   (Outlook)
+autodiscover.{domain} → Mailcow IP   (Outlook, for tool accounts)
 _imap._tcp.{domain}   → SRV record
 _smtp._tcp.{domain}   → SRV record
 ```
@@ -380,11 +318,10 @@ _smtp._tcp.{domain}   → SRV record
 ## Consequences
 
 - Zero per-tool M365 licenses — all tool mailboxes on Mailcow
-- Adding a tool mailbox = one Mailcow mailbox + one M365 Mail Flow Rule (both via Ansible)
+- Adding a tool mailbox = one Mailcow mailbox + Vault entry (no Exchange config)
 - Virtual addresses = zero infrastructure change — tool manages internally
-- M365 is the inbound router only — not a mail store for tools
-- All credentials in Vault — never in config files or environment variables at rest
-- Subaddressing works on both M365 and Mailcow — no provider lock-in for thread routing
+- Two connectors replace all per-tool Mail Flow Rules — simpler, less admin
+- All credentials in Vault — never in config files
 
 ---
 
@@ -394,25 +331,27 @@ _smtp._tcp.{domain}   → SRV record
 
 | Control | Title | Status | Notes |
 |---|---|---|---|
-| A.8.24 | Use of cryptography | ✓ | TLS on all SMTP relay; IMAP over SSL only |
+| A.8.24 | Use of cryptography | ✓ | TLS on Connector 2; IMAP over SSL only |
 | A.5.14 | Information transfer | ✓ | Authenticated SMTP or IMAP+SSL; no plaintext |
 | A.8.15 | Logging | ✓ | M365 mail flow audit logging; Mailcow logs to Loki (future) |
-| A.9.4.2 | Secure logon procedures | ✓ | IMAP credentials in Vault; M365 relay is IP-based |
+| A.9.4.2 | Secure logon procedures | ✓ | IMAP credentials in Vault; Connector 2 auth via TLS cert or static IP |
 
 ### NIS2 (Directive 2022/2555)
 
 | Article | Requirement | Status | Notes |
 |---|---|---|---|
-| Art. 21(2)(e) | Security in network and information systems | ✓ | Relay restricted by IP allowlist; SPF enforced; no open relay |
+| Art. 21(2)(e) | Security in network and information systems | ✓ | Relay restricted by IP/TLS; SPF enforced; no open relay |
 
 ---
 
 ## References
 
+- Mailcow Exchange Hybrid setup: https://docs.mailcow.email/third_party/exchange_onprem/third_party-exchange_onprem/
+- Mailcow relayhost guide: https://docs.mailcow.email/manual-guides/Postfix/u_e-postfix-relayhost/
+- Microsoft connector setup: https://docs.microsoft.com/exchange/mail-flow-best-practices/use-connectors-to-configure-mail-flow/set-up-connectors-to-route-mail
 - ADR-0025: Notification & Collaboration Integration
-- ADR-0024: Identity Provisioning & Sync (Ansible adapters)
+- ADR-0024: Identity Provisioning & Sync
 - ADR-0016: Vault KV path convention
 - ADR-0014: Certificate strategy
 - ADR-0010 §10: `{domain}` deployment variable
-- `docs/references/m365-odoo-email-configuration.md` — ventor.tech guide (M365 catchall setup)
 - Tool-specific email configs: `platform-setup/tools/{tool}/docs/setup.md`
