@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+* **ADR-0015** — Status updated to "Partially Implemented"; SDN zone `poc` + VNets deployed 2026-04-03; compliance table updated to reflect live state
+
+---
+
 ## [0.5.1](https://github.com/by-openclaw/doc-platform-core/compare/v0.5.0...v0.5.1) (2026-03-30)
 
 

@@ -1,7 +1,8 @@
 # ADR-0015: Network VLAN Architecture
 
-- **Status:** Accepted
+- **Status:** Accepted — Partially Implemented
 - **Date:** 2026-04-02
+- **Updated:** 2026-04-03 — Proxmox SDN zone `poc` + VNets deployed via Terraform
 - **Deciders:** @yboujraf
 
 ## Context
@@ -96,7 +97,7 @@ Alias definitions are exported to `tools/opnsense/config/aliases.conf` and versi
 
 | Control | Title | Status | Notes |
 |---|---|---|---|
-| A.8.20 | Networks security | ⚠ Partial | VLAN topology and OPNsense rules defined; enforcement pending OPNsense deployment |
+| A.8.20 | Networks security | ⚠ Partial | SDN zone + VNets live (2026-04-03); enforcement pending OPNsense deployment |
 | A.8.22 | Segregation of networks | ✓ Covered | OOB / MGMT / DMZ / SVC VLANs enforce separation; admin/automation on OOB only |
 | A.8.21 | Security of network services | ⚠ Partial | Firewall alias standard defined; rule implementation pending |
 
@@ -104,7 +105,7 @@ Alias definitions are exported to `tools/opnsense/config/aliases.conf` and versi
 
 | Article | Requirement | Status | Notes |
 |---|---|---|---|
-| Art. 21(2)(a) | Risk management — network controls | ⚠ Partial | Network topology designed for separation; OPNsense not yet deployed |
+| Art. 21(2)(a) | Risk management — network controls | ⚠ Partial | SDN fabric live (2026-04-03); OPNsense VM pending (issue #79) |
 | Art. 21(2)(e) | Security in network and information systems | ✓ Covered | Named alias standard prevents hardcoded IP sprawl; VLAN registry is version-controlled |
 
 ### GDPR (Regulation 2016/679)
