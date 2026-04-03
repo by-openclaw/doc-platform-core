@@ -31,13 +31,28 @@ The PoC platform spans multiple network segments managed via Arista 7060/7020 sw
 
 No dedicated VM-level storage or backup VLAN. Storage traffic (NAS, Proxmox backup) uses the OOB/MGMT network. A dedicated storage VLAN is a Phase 2 consideration only.
 
+### Proxmox Linux Bridges (srv-proxmox-poc-01)
+
+> **Updated 2026-04-03** — bridge rename completed.
+
+| Bridge | Status | IP | Purpose |
+|---|---|---|---|
+| `vmbrWAN1` | Active | — | WAN1 Proximus PPPoE |
+| `vmbrWAN2` | Active | — | WAN2 Telenet (untested) |
+| `vmbrWAN3` | Active | 10.6.224.105/20 | Internet access via OOB path — temporary during ISP migration (renamed from vmbrOOB 2026-04-03) |
+| `vmbrOOB` | Planned | none | Break-glass emergency access — isolated, no IP (to be created) |
+| `vmbrFAB` | Disabled | — | Fabric supervision — disabled until PoC fabric physically wired (renamed from vmbrMGMT 2026-04-01) |
+| `vmbrAPPS` | Active | — | Application/production VLAN bridge (placeholder, no ports) |
+
+> `vmbrPOC` was removed 2026-04-03 — was not in any ADR or design decision.
+
 ### WAN Uplinks
 
-| Uplink | Status | Role |
-|---|---|---|
-| OOB prod primary | Active | Primary WAN |
-| Proximus | Active | Secondary WAN (failover) |
-| Telenet | Untested | Not in active rotation |
+| Uplink | Bridge | Status | Role |
+|---|---|---|---|
+| OOB Proximus | vmbrWAN3 | Active | Internet access during ISP migration |
+| Proximus PPPoE | vmbrWAN1 | Active | WAN1 primary |
+| Telenet | vmbrWAN2 | Untested | Not in active rotation |
 
 ### OPNsense Firewall Rule Standard
 

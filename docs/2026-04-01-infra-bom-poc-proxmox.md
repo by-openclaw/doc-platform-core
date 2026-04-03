@@ -119,7 +119,7 @@ switchport trunk allowed vlan 300,310,320,330,340,350,400,410
 
 ## vmbrMGMT → vmbrFAB — Fabric Control Link (Disabled for PoC)
 
-> **Status: PENDING MANUAL ACTION — must be done before PoC deploy.**
+> **Status: ✅ COMPLETED 2026-04-01/2026-04-03** — vmbrMGMT renamed → vmbrFAB, bridge disabled.
 > Three-step isolation: rename `vmbrMGMT` → `vmbrFAB` + disable bridge + disable physical NIC port.
 
 **Purpose:** `vmbrMGMT` is the Proxmox host's connection to the Arista fabric control-plane VLAN (VLAN 600). Physical link is a **10G SFP** NIC (`nic4` / `enx0060dd44ecce`) uplinked to the Arista switch fabric. Used for switch management, SMPTE, PTP, and broadcast control traffic in prod.
