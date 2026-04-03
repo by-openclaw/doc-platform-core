@@ -31,6 +31,15 @@ The PoC platform spans multiple network segments managed via Arista 7060/7020 sw
 
 No dedicated VM-level storage or backup VLAN. Storage traffic (NAS, Proxmox backup) uses the OOB/MGMT network. A dedicated storage VLAN is a Phase 2 consideration only.
 
+### Proxmox Storage Rule for ISO / Template Media
+
+> **Decided 2026-04-03**
+
+- `poc-iso` (NFS on Synology) is the only valid storage target for `iso` and `vztmpl` content in PoC
+- `local`, `local-lvm`, and thin-LVM storage must not be used for ISO media
+- VM and LXC runtime disks stay on `poc-data` / ZFS
+- `poc-iso` is host-level NFS storage for Proxmox only; guests never mount it directly
+
 ### Proxmox SDN — Zone and VNet Naming Standard
 
 > **Decided 2026-04-03**

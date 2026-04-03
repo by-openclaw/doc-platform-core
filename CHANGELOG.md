@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - `docs/adr/0015-network-vlan-architecture.md`: locked Proxmox SDN naming standard — zone = environment, VNet names environment-agnostic (`mgmt`, `dmz`, `svc`), removed stale `vmbrPOC` concept from active docs
+- `docs/adr/0015-network-vlan-architecture.md`: added storage rule — `poc-iso` is the only valid storage target for PoC ISO / vztmpl media; never use `local`, `local-lvm`, or thin-LVM
 - `docs/status.md`, `docs/raid.md`: replaced stale `vmbrPOC` blockers with SDN zone/VNet language
 - `AGENTS.md`, `CLAUDE.md`: added explicit agent rule to stop inventing env-prefixed VNet names
 
