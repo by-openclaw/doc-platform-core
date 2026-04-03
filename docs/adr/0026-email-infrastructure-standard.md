@@ -328,6 +328,108 @@ User enters `user@{domain}` in Thunderbird or Outlook → autoconfig/autodiscove
 
 ---
 
+## Email account lifecycle flows
+
+### Flow 1 — New platform tool mailbox (e.g. add `netbox@{domain}`)
+
+```
+1. Ansible identity-sync playbook runs (exchange.yml or mailcow.yml adapter)
+2. Adapter creates shared mailbox / Mailcow mailbox: netbox@{domain}
+3. Adapter adds mailbox to Dynamic All Users group (M365 only)
+4. Adapter adds Mail Flow Rule: recipient = netbox@ → deliver to netbox mailbox
+5. Tool configured with SMTP credentials from Vault (outbound only for most tools)
+6. If tool needs inbound: Vault credential injected at deploy via env var
+```
+
+Result: email to `netbox@{domain}` routes to netbox mailbox. No manual Exchange admin.
+
+---
+
+### Flow 2 — New Odoo virtual address (e.g. add `accounting@{domain}`)
+
+```
+1. Admin creates alias / Sales Team / queue in Odoo UI
+2. Odoo internally maps accounting@{domain} → Accounting team
+3. Nothing changes in M365 or Mailcow
+4. External sender emails accounting@{domain}
+5. M365: no explicit rule matches → Rule LAST fires → forward to catchall mailbox
+6. Odoo reads catchall, sees To: accounting@{domain}
+7. Odoo routes to Accounting queue
+```
+
+Result: zero M365/Mailcow admin for Odoo virtual addresses. Odoo manages its own routing.
+
+---
+
+### Flow 3 — Inbound email to GitLab (issue reply, Service Desk)
+
+```
+1. GitLab generates unique token per issue/MR: abc123
+2. GitLab sets reply-to: gitlab-incoming+abc123@{domain}
+3. User replies to that email
+4. M365 Rule 1 matches: gitlab-incoming+*@ → deliver to gitlab-incoming mailbox
+5. GitLab mail_room polls mailbox (IMAP or Graph API)
+6. mail_room extracts +token from To: field
+7. mail_room posts reply as comment on correct issue/MR
+```
+
+---
+
+### Flow 4 — Outbound from tool (notification email)
+
+```
+1. Tool (Grafana, NetBox, Vault, GitLab) triggers notification
+2. Tool connects to M365 SMTP relay (port 587 or 25)
+3. M365 relay connector validates: sender IP in allowlist?
+4. Yes → M365 accepts and delivers on behalf of tool
+5. Recipient receives email from grafana@{domain} / gitlab@{domain} / etc.
+```
+
+SPF record includes tool server IPs. No per-tool M365 license. No credential on SMTP relay (IP-based auth).
+
+---
+
+### Flow 5 — Add a new human user (M365 licensed)
+
+```
+1. Admin creates user in Authentik (ADR-0024 provisioning flow)
+2. Authentik webhook → Ansible identity-sync
+3. exchange.yml adapter: create M365 licensed mailbox user@{domain}
+4. User added to Dynamic All Users group (auto-included as licensed mailbox)
+5. M365 Mail Flow Rules: user is in Dynamic All Users → never hits Rule LAST
+6. User receives email at user@{domain} directly
+7. User configures Outlook/Thunderbird via autoconfig/autodiscover (Mailcow) or M365 autodiscover
+```
+
+---
+
+### Flow 6 — Remove a user (offboarding)
+
+```
+1. Admin disables user in Authentik
+2. Authentik webhook → Ansible identity-sync
+3. exchange.yml adapter: disable M365 mailbox (not deleted)
+4. User removed from Dynamic All Users group
+5. Any email to user@{domain} → Rule LAST → catchall → Odoo (unmatched address)
+6. Odoo creates a ticket for undeliverable-looking inbound
+7. Hard deletion: explicit manual action after audit confirmation (ADR-0024 removal policy)
+```
+
+---
+
+### TX/RX matrix per mailbox type
+
+| Mailbox type | Receives (RX) | Sends (TX) | How tool reads | How tool sends |
+|---|---|---|---|---|
+| M365 licensed user | ✅ Direct delivery | ✅ Native Outlook/SMTP | Outlook / IMAP / Graph API | Outlook / SMTP |
+| M365 shared (tool) | ✅ Direct delivery | ✅ Via relay connector | Graph API or IMAP+OAuth | SMTP relay (IP auth) |
+| Mailcow tool mailbox | ✅ Direct / forwarded from M365 | ✅ Via SMTP | IMAP + password (Vault) | SMTP + password (Vault) |
+| Odoo catchall (M365) | ✅ Rule LAST only | ✅ Via relay connector | Graph API or IMAP+OAuth | SMTP relay |
+| Odoo catchall (Mailcow) | ✅ Rule LAST forward | ✅ SMTP | IMAP + password (Vault) | SMTP + password (Vault) |
+| Odoo virtual address | ❌ Not a real mailbox | ✅ Odoo sends as alias | N/A — Odoo internal | Odoo SMTP via relay |
+
+---
+
 ## Credentials summary
 
 | Secret | Vault path |
