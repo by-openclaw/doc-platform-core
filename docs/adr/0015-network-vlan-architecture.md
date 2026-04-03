@@ -42,7 +42,7 @@ No dedicated VM-level storage or backup VLAN. Storage traffic (NAS, Proxmox back
 | `vmbrWAN3` | Active | 10.6.224.105/20 | Internet access via OOB path — temporary during ISP migration (renamed from vmbrOOB 2026-04-03) |
 | `vmbrOOB` | Planned | none | Break-glass emergency access — isolated, no IP (to be created) |
 | `vmbrFAB` | Disabled | — | Fabric supervision — disabled until PoC fabric physically wired (renamed from vmbrMGMT 2026-04-01) |
-| `vmbrAPPS` | Active | — | Application/production VLAN bridge (placeholder, no ports) |
+| `vmbrAPPS` | Active | — | VM trunk — VLAN-aware, no IP. Each VM tags its own VLAN in NIC config (SDN VNets: mgmt/dmz/svc). OPNsense LAN attaches as trunk. Name confirmed correct 2026-04-03. |
 
 > `vmbrPOC` was removed 2026-04-03 — was not in any ADR or design decision.
 
