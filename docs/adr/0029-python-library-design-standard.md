@@ -239,6 +239,22 @@ Rules:
 | Integration tests | Live device required, marked with `@pytest.mark.integration` |
 | Smoke tests | Import + instantiation only — verifies packaging |
 | Ansible playbooks | One `playbook_{scope}.yml` per domain for integration validation |
+| Error handling tests | **Mandatory** — every test suite must verify try/except/finally behavior |
+
+**Error handling test requirements (mandatory for all managers):**
+
+Every manager test suite (unit AND integration) must include error handling tests that verify:
+
+1. **Manager logs ERROR and re-raises** — create/update/delete failures emit structured log, then re-raise the original exception unchanged.
+2. **Exception type is preserved** — `OpnsenseValidationError` stays `OpnsenseValidationError` through the manager, not wrapped in a generic `OpnsenseError`.
+3. **Consumer try/except/finally** — test the full consumer pattern: except catches typed exceptions, finally always runs (client.close()).
+4. **Invalid state raises ValueError** — `ensure(state="running", ...)` must raise `ValueError` immediately.
+5. **Auth error** — bad credentials produce `OpnsenseAuthError` (401), not a generic exception.
+6. **Connection/timeout error** — unreachable host produces `OpnsenseConnectionError` or `OpnsenseTimeoutError`.
+7. **Validation error** — invalid params produce `OpnsenseValidationError` with `.validations` dict.
+
+> **Rationale:** Error handling failures are silent — they only surface in production when a real error occurs.
+> Without explicit tests, a broken re-raise or swallowed exception goes undetected until an incident.
 
 **Quality gates:**
 
