@@ -69,6 +69,9 @@
 
 | ID | Issue | Severity | Date raised | Resolution | Status |
 |---|---|---|---|---|---|
+| I-28 | ADR-0010 naming convention had incorrect prod examples and wrong domain (by-systems.be instead of by-research.be) | Medium | 2026-04-03 | ✅ Amended ADR-0010: prod omits env from hostname/VM name; domain examples → by-research.be. doc-platform-core PR#5, platform-setup#83. | ✅ Resolved |
+| I-29 | ADR-0015 missing WireGuard specification — no subnet, no VLAN assignment, no peer naming | Medium | 2026-04-03 | ✅ WireGuard section added: tunnel 10.100.0.0/24, no VLAN, per-device peer naming. doc-platform-core PR#5, platform-setup#83. | ✅ Resolved |
+| I-30 | ansible-platform had no OPNsense role or bootstrap playbook — firewall config undocumented and unautomated | High | 2026-04-03 | ✅ Full role scaffold + bootstrap playbook created. ansible-platform PR#4, platform-setup#85. | ✅ Resolved |
 | I-25 | Cloudflare API token rotation runbook missing — no procedure for expiry or compromise rotation before PoC go-live | High | 2026-04-01 | Follow CISO token rotation process. Runbook: locate token in Vault, issue new token per CISO process, update Vault secret, rolling Traefik restart, verify cert renewal. Add Grafana cert-expiry alert. | Open |
 | I-26 | NFS routing from scratch PoC VM to NAS (10.6.224.6) via OPNsense untested | High | 2026-04-01 | **CLOSED 2026-04-01** — Storage architecture corrected. VMs never mount NFS. NAS is host-level only (poc-iso + poc-backup on Proxmox host). Risk eliminated. GitHub #69 closed. | Closed |
 | I-23 | `FileStation.upload()` return dict returns `{"skipped": bool}` — violates ADR-0007 `{"changed": bool, "action": str}` contract | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: return `{"changed": bool, "action": "created"\|"skipped"\|"overwritten"}` | Open |

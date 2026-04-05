@@ -12,15 +12,17 @@ The naming & identity convention defines six environment tiers. This ADR extract
 
 ## Decision
 
-### Six environment tiers — ordered pipeline
+### Five environment tiers — ordered pipeline
+
+> **Note (2026-04-03):** `poc` has been removed as an environment tier. It was being confused with the Proxmox node name `srv-proxmox-poc-01` (hardware label). `poc` is not an env tier — it is infrastructure naming. All VMs deployed on that node are `env=prod` (or `dev`/`test` as applicable). Env is always declared per-VM/LXC, never inferred from node or folder names.
 
 ```
-poc → dev → test → staging → acc → prod
+dev → test → staging → acc → prod
 ```
 
 | Tier | Full name | Purpose | Promotion gate |
 |---|---|---|---|
-| `poc` | Proof of concept | Lab / sandbox — pre-pipeline, no SLA, disposable | Manual — "does this idea work?" |
+| `dev` | Development | Active development | CI green |
 | `dev` | Development | Active development, feature branches, local integration | CI green (lint + unit tests) |
 | `test` | Test | Automated testing — integration, regression, smoke | Full test suite green |
 | `staging` | Staging | Pre-prod validation — mirrors prod config | Deployment dry-run successful |
@@ -45,7 +47,7 @@ poc → dev → test → staging → acc → prod
 
 | Tier | Data | Backup | Monitoring | Access |
 |---|---|---|---|---|
-| `poc` | Synthetic/test only | None required | Optional | All developers |
+
 | `dev` | Synthetic/test only | Daily (best effort) | Basic | All developers |
 | `test` | Synthetic/test only | None required | CI integration | CI service accounts |
 | `staging` | Anonymized prod copy | Daily | Full (mirrors prod) | Ops + senior devs |
@@ -94,5 +96,5 @@ poc → dev → test → staging → acc → prod
 ## Notes
 
 - Source: naming & identity convention draft §1 (promoted to its own ADR for independent referenceability)
-- Current state (Phase 1): only `poc` tier is active. `prod` tier activates with first production workload.
+- Current state (Phase 1): `prod` tier is active. All current VMs on `srv-proxmox-poc-01` are `env=prod`. `dev` / `test` tiers activate when the first non-prod workload needs isolation.
 - Environment pipeline: `poc → dev → test → staging → acc → prod` (OPERATING-STANDARD.md §9.4)

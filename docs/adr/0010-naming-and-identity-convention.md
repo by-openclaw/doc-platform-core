@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-03-31
+**Updated:** 2026-04-03 — prod env omitted from hostnames/VM names; domain examples updated to by-research.be
 **Deciders:** @yboujraf
 
 ## Context
@@ -25,16 +26,24 @@ Six environment tiers, always explicit:
 | `acc` | Acceptance / UAT | Customer or stakeholder validation |
 | `prod` | Production | Live — always labeled, never implicit |
 
-**Rule:** `prod` is always explicit. No label = something is wrong, not "it's prod."
+**Rule:** `prod` is always labeled in metadata, tags, secret paths, and deployment manifests. However, `prod` is **omitted from the hostname and VM name** — the prod tag on the asset is the environment marker. All non-prod tiers (`poc`, `dev`, `test`, `staging`, `acc`) carry `{env}` explicitly in the name.
+
+> **Rationale:** Prod hostnames are clean and short (`vm-netbox-01`). Non-prod carries env to prevent cross-env confusion. The prod tag in NetBox, Proxmox, secret file paths, and Vault paths still carries `prod` explicitly.
+
+> **CRITICAL — env is per-VM/LXC, not per-node (added 2026-04-03):**
+> Proxmox node names (e.g. `srv-proxmox-poc-01`) are hardware labels — they do NOT set the environment tier of VMs running on that node.
+> A node named `poc-01` can host `env=prod` VMs, `env=dev` VMs, and `env=test` VMs simultaneously.
+> `env` is declared explicitly in each VM/LXC definition (Terraform `env` variable, Proxmox tag `env-{tier}`, Ansible host_var `env: tier`).
+> Never infer env from the Proxmox node name, folder name, storage pool name, or inventory folder name.
 
 ### 2. Environment label placement — consistent position across all layers
 
 | Layer | Pattern | Example (poc) | Example (prod) |
 |---|---|---|---|
-| Hostname | `{function}-{type}-{env}-{seq:02d}` | `srv-proxmox-poc-01` | `srv-proxmox-prod-01` |
-| VM | `vm-{service}-{env}-{seq:02d}` | `vm-netbox-poc-01` | `vm-netbox-prod-01` |
-| LXC | `lxc-{service}-{env}-{seq:02d}` | `lxc-pihole-poc-01` | `lxc-pihole-prod-01` |
-| VM FQDN | `{hostname}.{domain}` | `vm-netbox-poc-01.{domain}` | `vm-netbox-prod-01.{domain}` |
+| Hostname | `{function}-{type}-{env}-{seq:02d}` | `srv-proxmox-poc-01` | `srv-proxmox-01` |
+| VM | `vm-{service}-{env}-{seq:02d}` | `vm-netbox-poc-01` | `vm-netbox-01` |
+| LXC | `lxc-{service}-{env}-{seq:02d}` | `lxc-pihole-poc-01` | `lxc-pihole-01` |
+| VM FQDN | `{hostname}.{domain}` | `vm-netbox-poc-01.{domain}` | `vm-netbox-01.{domain}` |
 | Service URL | `{alias}.{domain}` (config) | `netbox.poc.{domain}` (defined in Traefik) | `netbox.{domain}` (defined in Traefik) |
 | Certificate | `*.{domain}` | `*.{domain}` (see ADR-0014 for CA selection) | `*.{domain}` (see ADR-0014 for CA selection) |
 | Secret file | `{scope}-{service}-{env}.json` | `infra-proxmox-poc.json` | `infra-proxmox-prod.json` |
@@ -148,9 +157,9 @@ Examples of how `{domain}` resolves:
 
 | Deployment | `{domain}` | VM FQDN example | Service URL example |
 |---|---|---|---|
-| BY-SYSTEMS poc | `example.com` | `vm-netbox-poc-01.example.com` | `netbox.poc.example.com` |
-| BY-SYSTEMS prod | `by-systems.be` | `vm-netbox-prod-01.by-systems.be` | `netbox.by-systems.be` |
-| Client XYZ prod | `client-xyz.com` | `vm-netbox-prod-01.client-xyz.com` | `netbox.client-xyz.com` |
+| BY-SYSTEMS poc | `by-research.be` | `vm-netbox-poc-01.by-research.be` | `netbox.poc.by-research.be` |
+| BY-SYSTEMS prod | `by-research.be` | `vm-netbox-01.by-research.be` | `netbox.by-research.be` |
+| Client XYZ prod | `client-xyz.com` | `vm-netbox-01.client-xyz.com` | `netbox.client-xyz.com` |
 
 No ADR changes required when a domain changes — update the deployment manifest only.
 

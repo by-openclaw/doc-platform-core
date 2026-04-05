@@ -76,6 +76,38 @@ Future environments (`dev`, `prod`) get dedicated Proxmox nodes with their own z
 | Proximus PPPoE | vmbrWAN1 | Active | WAN1 primary |
 | Telenet | vmbrWAN2 | Untested | Not in active rotation |
 
+### WireGuard VPN
+
+> **Decided 2026-04-03**
+
+WireGuard runs as a virtual interface on OPNsense. It does **not** require a dedicated VLAN.
+
+| Item | Value |
+|---|---|
+| Endpoint | OPNsense WAN interface — UDP 51820 |
+| Tunnel subnet | `10.100.0.0/24` (virtual, no VLAN — routed by OPNsense) |
+| OPNsense interface IP | `10.100.0.1/24` |
+| Subnet scope | `/20` supernet reserved — no conflict with VLANs 300–410 or fabric VLANs 600–999 |
+| DMZ anchor IP | `10.1.2.61` (OPNsense DMZ-side, VLAN 320 — WireGuard listens here) |
+
+**Peer naming convention:** one peer per device. Peers are identified by device, not by user.
+
+| Peer name | Owner | Device | Tunnel IP |
+|---|---|---|---|
+| `peer-yboujraf-win11` | yboujraf | Win11 workstation | `10.100.0.2/32` |
+| `peer-yboujraf-mobile` | yboujraf | Mobile | `10.100.0.3/32` |
+| `peer-rune-vm` | automation | Rune VM | `10.100.0.4/32` |
+
+Add a new device = add a new peer entry. No VLAN allocation needed.
+
+**Access:** WireGuard peers receive a tunnel IP from `10.100.0.0/24` and can reach MGMT (`10.1.1.0/24`) and SVC (`10.1.3.0/24`) zones subject to OPNsense firewall rules. DMZ (`10.1.2.0/24`) is not accessible via VPN by default.
+
+**Managed by:** Ansible `roles/opnsense` — `community.opnsense` WireGuard modules. Peer keypairs are generated per device; private keys never leave the device.
+
+**Secret storage:** WireGuard server private key stored in `infra/secrets/wireguard-opnsense.yml` (ansible-vault encrypted). Later: migrated to HashiVault (ADR-0024).
+
+---
+
 ### OPNsense Firewall Rule Standard
 
 All firewall rules use named aliases. Hardcoded IPs, ports, and URLs are banned in rules.

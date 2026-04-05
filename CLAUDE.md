@@ -71,8 +71,10 @@ Do **not** add source code, Dockerfiles, CI pipelines, or build tooling to this 
 ## Cross-repo References
 
 - Naming convention: see `docs/adr/0010-naming-and-identity-convention.md`
-- Environment tiers: poc/dev/test/staging/acc/prod — always explicit. See `docs/adr/0012-environment-tier-standard.md`
-- Network VLAN + Proxmox SDN naming: see `docs/adr/0015-network-vlan-architecture.md` — zone = environment, VNets = `mgmt`/`dmz`/`svc`
+- Environment tiers: dev/test/staging/acc/prod — always explicit per VM/LXC. See `docs/adr/0012-environment-tier-standard.md`
+- `poc` in Proxmox node/folder/storage names = hardware labels, NOT env tier (decided 2026-04-03)
+- `env` is a per-VM property. Same tool can run as prod + dev on the same node.
+- Network VLAN + Proxmox SDN naming: see `docs/adr/0015-network-vlan-architecture.md` — zone = node identifier, VNets = `mgmt`/`dmz`/`svc`
 
 ---
 
