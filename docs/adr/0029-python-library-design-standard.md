@@ -153,14 +153,81 @@ async def ensure(
 - **No bare `except:`.** Always catch specific exception types.
 - **Resource cleanup via `async with` / context managers.** Clients implement `__aenter__` / `__aexit__` (async) and `__enter__` / `__exit__` (sync) for guaranteed session teardown.
 
+### try / except / finally — mandatory pattern
+
+Every mutation operation (create, update, delete, assign) in managers MUST use:
+
+```python
+# Inside manager — log + re-raise
+try:
+    uuid = await self._client.create(endpoint, payload_key, params)
+    await self._apply()
+except Exception as exc:
+    logger.error("create failed: %s", exc, extra={"action": "create_failed", ...})
+    raise
+```
+
+Every consumer (Ansible module, script, integration test) MUST use:
+
+```python
+# Consumer — catch typed exceptions, never crash
+try:
+    result = await mgr.ensure("present", params)
+except ProductValidationError as exc:
+    logger.error("Validation: %s", exc.validations)
+    # handle gracefully — report to user, skip, retry
+except ProductAuthError:
+    logger.critical("Auth failed — check API key")
+    # abort — do not retry auth failures
+except ProductTimeoutError:
+    logger.warning("Timeout — will retry")
+    # retry or escalate
+except ProductError as exc:
+    logger.error("API error: %s", exc)
+    # generic fallback
+finally:
+    # ALWAYS runs — cleanup resources, close connections, report status
+    # Use for: closing files, releasing locks, sending notifications
+    pass
+```
+
+Rules:
+- **`try`**: wrap the operation that may fail
+- **`except`**: catch most-specific exception first, then broader (validation before base)
+- **`finally`**: guaranteed cleanup — runs on success AND failure. Use for resource teardown, audit logging, status reporting
+- **Never swallow exceptions silently** — always log at ERROR or re-raise
+- **Never use bare `except:`** — always specify the exception type
+- **Managers re-raise after logging** — they don't decide recovery strategy, the consumer does
+
 ---
 
 ## 9. Decision — Secret Redaction
 
 - Each manager declares a `REDACT_FIELDS` set listing field names that contain secrets (e.g. `{'password', 'privkey', 'psk', 'secret', 'otp_seed'}`).
-- Redaction format: `<REDACTED:{field_name}>` — e.g. `<REDACTED:password>`.
 - Redaction applies in all logs, diffs, and `EnsureResult.diff` output.
 - Raw API responses containing secret fields are never logged. The client transport layer does not log response bodies; managers redact before any logging or result construction.
+
+### Partial reveal with configurable depth
+
+Full redaction (`<REDACTED:field>`) prevents verification. Use partial reveal where safe:
+
+```python
+REDACT_RULES = {
+    "password":       (0, 0, "*"),   # full — <REDACTED:password>
+    "secret":         (0, 4, "*"),   # last 4 — ***...ExQi
+    "api_key":        (4, 4, "*"),   # first 4 + last 4 — gTCJ***igCn
+    "authorizedkeys": (8, 0, "*"),   # first 8 — ssh-ed25***
+}
+# Rule: (reveal_start, reveal_end, mask_char)
+# Values shorter than reveal window → full redaction (safe default)
+```
+
+Rules:
+- **Passwords, OTP seeds**: always full redaction `(0, 0)` — never show any part
+- **API keys, tokens**: partial reveal `(4, 4)` — first + last 4 chars for verification
+- **SSH keys**: show type prefix `(8, 0)` — enough to identify key type
+- **Secrets**: show last 4 `(0, 4)` — enough to verify which secret is in use
+- Redaction runs as a **structlog processor** — applied before both console and file output
 
 ---
 
