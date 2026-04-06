@@ -2,38 +2,40 @@
 
 <!-- One sentence: what changed and why. -->
 
-## Issue
-
-<!-- REQUIRED: Link the issue this PR addresses. -->
 Closes #
 
 ## Type
 
-<!-- Select ONE. -->
 - [ ] feat — new feature
 - [ ] fix — bug fix
 - [ ] docs — documentation only
 - [ ] chore — maintenance, refactor, CI
 - [ ] security — security fix or hardening
 
-## Changes
+## Files changed
 
-<!-- Bullet list of what was done. Keep it short. -->
--
--
+<!-- List every file touched. One row per file. -->
+
+| File | Type | Change |
+|------|------|--------|
+| `docs/adr/0000-example.md` | new / update | One-line description |
+
+## How to review
+
+1. Read the changed files
+2. Verify ADR numbering is sequential (no gaps, no duplicates)
+3. Verify CISO mapping section present (if new ADR)
+4. Verify cross-references are valid
 
 ## Checklist
 
-<!-- Check what applies. Not all boxes apply to every PR. -->
-
 ### Quality
-- [ ] Lint clean (`ruff` / `ansible-lint` / `terraform fmt`)
-- [ ] Tests pass (`pytest` / `terraform plan`)
-- [ ] No coverage drop
+- [ ] Markdown renders correctly (no broken tables or links)
+- [ ] No spelling errors in headings
 
 ### Security
 - [ ] No secrets, tokens, or passwords in committed files
-- [ ] No `<REDACTED>` in code (docs only)
+- [ ] No real IPs, domains, or credentials (use example.com)
 
 ### Docs
 - [ ] CHANGELOG entry added (if user-facing change)
@@ -41,8 +43,6 @@ Closes #
 
 ## Review
 
-- [ ] Label `review:opus` added
-- [ ] Opus reviewed and approved (label: `opus:approved`)
 - [ ] @yboujraf approved
 
 <!--
