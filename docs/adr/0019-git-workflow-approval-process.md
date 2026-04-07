@@ -50,6 +50,79 @@ Multiple agents (Rune, Opus) and human contributors interact with the same repos
 
 Not applicable — this ADR covers git workflow, not personal data processing.
 
+## PR Content Standard
+
+> Added 2026-04-06 — all PRs must include structured review context.
+
+Every PR description must include the following sections. Sections marked (if applicable) may be omitted when not relevant to the change.
+
+### 1. Files changed table (mandatory)
+
+| File | Type | Change |
+|------|------|--------|
+| `path/to/file.py` | new / fix / update / delete | One-line description |
+
+### 2. Test results table (if code changed)
+
+| Suite | Scope | File | Passed | Failed |
+|-------|-------|------|--------|--------|
+| Unit | ManagerName | `tests/unit/test_manager.py` | 16 | 0 |
+| Integration | Domain | `tests/integration/test_lifecycle.py` | 14 | 0 |
+| **Full suite** | **All** | `tests/` | **226** | **0** |
+| Lint | ruff / ansible-lint / terraform fmt | `src/` + `tests/` | clean | — |
+
+### 3. Endpoints / resources covered (if API/infra code)
+
+For `lib-*` repos:
+
+| Endpoint | Method | Tested |
+|----------|--------|--------|
+| `/api/domain/action` | POST | unit + integration |
+
+For `infra-terraform-*` repos:
+
+| Module / Resource | Action | Tested |
+|------------------|--------|--------|
+| `module/vm-opnsense` | plan + apply | yes |
+
+### 4. Safety boundaries (if touching live systems)
+
+- **READ-ONLY:** what must NOT be modified on the live device
+- **CRUD safe:** what can be created/deleted with `inttest-` prefix
+- **DISABLED only:** what must be created in disabled state
+
+### 5. How to review (mandatory)
+
+Numbered steps guiding the reviewer through the change:
+1. Read X — verify Y
+2. Check Z — confirm W
+
+### Commit message format
+
+One commit per concern. Structure:
+
+```
+type(scope): title
+
+Managers/modules/resources:
+  - Name: endpoint/path
+    File: path/to/file.py
+
+Tests:
+  - Name unit (N tests): path/to/test.py
+  - Name integration (N tests): path/to/test.py
+
+Fixes (if any):
+  - Description
+    File: path/to/file.py
+
+Files changed:
+  path/to/file1.py  (new/fix/update)
+  path/to/file2.py  (new/fix/update)
+
+Co-Authored-By: ...
+```
+
 ## Consequences
 
 - All agent work on `main` goes through a PR. No exceptions.
