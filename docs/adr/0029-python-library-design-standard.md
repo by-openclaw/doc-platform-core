@@ -79,6 +79,7 @@ src/{product}/
 - **exceptions.py** owns ALL exceptions including FieldValidationError, AmbiguousMatchError
 - **client.py** owns transport, authentication, retry, status-to-exception mapping — zero business logic
 - **Every component** must be importable and usable without instantiating the full stack
+- **Every manager docstring** must include INPUT (required/optional fields, parent UUIDs) and OUTPUT (EnsureResult fields) sections
 
 ### 3.3 Reusability contract
 
@@ -454,6 +455,7 @@ Python version matrix: 3.10, 3.11, 3.12, 3.13.
 
 - No PR without all quality gates passing
 - No manager without validators
+- No manager without INPUT/OUTPUT docstring (required/optional fields, parent UUIDs, EnsureResult)
 - No validators without unit tests
 - No integration test without safety boundaries documented
 - No merge without CI confirmed green
