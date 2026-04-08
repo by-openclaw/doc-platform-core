@@ -457,6 +457,9 @@ Python version matrix: 3.10, 3.11, 3.12, 3.13.
 - No validators without unit tests
 - No integration test without safety boundaries documented
 - No merge without CI confirmed green
+- No manager PR without `docs/api-coverage.md` updated (status, match keys, notes)
+- No manager PR without integration tests committed (smoke-only is not enough)
+- Never output secrets in terminal commands — read silently, write to `.env` only
 
 ---
 
