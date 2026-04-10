@@ -10,14 +10,18 @@ The platform uses service accounts (svc-rune) and local admin accounts (by-syste
 
 ## Decision
 
-### 1. Two Account Types
+### 1. Three Account Types
 
 | Account | Type | Purpose | Source | Always available? |
 |---|---|---|---|---|
-| `svc-rune` | Service account | Day-to-day ops, Ansible, API, git, CI | Authentik (future), local (now) | Depends on Authentik |
+| `svc-rune` | Service account | Day-to-day interactive ops, API, git | Authentik (future), local (now) | Depends on Authentik |
+| `svc-ansible` | Automation account | Ansible, CI/CD, non-interactive | Local | YES |
 | `by-systems` | Local admin | OOB emergency, break-glass, console | Always local (`/etc/passwd`) | YES — even if Authentik/network down |
 
-**Rule:** Never delete the local admin. Authentik manages operational accounts. `by-systems` is the last resort.
+**Rules:**
+- Never delete the local admin. `by-systems` is the last resort.
+- `svc-rune` = interactive (human at keyboard). `svc-ansible` = automation (no human).
+- Separate accounts = separate blast radius. Compromised CI token does not give interactive access.
 
 ### 2. SSH Keys
 
@@ -44,12 +48,43 @@ The platform uses service accounts (svc-rune) and local admin accounts (by-syste
 
 ### 4. Sudo
 
-| Account | Sudo | Config |
-|---|---|---|
-| `svc-rune` | `NOPASSWD: ALL` | `/etc/sudoers.d/svc-rune` |
-| `by-systems` | `NOPASSWD: ALL` | `/etc/sudoers.d/by-systems` |
+**Rule: `NOPASSWD` is FORBIDDEN.** Every sudo requires a password. No exceptions.
 
-Both need passwordless sudo for automation (Ansible) and emergency access.
+| Account | Sudo | Password source | Config |
+|---|---|---|---|
+| `svc-rune` | Password required | User types it (interactive) | `/etc/sudoers.d/svc-rune` |
+| `svc-ansible` | Password required | `ansible_become_pass` from Vault KV | `/etc/sudoers.d/svc-ansible` |
+| `by-systems` | Password required | User types it (console/OOB) | `/etc/sudoers.d/by-systems` |
+
+#### Automation (Ansible, CI/CD)
+
+Non-interactive automation cannot type a password. The become password is stored in HashiCorp Vault and injected at runtime:
+
+```yaml
+# group_vars/all.yml (ansible-vault encrypted or Vault lookup)
+ansible_become_pass: "{{ lookup('hashi_vault', 'secret/automation/svc-ansible:become_pass') }}"
+```
+
+A dedicated `svc-ansible` service account is used for automation:
+- Separate from `svc-rune` (interactive ops) — blast radius isolation
+- Password stored in Vault KV, never on disk
+- Sudo is password-required (Ansible provides it via `become_pass`)
+- SSH key with passphrase (Ansible uses `ssh-agent` or Vault SSH secrets engine)
+
+#### Sudoers config
+
+```
+# /etc/sudoers.d/svc-rune
+svc-rune ALL=(ALL:ALL) ALL
+
+# /etc/sudoers.d/svc-ansible
+svc-ansible ALL=(ALL:ALL) ALL
+
+# /etc/sudoers.d/by-systems
+by-systems ALL=(ALL:ALL) ALL
+```
+
+No `NOPASSWD`. No `!authenticate`. Every privilege escalation is audited.
 
 ### 5. Shell
 
