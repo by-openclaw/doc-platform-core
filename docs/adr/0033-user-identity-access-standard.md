@@ -1,0 +1,146 @@
+# ADR-0033: User Identity & Access Standard
+
+**Status:** Accepted
+**Date:** 2026-04-10
+**Deciders:** @yboujraf
+
+## Context
+
+The platform uses service accounts (svc-rune) and local admin accounts (by-systems) across multiple VMs, LXCs, and services. No formal standard exists for user creation, SSH key management, GPG signing, sudo configuration, or how Authentik (future OIDC/LDAP authority) interacts with local accounts. The odoo-install/ssh/git.sh script provides a reference implementation but is hardcoded to Odoo paths and missing user creation, sudo, and agent autoload.
+
+## Decision
+
+### 1. Two Account Types
+
+| Account | Type | Purpose | Source | Always available? |
+|---|---|---|---|---|
+| `svc-rune` | Service account | Day-to-day ops, Ansible, API, git, CI | Authentik (future), local (now) | Depends on Authentik |
+| `by-systems` | Local admin | OOB emergency, break-glass, console | Always local (`/etc/passwd`) | YES — even if Authentik/network down |
+
+**Rule:** Never delete the local admin. Authentik manages operational accounts. `by-systems` is the last resort.
+
+### 2. SSH Keys
+
+| Rule | Requirement |
+|---|---|
+| Algorithm | ED25519 only. No RSA, no ECDSA. |
+| Passphrase | Mandatory. No empty passphrase keys. |
+| One key per user | One ED25519 key pair per user identity. Not per machine. |
+| Key comment | `{username}@{domain}` (e.g. `svc-rune@by-systems.be`) — agnostic, not tied to hostname |
+| Agent | ssh-agent loaded in `.bashrc`. Passphrase typed once per session. |
+| Storage | Private key: local `~/.ssh/` + Vault KV backup. Public key: git repo `infra/keys/`. |
+
+### 3. GPG Keys
+
+| Rule | Requirement |
+|---|---|
+| Algorithm | EdDSA (Ed25519) |
+| Passphrase | Mandatory |
+| Identity | `{username} <{username}@{domain}>` |
+| Expiry | 365 days. Renewal alert 30 days before expiry. |
+| Agent | gpg-agent loaded in `.bashrc`. `GPG_TTY=$(tty)`. |
+| Storage | Private key: Vault KV. Public key: git repo + GitHub. |
+| Git signing | All commits and tags signed (`commit.gpgsign=true`, `tag.gpgsign=true`) |
+
+### 4. Sudo
+
+| Account | Sudo | Config |
+|---|---|---|
+| `svc-rune` | `NOPASSWD: ALL` | `/etc/sudoers.d/svc-rune` |
+| `by-systems` | `NOPASSWD: ALL` | `/etc/sudoers.d/by-systems` |
+
+Both need passwordless sudo for automation (Ansible) and emergency access.
+
+### 5. Shell
+
+| Account | Linux | OPNsense |
+|---|---|---|
+| `svc-rune` | `/bin/bash` | `/bin/sh` (mandatory for SSH — default "none" kills connection) |
+| `by-systems` | `/bin/bash` | `/bin/sh` |
+
+### 6. Groups
+
+| Group | Members | Purpose |
+|---|---|---|
+| `sshuser` | svc-rune, by-systems | SSH AllowGroups (sshd hardening) |
+| `sudo` | svc-rune, by-systems | Sudo access |
+| `docker` | svc-rune | Docker operations (where applicable) |
+
+### 7. Agent Autoload (`.bashrc`)
+
+```bash
+# SSH agent — passphrase once per session
+if [ -z "$SSH_AUTH_SOCK" ]; then
+    eval "$(ssh-agent -s)" > /dev/null
+    ssh-add ~/.ssh/id_ed25519 2>/dev/null
+fi
+
+# GPG agent
+export GPG_TTY=$(tty)
+```
+
+### 8. Provisioning
+
+Six concerns, executed in order by Ansible:
+
+| # | Concern | Ansible role | Runs on |
+|---|---|---|---|
+| 1 | User / group creation + sudo | `roles/user-mgmt` | All VMs/LXCs |
+| 2 | sshd hardening (port, crypto, socket disable) | `roles/sshd-hardening` | All VMs/LXCs |
+| 3 | Banner (`/etc/issue.net`) | `roles/banner` | All VMs/LXCs |
+| 4 | Git config (system + per-user) | `roles/git-config` | Dev VMs only |
+| 5 | SSH + GPG keys (generate, upload, Vault) | `roles/key-mgmt` | Dev VMs only |
+| 6 | fail2ban (SSH jail, OOB whitelist) | `roles/fail2ban` | All VMs/LXCs |
+
+### 9. Authentik Integration (Future)
+
+| Phase | State |
+|---|---|
+| Now | Local users, Ansible provisioned |
+| Phase 2 | Authentik deployed, LDAP provider, SSSD on Linux VMs |
+| Phase 3 | svc-rune sourced from Authentik. by-systems stays local (OOB fallback). |
+
+### 10. Secret Storage
+
+| Secret | Location (now) | Location (target) |
+|---|---|---|
+| SSH private key | `~/.ssh/id_ed25519` | Same + Vault KV backup |
+| SSH passphrase | User memory | Vault KV |
+| GPG private key | `~/.gnupg/` | Same + Vault KV backup |
+| GPG passphrase | User memory | Vault KV |
+| SSH public key | git repo `infra/keys/` | Same |
+| GPG public key | git repo + GitHub | Same |
+| API tokens | `infra/secrets/*.env` | Vault KV |
+
+## Consequences
+
+- Every new VM/LXC runs the 6-role provisioning playbook
+- No more ad-hoc user creation or SSH key copying
+- One key per user, passphrase mandatory — existing keyless keys must be rotated
+- OPNsense users MUST have `shell=/bin/sh` set (discovered 2026-04-10)
+- by-systems local account is never managed by Authentik — always local fallback
+- 6 existing SSH keys on Rune VM need consolidation to 1
+
+## CISO mapping
+
+### ISO/IEC 27001:2022
+
+| Control | Title | Status | Notes |
+|---|---|---|---|
+| A.5.15 | Access control | Covered | Two account types, least privilege, group-based |
+| A.5.17 | Authentication information | Covered | ED25519 + passphrase, no empty keys |
+| A.8.5 | Secure authentication | Covered | SSH key + passphrase, agent-based |
+
+### NIS2
+
+| Article | Requirement | Status | Notes |
+|---|---|---|---|
+| Art. 21(2)(d) | Supply chain security | Covered | Signed commits, GPG verification |
+| Art. 21(2)(j) | Multi-factor auth | Partial | SSH key + passphrase = 2 factors. Authentik adds OIDC MFA later. |
+
+## References
+
+- ADR-0010: Naming & Identity Convention
+- ADR-0012: Environment Tier Standard
+- ADR-0031: CI Token & Identity Standard
+- Audit source: by-systems/odoo-install/ssh/ (git.sh, sshd-hardening-apply.sh)
