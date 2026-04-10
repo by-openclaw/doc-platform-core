@@ -29,38 +29,65 @@ ADR-0015 defined a PoC VLAN set (300-330) without a scalable zone taxonomy. The 
 
 ### 2. VLAN Range Allocation
 
-| Range | Zone | Purpose |
+| Range | Purpose | Notes |
 |---|---|---|
-| 1-2000 | prod | All production segments |
-| 2001-4094 | test | All non-prod (dev, test, staging, acc) |
+| 1-999 | **Reserved** — ISP, Arista fabric, broadcast | Do NOT allocate |
+| 1001-1999 | **Prod** — all production segments | BY-SYSTEMS infra |
+| 2001-2999 | **Test** — all non-prod (dev, test, staging, acc) | Integration testing |
+| 3001-4094 | **Future** — additional envs if needed | Unallocated |
 
-### 3. Production VLAN Assignment
+### Reserved VLANs (1-999) — DO NOT USE
 
-| VLAN ID | Segment | Subnet (v4) | Subnet (v6 ULA) | Gateway |
-|---|---|---|---|---|
-| 100 | OOB | 10.0.100.0/24 | — | — (L2 only, no routing) |
-| 200 | FABRICS | 10.0.200.0/24 | — | — (isolated) |
-| 300 | MGMT | 10.1.1.0/24 | fd00:1:1::/64 | 10.1.1.1 |
-| 310 | DMZ | 10.1.2.0/24 | fd00:1:2::/64 | 10.1.2.1 |
-| 320 | SVC | 10.1.3.0/24 | fd00:1:3::/64 | 10.1.3.1 |
-| 330 | VPN | 10.1.4.0/24 | fd00:1:4::/64 | 10.1.4.1 |
-| 400 | IoT | 10.1.10.0/24 | fd00:1:10::/64 | 10.1.10.1 |
-| 410 | VoIP | 10.1.11.0/24 | fd00:1:11::/64 | 10.1.11.1 |
-| 500 | Storage | 10.1.20.0/24 | — | 10.1.20.1 |
-| 600 | Media | 10.1.30.0/24 | fd00:1:30::/64 | 10.1.30.1 |
-| 700 | CCTV | 10.1.40.0/24 | — | 10.1.40.1 |
+| VLAN | Owner | Purpose |
+|---|---|---|
+| 1 | Dead | Never use — VLAN hopping risk (802.1Q double-tagging) |
+| 10 | Proximus | PPPoE WAN uplink |
+| 20 | Proximus | Reserved |
+| 110-121 | Arista | P2P fabric links (7060/7020) |
+| 600-999 | Arista/ISP | Broadcast control (SMPTE, PTP, MGMT_CTRL), Telenet (999) |
 
-### 4. Test VLAN Assignment (offset +2000)
+### 3. Production VLAN Assignment (1001-1999)
 
 | VLAN ID | Segment | Subnet (v4) | Subnet (v6 ULA) | Gateway |
 |---|---|---|---|---|
-| 2300 | MGMT | 10.11.1.0/24 | fd11:1::/64 | 10.11.1.1 |
-| 2310 | DMZ | 10.11.2.0/24 | fd11:2::/64 | 10.11.2.1 |
-| 2320 | SVC | 10.11.3.0/24 | fd11:3::/64 | 10.11.3.1 |
-| 2330 | VPN | 10.11.4.0/24 | fd11:4::/64 | 10.11.4.1 |
+| 1010 | MGMT | 10.1.1.0/24 | fd01:1::/64 | 10.1.1.1 |
+| 1020 | DMZ | 10.1.2.0/24 | fd01:2::/64 | 10.1.2.1 |
+| 1030 | SVC | 10.1.3.0/24 | fd01:3::/64 | 10.1.3.1 |
+| 1040 | VPN | 10.1.4.0/24 | fd01:4::/64 | 10.1.4.1 |
+| 1100 | IoT | 10.1.10.0/24 | fd01:10::/64 | 10.1.10.1 |
+| 1110 | VoIP | 10.1.11.0/24 | fd01:11::/64 | 10.1.11.1 |
+| 1200 | Storage | 10.1.20.0/24 | fd01:20::/64 | 10.1.20.1 |
+| 1300 | Media | 10.1.30.0/24 | fd01:30::/64 | 10.1.30.1 |
+| 1400 | CCTV | 10.1.40.0/24 | fd01:40::/64 | 10.1.40.1 |
 
-Test zone only creates segments needed for lib-opnsense integration testing.
-Additional test segments (IoT, VoIP, etc.) added when needed.
+OOB and FABRICS are NOT VLANs on SDN — they are dedicated Proxmox bridges (vmbrOOB, vmbrFAB).
+
+### 4. Test VLAN Assignment (2001-2999, offset +1000 from prod)
+
+All segments dual-stack (IPv4 + IPv6 ULA).
+
+| VLAN ID | Segment | Subnet (v4) | Subnet (v6 ULA) | Gateway |
+|---|---|---|---|---|
+| 2010 | MGMT | 10.11.1.0/24 | fd11:1::/64 | 10.11.1.1 |
+| 2020 | DMZ | 10.11.2.0/24 | fd11:2::/64 | 10.11.2.1 |
+| 2030 | SVC | 10.11.3.0/24 | fd11:3::/64 | 10.11.3.1 |
+| 2040 | VPN | 10.11.4.0/24 | fd11:4::/64 | 10.11.4.1 |
+| 2100 | IoT | 10.11.10.0/24 | fd11:10::/64 | 10.11.10.1 |
+| 2110 | VoIP | 10.11.11.0/24 | fd11:11::/64 | 10.11.11.1 |
+| 2200 | Storage | 10.11.20.0/24 | fd11:20::/64 | 10.11.20.1 |
+| 2300 | Media | 10.11.30.0/24 | fd11:30::/64 | 10.11.30.1 |
+| 2400 | CCTV | 10.11.40.0/24 | fd11:40::/64 | 10.11.40.1 |
+
+### Migration from current test VLANs
+
+| Current | New | Segment |
+|---|---|---|
+| 1310 | 2010 | MGMT |
+| 1320 | 2020 | DMZ |
+| 1330 | 2030 | SVC |
+| 1340 | 2040 | VPN |
+
+Applied with VM 1100. VM 101 stays on 1310-1340 until decommissioned.
 
 ### 5. VMID Scheme
 
@@ -87,7 +114,7 @@ Zone name = environment tier (ADR-0012). VNet names are segment abbreviations.
 | Zone | Environment | VNets |
 |---|---|---|
 | prod | Production | mgmt, dmz, svc, vpn, iot, voip, storage, media, cctv |
-| test | Test/Dev/Staging/Acc | tmgmt, tdmz, tsvc, tvpn |
+| test | Test/Dev/Staging/Acc | tmgmt, tdmz, tsvc, tvpn, tiot, tvoip, tstor, tmedia, tcctv |
 
 ### 8. Merges Applied
 
@@ -101,8 +128,9 @@ Zone name = environment tier (ADR-0012). VNet names are segment abbreviations.
 
 ## Consequences
 
-- ADR-0015 VLAN IDs (310/320/330) change to match new registry — migration needed
-- Current test VLANs (1310-1340) need migration to 2300+ range — planned with vm-fw-test-01 (1100)
+- ADR-0015 VLAN IDs (310/320/330) superseded — prod now starts at 1001
+- Current test VLANs (1310-1340) migrate to 2010-2040 with vm-fw-test-01 (1100)
+- VLANs 1-999 permanently reserved for ISP (10, 20), Arista fabric (110-121, 600-999)
 - Zone `poc` is removed — replaced by `prod` (ADR-0012 compliance)
 - All Terraform SDN configs updated to match new VLAN IDs
 - Future segments added by appending to the registry — no structural change needed
