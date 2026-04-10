@@ -35,13 +35,15 @@ Minimum viable: get SSH working so Ansible can take over.
 | Step | Action |
 |---|---|
 | 1 | Complete OPNsense ISO installer |
-| 2 | Assign interfaces: `vtnet0` = WAN, `vtnet1` = LAN |
-| 3 | Set LAN IP: `10.1.1.1/24` |
-| 4 | Enable SSH: System → Administration → Secure Shell |
-| 5 | Enable shell access: same page |
-| 6 | Add root authorized_keys: `rune@by-systems-automation` + `by-systems@ws-win11-ref` |
+| 2 | Assign interfaces: `vtnet0` = LAN (trunk), `vtnet1-3` = WAN1/WAN2/WAN3 |
+| 3 | Set LAN IP (MGMT gateway): prod `10.1.1.1/24`, test `10.11.1.1/24` |
+| 4 | `pfctl -d` from console (disable firewall for initial API/SSH access) |
+| 5 | Enable SSH: System → Administration → Secure Shell |
+| 6 | Create user `svc-rune`: admins group, `shell=/bin/sh`, SSH pubkey (`svc-rune@by-systems.be`), generate API key → store in secrets (ADR-0033) |
+| 7 | Verify: `curl -k -u <key>:<secret> https://<WAN-IP>/api/core/firmware/status` |
+| 8 | Verify: `ssh svc-rune@<WAN-IP>` |
 
-**That is all.** Nothing else is done manually. No firewall rules, no gateways, no routes, no packages, no UI config.
+**That is all.** No root SSH needed — `svc-rune` with `shell=/bin/sh` + pubkey works for SSH (confirmed 2026-04-10). No firewall rules, no gateways, no routes, no packages, no UI config beyond this list.
 
 ### Phase 2 — Ansible: Full Configuration
 
