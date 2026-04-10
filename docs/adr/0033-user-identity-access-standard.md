@@ -6,7 +6,7 @@
 
 ## Context
 
-The platform uses service accounts (svc-rune) and local admin accounts (by-systems) across multiple VMs, LXCs, and services. No formal standard exists for user creation, SSH key management, GPG signing, sudo configuration, or how Authentik (future OIDC/LDAP authority) interacts with local accounts. The odoo-install/ssh/git.sh script provides a reference implementation but is hardcoded to Odoo paths and missing user creation, sudo, and agent autoload.
+The platform uses service accounts (svc-rune) and local admin accounts (by-systems) across multiple VMs, LXCs, and services. No formal standard exists for user creation, SSH key management, GPG signing, sudo configuration, or how Authentik (future OIDC/LDAP authority) interacts with local accounts. A prior reference implementation exists but is application-specific and missing user creation, sudo, and agent autoload.
 
 ## Decision
 
@@ -131,16 +131,24 @@ Six concerns, executed in order by Ansible:
 | A.5.17 | Authentication information | Covered | ED25519 + passphrase, no empty keys |
 | A.8.5 | Secure authentication | Covered | SSH key + passphrase, agent-based |
 
-### NIS2
+### NIS2 (Directive 2022/2555)
 
 | Article | Requirement | Status | Notes |
 |---|---|---|---|
 | Art. 21(2)(d) | Supply chain security | Covered | Signed commits, GPG verification |
+| Art. 21(2)(i) | Human resources security | Covered | Named accounts, no shared credentials, audit trail |
 | Art. 21(2)(j) | Multi-factor auth | Partial | SSH key + passphrase = 2 factors. Authentik adds OIDC MFA later. |
+
+### GDPR (Regulation 2016/679)
+
+| Article | Requirement | Status | Notes |
+|---|---|---|---|
+| Art. 5(1)(f) | Integrity and confidentiality | Covered | Encrypted keys (passphrase), no plaintext credentials on disk |
+| Art. 25 | Data protection by design | Covered | Least privilege accounts, group-based access, local fallback isolated |
+| Art. 32 | Security of processing | Covered | SSH key + passphrase, agent-based auth, break-glass audit trail |
 
 ## References
 
 - ADR-0010: Naming & Identity Convention
 - ADR-0012: Environment Tier Standard
 - ADR-0031: CI Token & Identity Standard
-- Audit source: by-systems/odoo-install/ssh/ (git.sh, sshd-hardening-apply.sh)
