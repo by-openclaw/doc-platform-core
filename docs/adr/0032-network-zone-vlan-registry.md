@@ -13,19 +13,30 @@ ADR-0015 defined a PoC VLAN set (300-330) without a scalable zone taxonomy. The 
 
 ### 1. Network Segments — 11 confirmed
 
-| # | Segment | Purpose | Trust level | Internet | Notes |
-|---|---|---|---|---|---|
-| 1 | OOB | Hardware mgmt (iLO, iDRAC, switch console), break-glass | Highest | No | Never routed through FW |
-| 2 | MGMT | Platform admin, monitoring, Proxmox API, TF, Ansible | High | Via FW rules | Management plane |
-| 3 | DMZ | Public-facing services (Traefik, web) | Low | Yes (inbound + outbound) | Exposed to WAN |
-| 4 | SVC | Internal platform services + applications | Medium | Outbound only via FW | Not directly exposed |
-| 5 | FABRICS | Switch fabric control plane (Arista 7060/7020) | High | No | Isolated, vmbrFAB |
-| 6 | VPN | Remote access (WireGuard, OpenVPN, IPsec) + site-to-site | Medium | Via tunnel only | FW rules per tunnel |
-| 7 | IoT | Sensors, printers, smart devices | Untrusted | Restricted | No access to MGMT/SVC |
-| 8 | VoIP | Phone system (SIP, RTP) | Medium | SIP trunk only | QoS priority |
-| 9 | Storage | Ceph, NAS, backup traffic | High | No | Isolated, high bandwidth |
-| 10 | Media | TV, IPTV, OTT streaming, gaming | Untrusted | Yes | No access to internal |
-| 11 | CCTV | Security cameras, NVR | Isolated | No | Air-gapped from all other segments |
+| # | Segment | Purpose | Trust | Mask | Inter-VLAN | Internet | Notes |
+|---|---|---|---|---|---|---|---|
+| 1 | OOB | iLO, iDRAC, switch console, break-glass | Highest | /24 | NO | NO | Never routed through FW |
+| 2 | MGMT | Platform admin, monitoring, TF, Ansible | High | /24 | YES → SVC, DMZ | YES (updates) | Management plane |
+| 3 | DMZ | Public-facing services (Traefik, web) | Low | /24 | YES ← WAN | YES (in+out) | Exposed to WAN |
+| 4 | SVC | Internal platform services + apps | Medium | /24 | YES → DMZ | YES (outbound) | Not directly exposed |
+| 5 | FABRICS | Switch fabric control plane (Arista) | High | /24 | YES → via VRF leak | NO | GW through VRF on Arista |
+| 6 | VPN | Remote access (WG, OVPN, IPsec) + site-to-site | Medium | /24 | YES → per user | Via tunnel | FW rules per tunnel |
+| 7 | IoT | Sensors, printers, smart devices | Untrusted | /24 | NO | Restricted | No access to MGMT/SVC |
+| 8 | VoIP | Phone system (SIP, RTP) | Medium | /24 | NO | YES (SIP trunk) | QoS priority |
+| 9 | Storage | Ceph, NAS, backup traffic | High | /24 | YES → SVC only | NO | Data plane only |
+| 10 | Media | TV, IPTV, OTT streaming, gaming | Untrusted | /24 | NO | YES (streaming) | No access to internal |
+| 11 | CCTV | Security cameras, NVR | Isolated | /24 | NO | NO | Air-gapped |
+
+**All subnets /24 minimum.** No smaller masks.
+
+### Proxmox SDN Architecture
+
+- **SDN Zone (VLAN type):** L2 switching only — Proxmox does NO routing
+- **SDN VNet:** creates VLAN tag on vmbrAPPS bridge, appears as local interface
+- **SDN Subnet:** optional metadata in VLAN zones (IPAM reference, no gateway created)
+- **OPNsense** is the ONLY router: gateway, inter-VLAN routing, DHCP, DNS, FW rules, IPv4+IPv6
+- VMs on same VNet talk directly (L2, no gateway needed)
+- VMs on different VNets MUST go through OPNsense (FW rules decide)
 
 ### 2. VLAN Range Allocation
 
