@@ -11,7 +11,7 @@
 Terraform state (`terraform.tfstate`) is the source of truth for all managed infrastructure.
 Losing it means losing the ability to reconcile real infrastructure with config — forces destroy/recreate cycles.
 
-During PoC phase, state is stored locally on the Rune VM (`~/.openclaw/workspace/repos/infra-terraform-proxmox/environments/poc/`).
+During PoC phase, state is stored locally on the Rune VM (`~/repos/infra-terraform-proxmox/environments/poc/`).
 The Rune VM is ephemeral by nature (PoC, not HA). A remote backend is required to survive VM loss.
 
 ---

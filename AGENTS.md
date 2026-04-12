@@ -17,12 +17,12 @@ Before creating or editing anything in this repo:
 Before writing, editing, or reviewing any file in this repo, read:
 
 ### doc-platform-core repo:
-1. `/home/by-systems/.openclaw/workspace/repos/doc-platform-core/docs/standards/` — all standards files
-2. `/home/by-systems/.openclaw/workspace/repos/doc-platform-core/docs/adr/` — all Accepted ADRs
+1. `/home/by-systems/repos/doc-platform-core/docs/standards/` — all standards files
+2. `/home/by-systems/repos/doc-platform-core/docs/adr/` — all Accepted ADRs
 3. The ADR template for your scope: `doc-platform-core/docs/templates/adr-template-infra.md`
 
 ### lib repos (lib-synology-dsm etc.):
-1. `/home/by-systems/.openclaw/workspace/repos/lib-synology-dsm/docs/adr/` — lib-scoped ADRs only
+1. `/home/by-systems/repos/lib-synology-dsm/docs/adr/` — lib-scoped ADRs only
 2. The ADR template for your scope: `doc-platform-core/docs/templates/adr-template-lib.md`
 3. Platform standards are NOT binding on lib repos — but lib CISO sections must reference them
 
