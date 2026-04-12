@@ -1,6 +1,6 @@
 # AGENTS.md -- doc-platform-core
 
-> **Rules:** OPERATING-STANDARD.md (workspace) is mandatory for all agents, all sessions.
+> **Rules:** [OPERATING-STANDARD.md](https://github.com/by-openclaw/doc-platform-core/blob/main/OPERATING-STANDARD.md) is mandatory for all agents, all sessions. [SOUL.md](https://github.com/by-openclaw/doc-platform-core/blob/main/SOUL.md) · [USER.md](https://github.com/by-openclaw/doc-platform-core/blob/main/USER.md)
 
 Central documentation repository for the BY-SYSTEMS platform -- architecture, ADRs, stack reference, RAID, and naming conventions. **No code lives here.**
 
