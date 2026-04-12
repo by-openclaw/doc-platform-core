@@ -28,6 +28,7 @@ NNNN-short-title.md
 | Scope | Folder | Status |
 |---|---|---|
 | Identity (authentication, provisioning, machine creds, OS accounts) | [`identity/`](identity/) | Draft — 4 ADRs |
+| Git (workflow, platform strategy, configuration) | [`git/`](git/) | Draft — 3 ADRs |
 
 Flat ADRs are being migrated to scoped folders one scope at a time. See the refactor draft for the full plan.
 
@@ -38,7 +39,6 @@ Flat ADRs are being migrated to scoped folders one scope at a time. See the refa
 | [ADR-0001](0001-platform-stack-decisions.md) | Platform stack decisions | Accepted | 2026-03-29 |
 | [ADR-0002](0002-repository-structure-and-naming.md) | Repository structure and naming | Accepted | 2026-03-29 |
 | [ADR-0003](0003-issue-tracking-standard.md) | Issue tracking standard | Accepted | 2026-03-29 |
-| [ADR-0005](0005-vcs-and-cicd-strategy.md) | VCS and CI/CD strategy | Accepted | 2026-03-29 |
 | [ADR-0006](0006-platform-charter.md) | Platform charter (layer model) | Accepted | 2026-03-30 |
 | [ADR-0007](0007-automation-scripting-standard.md) | Automation & scripting standard | Accepted | 2026-03-30 |
 | [ADR-0008](0008-terraform-state-management.md) | Terraform state management | Accepted | 2026-03-30 |
