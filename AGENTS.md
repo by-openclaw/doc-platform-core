@@ -1,6 +1,5 @@
 # AGENTS.md -- doc-platform-core
 
-> **Rules:** See [OPERATING-STANDARD.md](~/.openclaw/workspace/OPERATING-STANDARD.md) for all platform rules.
 
 Central documentation repository for the BY-SYSTEMS platform -- architecture, ADRs, stack reference, RAID, and naming conventions. **No code lives here.**
 
