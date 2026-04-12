@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.0](https://github.com/by-openclaw/doc-platform-core/compare/v0.5.1...v0.6.0) (2026-04-11)
+
+
+### Features
+
+* add ADR-0032, ADR-0033, ADR-0034 ([424bd4b](https://github.com/by-openclaw/doc-platform-core/commit/424bd4beb7640ec38851e6b6d00030104e02c08a))
+
+
+### Bug Fixes
+
+* ADR-0027 update bootstrap for multi-WAN + svc-rune SSH ([dc201ee](https://github.com/by-openclaw/doc-platform-core/commit/dc201ee69eab36bf0c0635c2ff8f7881e7f71f26))
+* ADR-0032 add subnet masks, inter-VLAN routing, SDN architecture ([e12eeb4](https://github.com/by-openclaw/doc-platform-core/commit/e12eeb40eb491b9b3b9c92ba124128599c06b775))
+* ADR-0032 corrected VLAN scheme — prod 1001+, test 2001+ ([aa523a8](https://github.com/by-openclaw/doc-platform-core/commit/aa523a8cbcd2fb07380cdfba5fffc19a408b2a1f))
+* ADR-0033 NOPASSWD forbidden, add svc-ansible account ([13f16d7](https://github.com/by-openclaw/doc-platform-core/commit/13f16d76cfa2cd60ede3cf3e4a04db48c13380d0))
+* ADR-0033 remove application-specific references, add GDPR ([9ae3799](https://github.com/by-openclaw/doc-platform-core/commit/9ae3799c516a5e785398f915a9c226492ae32d04))
+* **adr:** resolve 3 critical audit findings ([e60e05c](https://github.com/by-openclaw/doc-platform-core/commit/e60e05cefce9f47cff8d04e08b11bedecbbcf4cf))
+* **docs:** canonical FQDN pattern, pin Docker images, fix RAM, standardize org placeholder ([85b6b2c](https://github.com/by-openclaw/doc-platform-core/commit/85b6b2c488194ceecf68da6c7e7362fb704a41dd))
+* **docs:** canonical FQDN pattern, pin Docker images, fix RAM, standardize org placeholder ([4e179cf](https://github.com/by-openclaw/doc-platform-core/commit/4e179cfe0db2e1ec5cb93b5cce90aa6708b25f5a))
+* **network:** vmbrOOB uses VLAN 300 (10.1.0.0/24) not 10.6.224.x ([388d0aa](https://github.com/by-openclaw/doc-platform-core/commit/388d0aa731e395d4db925554293ae10fbf24cef8))
+* revert Redis image to redis:7.2.7-alpine (BSD-3) — 7.4+ is RSALv2/SSPL (R-25) ([ddd532d](https://github.com/by-openclaw/doc-platform-core/commit/ddd532d2daca03b9f8799898f074fec187f40f7d))
+* **sdn:** replace env-prefixed VNet names with agnostic standard ([e2cdc70](https://github.com/by-openclaw/doc-platform-core/commit/e2cdc70b73d32e3550f1207a3405f85a3b6ea254))
+
 ## [Unreleased]
 
 ### Changed
