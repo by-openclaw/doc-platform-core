@@ -1,5 +1,6 @@
 # AGENTS.md -- doc-platform-core
 
+> **Rules:** OPERATING-STANDARD.md (workspace) is mandatory for all agents, all sessions.
 
 Central documentation repository for the BY-SYSTEMS platform -- architecture, ADRs, stack reference, RAID, and naming conventions. **No code lives here.**
 
