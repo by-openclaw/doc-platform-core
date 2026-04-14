@@ -38,7 +38,7 @@ No other rule applies. No per-service exception. If a service cannot decide its 
 
 | Env tier | Typical domain | CA |
 |---|---|---|
-| `poc`, `dev`, `test` | IANA-reserved (`example.com`) or internal-only zone | step-ca |
+| `dev`, `test` | IANA-reserved (`example.com`) or internal-only zone | step-ca |
 | `staging`, `acc` | Real domain, internal exposure only | step-ca (default) or LE (if publicly reachable) |
 | `prod` | Real domain, publicly reachable | LE |
 | `drp` | Same as prod | LE (must be issuable during DR — Cloudflare DNS-01 does not depend on primary site availability) |
