@@ -1,25 +1,32 @@
-# RAID.md — doc-platform-core
+# RAID.md — `doc-platform-core`
 
-> **Scope:** Platform-wide risks, issues, actions, and dependencies tracked at the doc-platform-core level.
-> **Detailed per-component RAID:** see each repo's own RAID.md
-> **Full platform RAID:** `docs/raid.md` (88+ items)
+> **Scope:** Platform-wide risks, issues, actions, and dependencies tracked at the `doc-platform-core` level.
+> **Detailed per-component RAID:** see each repo's own `RAID.md`
+> **Full platform RAID:** [`docs/raid.md`](docs/raid.md)
 
 ---
 
-## Open Items
+## Open items
 
 | ID | Type | Description | Severity | Owner | Status |
 |---|---|---|---|---|---|
-| R-PC-01 | RISK | RAID location conflict: ADR-0003 (centralized) vs ADR-0004 (per-repo hybrid) — resolved by ADR-0004 amendment | LOW | @yboujraf | ✅ Resolved (2026-03-30) |
-| R-PC-02 | RISK | ADR-0006 layer status stale — parallel Layer 4 dev not documented as exception | LOW | @yboujraf | ✅ Resolved — exception documented in status.md |
-| I-PC-01 | ISSUE | Gap report (lib-synology-dsm-gap-report-2026-03-29.md) was superseded | LOW | Rune | ✅ Resolved — archived 2026-03-30 |
-| I-PC-02 | ISSUE | No live platform status view | MEDIUM | Rune | ✅ Resolved — docs/status.md created 2026-03-30 |
-| R-PC-03 | RISK | ADR-0010 naming convention not yet enforced across all repos — service accounts, groups, and env labels have gaps | MEDIUM | @yboujraf | 🔄 Open — tracked per-repo in RAID.md |
-| R-PC-04 | RISK | CLAUDE.md/AGENTS.md did not reference ADR-0010/ADR-0012 | LOW | Rune | 🔄 In Progress — fixing in sprint Block 3 |
-| D-PC-01 | DEPENDENCY | doc-platform-core templates must stay in sync with per-repo audits | MEDIUM | @yboujraf | 🔄 Open — Tier 2 backport pending |
+| D-PC-01 | DEPENDENCY | `doc-platform-core` templates (`docs/templates/*.tpl.md`) must stay in sync with per-repo `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` improvements — backport pattern | MEDIUM | @yboujraf | 🔄 Open |
 
 ---
 
-## Resolved Items
+## Resolved items
 
-See `docs/raid.md` for the full historical RAID register (88+ items).
+| ID | Type | Description | Resolved |
+|---|---|---|---|
+| R-PC-01 | RISK | RAID location conflict: centralized vs per-repo hybrid — resolved via per-repo `RAID.md` + platform-wide `docs/raid.md` split, now captured in `OPERATING-STANDARD.md §3.2 File ownership` and `§7 Issue & Project Tracking` | 2026-03-30 |
+| R-PC-02 | RISK | Layer status stale — parallel Layer 4 library dev not documented as exception | 2026-03-30 — exception documented in `docs/adr/infra/0002-platform-charter §Parallel development exception` |
+| I-PC-01 | ISSUE | Gap report (`lib-synology-dsm-gap-report-2026-03-29.md`) was superseded | 2026-03-30 — archived |
+| I-PC-02 | ISSUE | No live platform status view | 2026-03-30 — `docs/status.md` created |
+| R-PC-03 | RISK | Naming convention not yet enforced across all repos — service accounts, groups, env labels had gaps | 2026-04-14 — naming is now enforced by 4 scoped ADRs: `naming/0001-infra`, `naming/0002-identity`, `naming/0003-firewall`, `naming/0004-automation`. Stability rule in `naming/0001-infra §10` forbids env in hostnames. Per-repo `CLAUDE.md` updates are tracked as a separate follow-up. |
+| R-PC-04 | RISK | `CLAUDE.md` / `AGENTS.md` did not reference ADR-0010 / ADR-0012 | 2026-04-14 — top-level metadata files refreshed in PR #39 to reference scoped ADRs (`naming/0001-infra`, `infra/0005-environment-tiers`). Per-repo CLAUDE.md cross-repo updates remain as a follow-up. |
+
+---
+
+## Full history
+
+See [`docs/raid.md`](docs/raid.md) for the full platform-wide RAID register, which tracks items that span multiple repos or the platform as a whole. This file holds only items specific to `doc-platform-core` itself.
