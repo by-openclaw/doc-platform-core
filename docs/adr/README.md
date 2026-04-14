@@ -30,7 +30,7 @@ NNNN-short-title.md
 | Identity (authentication, provisioning, machine creds, OS accounts) | [`identity/`](identity/) | Draft — 4 ADRs |
 | Git (workflow, platform strategy, configuration) | [`git/`](git/) | Draft — 3 ADRs |
 | Naming (infra, identity, firewall, automation) | [`naming/`](naming/) | Draft — 4 ADRs |
-| Security (secret storage, compliance, hardening, certificates) | [`security/`](security/) | Draft — 4 ADRs |
+| Security (secret storage, compliance, hardening, certificates, licensing) | [`security/`](security/) | Draft — 5 ADRs |
 | Infra (stack, charter, terraform, network, env tiers, logging, monitoring, backup) | [`infra/`](infra/) | Draft — 8 ADRs |
 | Services (opnsense, email, netbox CMDB, database strategy) | [`services/`](services/) | Draft — 4 ADRs |
 | Lib — Python (design standard) | [`lib/python/`](lib/python/) | Draft — 1 ADR |
@@ -44,4 +44,3 @@ Flat ADRs are being migrated to scoped folders one scope at a time. See the refa
 | [ADR-0002](0002-repository-structure-and-naming.md) | Repository structure and naming | Split: naming part already in `naming/0004-automation`; structure part → `OPERATING-STANDARD.md` |
 | [ADR-0003](0003-issue-tracking-standard.md) | Issue tracking standard | Archive — already in `OPERATING-STANDARD.md §7` |
 | [ADR-0007](0007-automation-scripting-standard.md) | Automation & scripting standard | Archive — already in `OPERATING-STANDARD.md` |
-| [ADR-0022](0022-licensing-policy.md) | Open source licensing policy | `security/0005-licensing-policy` (follow-up — licensing is a compliance concern, not a service) |
