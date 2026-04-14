@@ -156,7 +156,7 @@ gitlab              IN  CNAME  vm-trfk-01.by-research.be.
 
 Browser resolves `gitlab.by-research.be` → CNAME `vm-trfk-01.by-research.be.` → A/AAAA → hits Traefik on v4 **or** v6 → Host-header routed to `vm-glab-01`. Same flow on IPv4 and IPv6 simultaneously.
 
-**Non-prod example (poc):** every record above shifts into `*.poc.by-research.be` zone. CNAME becomes `gitlab.poc.by-research.be → vm-trfk-01.poc.by-research.be.`. Dual-stack rule still applies.
+**Non-prod example (dev):** every record above shifts into `*.dev.by-research.be` zone. CNAME becomes `gitlab.dev.by-research.be → vm-trfk-01.dev.by-research.be.`. Dual-stack rule still applies.
 
 ### 7. Environment sub-domain
 
@@ -164,30 +164,31 @@ Env does **not** appear in the NetBox `name`. Env is expressed via the **DNS zon
 
 | Env | Asset FQDN | Service URL |
 |---|---|---|
-| prod | `vm-glab-01.by-research.be` | `gitlab.by-research.be` |
-| poc  | `vm-glab-01.poc.by-research.be` | `gitlab.poc.by-research.be` |
-| dev  | `vm-glab-01.dev.by-research.be` | `gitlab.dev.by-research.be` |
-| test | `vm-glab-01.test.by-research.be` | `gitlab.test.by-research.be` |
-| acc  | `vm-glab-01.acc.by-research.be` | `gitlab.acc.by-research.be` |
-| drp  | `vm-glab-01.drp.by-research.be` | `gitlab.drp.by-research.be` |
+| prod    | `vm-glab-01.by-research.be` | `gitlab.by-research.be` |
+| dev     | `vm-glab-01.dev.by-research.be` | `gitlab.dev.by-research.be` |
+| test    | `vm-glab-01.test.by-research.be` | `gitlab.test.by-research.be` |
+| staging | `vm-glab-01.staging.by-research.be` | `gitlab.staging.by-research.be` |
+| acc     | `vm-glab-01.acc.by-research.be` | `gitlab.acc.by-research.be` |
+| drp     | `vm-glab-01.drp.by-research.be` | `gitlab.drp.by-research.be` |
 
 **Rules:**
 - Prod env sub-domain is **omitted** from DNS zones — prod is clean
 - All non-prod envs inject an env sub-domain between hostname and domain
 - The NetBox `name` field is **the same** across all envs — only the DNS zone changes
-- Env migration (e.g. poc → prod) = update NetBox `env` custom field + move the DNS records to a different zone. **No rename.**
-- Tier definitions (`poc`, `dev`, `test`, `staging`, `acc`, `prod`, `drp`) are in `infra/0005-environment-tiers`. This ADR uses the tokens, does not define them.
+- Env migration (e.g. `dev` → `prod`) = update NetBox `env` custom field + move the DNS records to a different zone. **No rename.**
+- Tier definitions (`dev`, `test`, `staging`, `acc`, `prod`, `drp`) are in `infra/0005-environment-tiers`. This ADR uses the tokens, does not define them. **`poc` is not a tier** — it was historically conflated with a hostname label and has been dropped from the tier model.
 
 ### 8. Wildcard TLS certificates
 
 One wildcard certificate per DNS zone covers both asset FQDNs and service URLs:
 
 ```
-*.by-research.be        → prod (asset + service)
-*.poc.by-research.be    → poc
-*.dev.by-research.be    → dev
-*.drp.by-research.be    → drp
-... etc.
+*.by-research.be         → prod (asset + service)
+*.dev.by-research.be     → dev
+*.test.by-research.be    → test
+*.staging.by-research.be → staging
+*.acc.by-research.be     → acc
+*.drp.by-research.be     → drp
 ```
 
 Certificate issuance and renewal strategy is in `security/0004-certificate-strategy` (future).
@@ -208,7 +209,7 @@ Examples:
 | Deployment | `{domain}` resolves to |
 |---|---|
 | BY-SYSTEMS prod | `by-research.be` |
-| BY-SYSTEMS poc | `by-research.be` (same domain, env sub-domain `poc.`) |
+| BY-SYSTEMS dev | `by-research.be` (same domain, env sub-domain `dev.`) |
 | Future client deployment | `client-xyz.com` (different domain entirely) |
 
 No ADR change is required when a domain changes — update the deployment manifest only.
@@ -219,7 +220,7 @@ No ADR change is required when a domain changes — update the deployment manife
 
 Names must survive relocation, env migration, hypervisor change, and role reassignment without requiring a rename. The following **must not** appear in the hostname:
 
-- Environment tier (`poc`, `dev`, `prod`) — lives in NetBox `env` field and DNS zone
+- Environment tier (`dev`, `test`, `prod`, etc.) — lives in NetBox `env` field and DNS zone
 - Functional role beyond the service code (e.g. no `-master-` / `-primary-` / `-worker-`) — lives in NetBox `role` / `tags`
 - Redundancy position (`-a`, `-b`, `-main`, `-backup`) — lives in NetBox `tags` or a dedicated custom field
 - Physical site when the asset is virtual — lives in NetBox `site` field (the 2-char `site` code in the name is the **logical** site, not the physical rack)

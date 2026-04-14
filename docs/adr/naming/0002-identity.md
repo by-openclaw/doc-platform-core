@@ -51,7 +51,7 @@ Examples:
 | Account | Function | Env |
 |---|---|---|
 | `svc-terraform-prod` | Terraform runs | prod |
-| `svc-terraform-poc` | Terraform runs | poc |
+| `svc-terraform-dev` | Terraform runs | dev |
 | `svc-ansible-prod` | Ansible runs | prod |
 | `svc-rune-prod` | Rune ops automation | prod |
 | `svc-vault-agent-prod` | Vault agent sidecar | prod |
@@ -76,7 +76,7 @@ Examples:
 | Account | Purpose | Env |
 |---|---|---|
 | `tmp-audit-nis2-prod` | NIS2 auditor read-only access | prod |
-| `tmp-migration-mailcow-poc` | One-off Mailcow data migration | poc |
+| `tmp-migration-mailcow-dev` | One-off Mailcow data migration | dev |
 | `tmp-contractor-acme-dev` | Acme Corp contractor | dev |
 
 **Rules:**
@@ -124,7 +124,7 @@ The passphrase itself is never stored on disk and never carried in the account. 
 **Consequences:**
 
 - No `svc-*` account has a usable key without access to HashiCorp Vault. Vault compromise = key passphrase compromise.
-- Vault access for passphrase retrieval uses per-env AppRole / policy scopes — `svc-rune-poc` cannot read `svc-rune-prod` secrets.
+- Vault access for passphrase retrieval uses per-env AppRole / policy scopes — `svc-rune-dev` cannot read `svc-rune-prod` secrets.
 - Key rotation = rotate key **and** passphrase **and** update Vault record, all together.
 - Credential storage paths are defined in `security/0001-secret-storage` (future, from flat 0011+0016).
 
@@ -140,7 +140,7 @@ Both use Vault-backed passphrases. The distinction is operational, not cryptogra
 | `docker` group | ✅ on container hosts | ❌ |
 | Blast radius | Interactive ops | Automation-scoped (what playbooks can do) |
 
-If either credential leaks, the attacker gains only that account's Vault scope — `svc-rune-poc` compromise does not unlock `svc-rune-prod`, nor `svc-ansible-*`, nor break-glass. **No passphrase-less key exists anywhere on the platform to exploit.**
+If either credential leaks, the attacker gains only that account's Vault scope — `svc-rune-dev` compromise does not unlock `svc-rune-prod`, nor `svc-ansible-*`, nor break-glass. **No passphrase-less key exists anywhere on the platform to exploit.**
 
 #### 5.2 Role groups — explicitly created for a function
 
@@ -190,7 +190,7 @@ Example future groups:
 | Group | Purpose |
 |---|---|
 | `grp-prod-dbadmin` | Database admins, prod env only |
-| `grp-poc-netadmin` | Network admins, poc env only |
+| `grp-dev-netadmin` | Network admins, dev env only |
 
 **Rules for platform RBAC groups:**
 - `grp-` prefix distinguishes them from Linux system groups (§5)

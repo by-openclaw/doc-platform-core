@@ -49,17 +49,17 @@ secret/{env}/{service}/{key}
 
 | Segment | Values | Notes |
 |---|---|---|
-| `env` | `poc`, `dev`, `test`, `staging`, `acc`, `prod`, `drp` | Environment tier — see `infra/0005-environment-tiers` (future) |
+| `env` | `dev`, `test`, `staging`, `acc`, `prod`, `drp` | Environment tier — see `infra/0005-environment-tiers` (6 tiers, no `poc`) |
 | `service` | Service short code | Matches the service token in `naming/0001-infra §5` (e.g. `authentik`, `gitlab`, `netbox`, `svc-rune`, `svc-ansible`) |
 | `key` | Key name | Lowercase, hyphen-separated |
 
 **Examples:**
 
 ```
-secret/poc/authentik/admin-password
+secret/dev/authentik/admin-password
 secret/prod/gitlab/admin-password
 secret/prod/netbox/secret-key
-secret/poc/postgres/superuser-password
+secret/dev/postgres/superuser-password
 secret/prod/traefik/cloudflare-api-token
 secret/prod/svc-rune/ssh-passphrase
 secret/prod/svc-ansible/ssh-passphrase
@@ -70,7 +70,7 @@ secret/prod/authentik/webhook-secret
 **Rules:**
 
 1. **No root-level paths.** `secret/authentik-password` is banned — every path has the 3-segment structure.
-2. **Env is always explicit.** No shared secrets across envs — `secret/poc/...` and `secret/prod/...` are fully independent.
+2. **Env is always explicit.** No shared secrets across envs — `secret/dev/...` and `secret/prod/...` are fully independent.
 3. **Service short code matches NetBox service vocabulary** (see `naming/0001-infra §5` and `services/0003-netbox-cmdb` when deployed).
 4. **Keys are lowercase, hyphen-separated.** No underscores, no CamelCase.
 5. **Structured secrets (JSON blobs) are stored as single KV values** — individual fields accessible via `vault kv get -field=...`. Never split a single logical credential across multiple KV paths.
@@ -80,18 +80,18 @@ secret/prod/authentik/webhook-secret
 Each service has a dedicated Vault policy scoped to its own path prefix:
 
 ```hcl
-# policy: gitlab-poc
-path "secret/data/poc/gitlab/*" {
+# policy: gitlab-dev
+path "secret/data/dev/gitlab/*" {
   capabilities = ["read"]
 }
-path "secret/metadata/poc/gitlab/*" {
+path "secret/metadata/dev/gitlab/*" {
   capabilities = ["list"]
 }
 ```
 
 **Rules:**
 
-1. **No policy grants cross-service access.** `gitlab` cannot read `netbox` secrets, `svc-rune-poc` cannot read `svc-rune-prod`.
+1. **No policy grants cross-service access.** `gitlab` cannot read `netbox` secrets, `svc-rune-dev` cannot read `svc-rune-prod`.
 2. **Least privilege always.** Read is default; write is granted only to rotation workflows.
 3. **AppRole auth method** for service accounts — per-env role_id + wrapped secret_id, rotation-ready.
 4. **Root token revoked** immediately after init. Unseal keys in encrypted cold storage, never in the running cluster.
