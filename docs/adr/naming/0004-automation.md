@@ -23,12 +23,19 @@ Pattern: `{type}-{product}` — all lowercase, hyphen-separated, no underscores.
 | `ansible` | Ansible collection | `ansible-opnsense`, `ansible-platform` |
 | `infra` | Terraform root or module repo | `infra-terraform-proxmox`, `infra-terraform-contabo` |
 | `doc` | Documentation | `doc-platform-core` |
-| `platform` | Platform config / runbooks | `platform-setup` |
+| `platform` | Platform config / runbooks (monorepo) | `platform-setup` |
+| `svc` | Application service — own code, CI/CD, releases | `svc-orders-api`, `svc-media-gateway` |
+| `k8s` | Kubernetes manifests + Helm charts | `k8s-platform`, `k8s-svc-orders-api` |
+| `ci-templates` | Shared GitLab CI pipeline templates | `ci-templates` (single repo, no suffix) |
 
 **Rules:**
 - One repo per (type, product) pair
 - No `by-` or org-prefix in repo name (org is set by GitHub/GitLab path, not by naming)
 - Hyphens only — no underscores, no CamelCase
+- **`platform-setup` is a monorepo** — all tool configs, runbooks, install scripts, security hardening, and log configs live under `platform-setup/tools/{tool-name}/`. Each tool follows the same internal folder structure (`config/`, `scripts/`, `security/`, `runbooks/`, `log/`). Docker Compose files for that tool are colocated. Adding a new tool = new folder under `platform-setup/tools/`, not a new repo.
+- **`svc-*` repos are per-service**, not monorepo. Each application service owns its own code, its own CI/CD pipeline, its own releases, and its own `docs/` (architecture, runbook, API). Service documentation stays in the service repo — `doc-platform-core` covers platform-level docs only.
+- **`k8s-*` repos** hold Kubernetes manifests and Helm charts. One per application or per service cluster — never a catch-all "`k8s` monorepo".
+- **`ci-templates`** is a single repo at the org level containing shared GitLab CI pipeline templates. Every `svc-*` and `infra-*` repo includes from this repo via the `include:` directive (see `git/0002-platform-strategy §CI templates include pattern`).
 
 ### 2. Python package naming
 
