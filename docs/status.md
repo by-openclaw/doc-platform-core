@@ -62,8 +62,7 @@ Per [`docs/raid.md`](raid.md) and the scoped ADRs' `§Pending decisions` / `§De
 | 2 | **HashiCorp Vault deployment** | Layer 2 complete → unblocks Layers 3, 4, 5 | [`security/0001-secret-storage`](adr/security/0001-secret-storage.md) + [`infra/0002-platform-charter §Layer 2`](adr/infra/0002-platform-charter.md) |
 | 3 | **step-ca deployment + `ca-trust` Ansible role** | All internal TLS services — missing root CA distribution silently breaks every internal HTTPS client | [`security/0004-certificate-strategy §Root CA distribution`](adr/security/0004-certificate-strategy.md) |
 | 4 | **11 `⚠ TBD` thresholds** in `infra/0008-backup-strategy` | Backup policy cannot be fully automated until thresholds are locked (off-site target, schedules, retention, RTO, drill cadence, KMS) | [`infra/0008-backup-strategy §Pending decisions`](adr/infra/0008-backup-strategy.md) |
-| 5 | **6 `⚠ TBD` thresholds** in `security/0003-hardening` | Patch cadence, Lynis score, Trivy CVE gate, filesystem policy, retention, Lynis scope | [`security/0003-hardening §Pending decisions`](adr/security/0003-hardening.md) |
-| 6 | **4 deferred decisions** in `services/0004-database-strategy` | PostgreSQL pooler choice (`pgbouncer` vs `pgpool-II`), Patroni DCS (`etcd` vs `Consul`), Sentinel colocation, Redis replica count | [`services/0004-database-strategy §Deferred decisions`](adr/services/0004-database-strategy.md) |
+| 5 | **4 deferred decisions** in `services/0004-database-strategy` | PostgreSQL pooler choice (`pgbouncer` vs `pgpool-II`), Patroni DCS (`etcd` vs `Consul`), Sentinel colocation, Redis replica count | [`services/0004-database-strategy §Deferred decisions`](adr/services/0004-database-strategy.md) |
 
 ---
 
@@ -71,6 +70,7 @@ Per [`docs/raid.md`](raid.md) and the scoped ADRs' `§Pending decisions` / `§De
 
 | Date | What changed |
 |---|---|
+| 2026-04-14 | `security/0003-hardening` moved from Draft to **Accepted** — all 6 thresholds locked (patch cadence, Lynis ≥80, Trivy zero-crit-zero-high, read-only root + tmpfs, 180d audit retention, Lynis Linux-only). |
 | 2026-04-14 | **Refactor complete.** Loose `docs/` files archived (PR #38). Top-level repo metadata refreshed (PR #40) — `SOUL.md` + `USER.md` deleted as workspace duplicates per `OPERATING-STANDARD.md §3.2`. `docs/status.md`, `roadmap.md`, `raid.md` refreshed (this PR). |
 | 2026-04-14 | Scoped ADR refactor merged — the final 12 PRs (#13 through #36) split 34 flat ADRs into 30 scoped ADRs across 7 scopes (identity / git / naming / security / infra / services / lib-python). `OPERATING-STANDARD.md §4.4` added (PR Content Standard). `OPERATING-STANDARD.md §§5.3.1–5.3.6` added (script-writing patterns from archived flat ADR-0007). |
 | 2026-04-13 | Identity / git / naming / security / infra / services / lib refactors merged. `poc` dropped as env tier — 6 tiers only (`dev` / `test` / `staging` / `acc` / `prod` / `drp`). HA database clusters from day 1 per [`services/0004-database-strategy`](adr/services/0004-database-strategy.md). |

@@ -1,7 +1,7 @@
 # security/0003 — Platform Hardening Baseline
 
-**Status:** Draft — several policy thresholds pending (`⚠ TBD` in §Pending decisions)
-**Date:** 2026-04-13 (supersedes flat ADR-0021, 2026-04-02)
+**Status:** Accepted
+**Date:** 2026-04-14 (thresholds locked; supersedes flat ADR-0021, 2026-04-02)
 **Scope:** Platform-wide hardening baseline — non-root processes, image hygiene, patch cadence, scanning gates, audit logging.
 **Related:** `security/0001-secret-storage`, `security/0004-certificate-strategy`, `identity/0004-os-accounts §5` (SSH break-glass), `git/0003-configuration`, `infra/0006-logging` (future)
 
@@ -49,46 +49,59 @@ See `security/0001-secret-storage` for Vault path conventions.
 
 Trivy runs in every repo that builds a container image. A CI gate blocks image promotion if the severity threshold is exceeded.
 
-**Gate threshold:** ⚠ **TBD** — see §Pending decisions
+**Gate threshold:** **Zero critical + zero high.** Any critical or high CVE fails the build. Medium and low are reported but non-blocking.
 
 **Rules:**
 - Trivy runs on every PR against the main branch
 - Scan targets: OS packages, language dependencies, config misconfigurations, and secrets
 - Scan results are archived per build for evidence
-- Suppression (`.trivyignore`) requires a documented justification per suppression entry
+- Suppression (`.trivyignore`) requires a documented justification **per suppression entry** (CVE ID, reason, expiry date)
+- Expired suppressions re-fail the gate automatically on next run
 
 ### 5. Host hardening — Lynis
 
 Lynis runs on every host VM (Linux) as part of the Ansible `hardening` role. Minimum hardening score is enforced.
 
-**Lynis score target:** ⚠ **TBD** — see §Pending decisions
+**Lynis score target:** **≥ 80** (strong baseline). Score below 80 fails the Ansible playbook.
 
 **Rules:**
 - Lynis runs as part of the hardening Ansible role (`ansible-platform/roles/hardening`)
 - Report is collected post-run and archived
-- Score below threshold fails the playbook
+- Score below 80 fails the playbook — the host is not considered hardened
+- **Scope:** Linux hosts only. Container images are covered by Trivy (§4), not Lynis — no overlap
+- Lynis runs again on every `ansible-platform` apply, not just initial provisioning
 
 ### 6. Patch cadence
 
 Critical and high-severity CVEs must be patched within defined windows from public disclosure.
 
-**Patch windows:** ⚠ **TBD** — see §Pending decisions
+**Patch windows (from public CVE disclosure):**
+
+| Severity | Window |
+|---|---|
+| Critical | ≤ 72 hours |
+| High | ≤ 7 days |
+| Medium | ≤ 30 days |
+| Low | ≤ 90 days |
 
 **Rules:**
 - Patching is automated where possible (Ansible `hardening` role, unattended-upgrades, container image rebuild)
 - Deviations from cadence must be documented in a per-service exception with expiry date
-- Incident response activates if a critical CVE cannot be patched within window (see NIS2 Art. 21(2)(b) — incident handling)
+- A critical CVE that cannot be patched within 72h activates incident response per NIS2 Art. 21(2)(b)
+- Patch status is tracked by Trivy (§4) on next CI run — no separate tracker needed
 
 ### 7. Filesystem policy
 
-Container root filesystems are read-only where feasible; writable paths use `tmpfs` or explicit volume mounts.
+Container root filesystems are **read-only by default**. Writable paths use `tmpfs` or explicit named volumes.
 
-**Filesystem mode:** ⚠ **TBD** — see §Pending decisions
+**Filesystem mode:** **Read-only root + `tmpfs` for `/tmp`, `/run`, `/var/run`.** Any additional writable path must be declared explicitly per service.
 
-**Rules (once policy is defined):**
-- `docker run --read-only` or equivalent k8s SecurityContext
-- Writable paths declared explicitly per service
+**Rules:**
+- `docker run --read-only` or equivalent Kubernetes `SecurityContext.readOnlyRootFilesystem: true`
+- `tmpfs` mounts for `/tmp`, `/run`, `/var/run` are added by default via the platform Compose/Helm templates
+- Additional writable paths must be declared per service and justified in the service's `docs/hardening.md`
 - Persistent state uses named volumes, never bind mounts into container paths
+- Exceptions (writable root) are written to the per-service `docs/override-hardening.md` and reviewed annually (same rule as §1)
 
 ### 8. Audit logging
 
@@ -98,7 +111,7 @@ All administrative actions are logged. Log destination is Loki (see `infra/0006-
 - Host-level auditd enabled on all VMs, forwarded to Loki via promtail
 - SSH session activity logged via sshd + PAM, forwarded to Loki
 - Bastion / jump host session recording via Teleport (future — see revision triggers)
-- Audit log retention: minimum 90 days, matching NIS2 Art. 23 incident notification windows
+- Audit log retention: **180 days** (doubles the NIS2 Art. 23 minimum; matches ISO 27001 auditor expectations)
 - Audit logs themselves are immutable from the perspective of platform service accounts — write-once to Loki
 
 ### 9. SSH hardening
@@ -119,20 +132,20 @@ Current baseline targets **Linux** hosts provisioned via SSH. When **Windows 11 
 
 Until then, Windows hosts are out of scope of this baseline.
 
-## Pending decisions
+## Locked thresholds (history)
 
-The following policy thresholds must be set by @yboujraf before this ADR moves from Draft to Accepted.
+All six thresholds were locked on 2026-04-14, moving this ADR from Draft to Accepted.
 
-| # | Decision | Options / reference | Status |
+| # | Decision | Locked value | Locked on |
 |---|---|---|---|
-| 1 | **Patch cadence — critical CVE** | e.g. `critical ≤ 72h`, `high ≤ 7d`, `medium ≤ 30d` | ⚠ TBD |
-| 2 | **Lynis minimum score** | Typical values: `≥ 70` (baseline), `≥ 80` (strong), `≥ 90` (strict) | ⚠ TBD |
-| 3 | **Trivy CVE gate threshold** | Typical values: `zero critical`, `zero critical + zero high`, `zero critical + ≤5 high with SLA` | ⚠ TBD |
-| 4 | **Filesystem policy — read-only root?** | `read-only root, tmpfs for /tmp /run` vs `writable with no-new-privileges only` | ⚠ TBD |
-| 5 | **Audit log retention** | Current target `≥ 90 days` (NIS2 minimum) — confirm or extend | ⚠ Proposed |
-| 6 | **Lynis scope** | Linux hosts only, or include container base images via `lynis audit system --profile ...`? | ⚠ TBD |
+| 1 | Patch cadence | critical ≤ 72h · high ≤ 7d · medium ≤ 30d · low ≤ 90d | 2026-04-14 |
+| 2 | Lynis minimum score | ≥ 80 | 2026-04-14 |
+| 3 | Trivy CVE gate | zero critical + zero high (per-entry `.trivyignore` with expiry) | 2026-04-14 |
+| 4 | Filesystem policy | read-only root + tmpfs for `/tmp`, `/run`, `/var/run` | 2026-04-14 |
+| 5 | Audit log retention | 180 days | 2026-04-14 |
+| 6 | Lynis scope | Linux hosts only (containers via Trivy §4) | 2026-04-14 |
 
-**Rule:** until each decision is locked, the corresponding section above carries the `⚠ TBD` marker. Once a decision is made, this ADR is amended and the marker removed. Partial decisions are better than none — do not block the entire ADR on one unresolved threshold.
+Any future change to a locked value requires a new ADR revision per §Revision triggers.
 
 ## Consequences
 
@@ -142,7 +155,7 @@ The following policy thresholds must be set by @yboujraf before this ADR moves f
 - **Secret leakage via image layers is eliminated** — no plaintext secrets in Dockerfiles or env vars
 - **Baseline is uniform across services** — per-service `docs/hardening.md` extends with service-specific additions, but never relaxes the baseline
 - **Windows is deferred** — cross-OS hardening is amended when WinRM hosts are introduced
-- **Known gap until §Pending decisions are locked:** several policy thresholds are placeholders. Incident response SLA cannot be fully automated until cadence + Lynis + Trivy thresholds are set.
+- **Incident response SLA is fully automatable** — the patch cadence + Trivy gate + Lynis threshold define a measurable window from CVE disclosure to enforced fix
 
 ## Revision triggers
 
@@ -160,6 +173,6 @@ Revise when:
 
 | Framework | Controls covered |
 |---|---|
-| ISO 27001:2022 | A.8.8 (technical vulnerabilities — ⚠ partial, thresholds TBD), A.8.9 (configuration management), A.8.15 (logging), A.8.25 (secure development lifecycle — ⚠ partial, Trivy gate TBD) |
-| NIS2 | Art. 21(2)(e) (network and information systems security — ⚠ partial), Art. 21(2)(h) (basic cyber hygiene) |
-| GDPR | Art. 32(1)(b) (ongoing confidentiality, integrity, availability — ⚠ partial) |
+| ISO 27001:2022 | A.8.8 (technical vulnerabilities), A.8.9 (configuration management), A.8.15 (logging), A.8.25 (secure development lifecycle) |
+| NIS2 | Art. 21(2)(e) (network and information systems security), Art. 21(2)(h) (basic cyber hygiene) |
+| GDPR | Art. 32(1)(b) (ongoing confidentiality, integrity, availability) |
