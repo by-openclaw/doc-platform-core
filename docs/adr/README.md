@@ -33,6 +33,7 @@ NNNN-short-title.md
 | Security (secret storage, compliance, hardening, certificates) | [`security/`](security/) | Draft — 4 ADRs |
 | Infra (stack, charter, terraform, network, env tiers, logging, monitoring, backup) | [`infra/`](infra/) | Draft — 8 ADRs |
 | Services (opnsense, email, netbox CMDB, database strategy) | [`services/`](services/) | Draft — 4 ADRs |
+| Lib — Python (design standard) | [`lib/python/`](lib/python/) | Draft — 1 ADR |
 
 Flat ADRs are being migrated to scoped folders one scope at a time. See the refactor draft for the full plan.
 
