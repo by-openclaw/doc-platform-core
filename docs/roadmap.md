@@ -1,350 +1,191 @@
-# ORG DevOps Platform — Roadmap
-**Last updated:** 2026-03-25
-**Status:** Active — PoC phase
-**Document type:** `roadmap`
+# Platform Roadmap
 
-> Practical, phased delivery plan for the ORG internal DevOps PoC.
-> Each phase must be fully operational before the next begins.
-> Naming conventions follow `docs/naming-convention.md`. Stack follows `docs/stack.md`.
+> **Last updated:** 2026-04-14
+> **Maintained by:** Rune — update when a layer advances or a scoped ADR changes the plan
+> **Reading order:** [`status.md`](status.md) → this file → [`docs/adr/README.md`](adr/README.md)
 
----
+Forward-looking delivery plan for the BY-SYSTEMS platform. Structure follows the 6-layer model in [`infra/0002-platform-charter §Layer model`](adr/infra/0002-platform-charter.md). Each layer must be documented, tested, and signed off before the next begins, with the parallel-development exception documented in the same ADR.
 
-## Summary
-
-| Phase | Name | Focus | Track |
-|---|---|---|---|
-| 1 | Foundation | Compute, networking, storage, IaC | Required |
-| 2 | Platform Services | GitLab, Nexus OSS, Vault, Authentik, NetBox, Traefik | Required |
-| 3 | Observability & Security | Monitoring, SIEM, compliance, GRC | Required |
-| 4a | Module: Broadcast | AES67, SMPTE ST 2110, PTP | Optional |
-| 4b | Module: VoIP | SIP, WebRTC, Kamailio, RTPEngine | Optional |
-| 4c | Module: CCTV | IP cameras, NVR, AI detection | Optional |
-| 5 | Customer Delivery | Templates, runbooks, SOW, handoff | Required |
+For live state (what is deployed today vs pending), see [`status.md`](status.md). This file is the *plan*, not the state.
 
 ---
 
-## Phase 1 — Foundation
+## Layer model at a glance
 
-**Goal:** A working, reproducible infrastructure baseline. Nothing runs on a workstation after this phase.
-
-### 1.1 Compute & Hypervisor
-
-- [ ] Deploy Proxmox VE on bare metal (`srv-proxmox-prod-01`)
-- [ ] Configure storage: local-lvm for VMs, ZFS/NFS pool for shared storage
-- [ ] Validate VM + LXC provisioning (manual first, then IaC)
-- [ ] Set up Packer pipeline for golden VM images (Debian/Ubuntu base)
-
-### 1.2 Networking
-
-- [ ] Deploy pfSense CE on dedicated node (`fw-pfsense-prod-01`)
-  - Configure: WAN/ISP uplink, VLAN segmentation, DHCP, DNS resolver (Unbound)
-  - Enable pfBlockerNG (threat blocking, IP reputation)
-  - Configure WireGuard: site-to-site + road warrior profiles
-- [ ] Deploy Bind 9 (authoritative internal DNS, `*.org.internal`)
-- [ ] Register `org.example` zone on Cloudflare (public DNS + DNS-01 ACME)
-- [ ] Configure Arista switches (`sw-arista-prod-01`) via Ansible `arista.eos`
-  - VLANs, IGMP snooping, spanning tree, QoS baseline
-- [ ] Deploy UniFi Network Controller (Docker) for AP management
-- [ ] Configure split DNS: `*.org.internal` → pfSense | `*.org.example` → Cloudflare
-- [ ] Deploy NetBird (mesh VPN for user devices, OIDC via Authentik — wire up after Phase 2)
-
-### 1.3 Infrastructure as Code Baseline
-
-- [ ] Init GitLab project structure (bootstrap: manual GitLab instance or temp container)
-  - `infra/proxmox-ansible`, `infra/network-arista`, `infra/network-pfsense`
-- [ ] Terraform: Proxmox provider wired, first VM provisioned via code
-- [ ] Ansible: roles for base hardening (Lynis baseline), package management, NTP, SSH
-- [ ] Commit signing: Ed25519 GPG keys configured, enforced in `.gitconfig`
-- [ ] Commitizen + pre-commit hooks: installed in all repos
-
-### 1.4 Storage
-
-- [ ] Deploy MinIO (Docker → K8S later) — S3 endpoint for backups and artifacts
-- [ ] Deploy PostgreSQL single instance (upgrade to Patroni cluster in Phase 2)
-- [ ] Deploy Redis single instance (Sentinel after Phase 2)
-
-**Exit criteria:** VMs provision via Terraform. Network is segmented and firewall-protected. DNS resolves internally and externally. IaC repos exist with CI skeleton. Baseline storage operational.
-
----
-
-## Phase 2 — Platform Services
-
-**Goal:** Full DevOps platform live. All internal services accessible via SSO, TLS, and Traefik.
-
-### 2.1 Reverse Proxy & TLS
-
-- [ ] Deploy Traefik v3 (K8S Helm or Docker Compose)
-  - Integrate with step-ca (Smallstep) for `*.org.internal` TLS
-  - Integrate with Cloudflare DNS-01 for `*.org.example` public TLS
-  - Enforce HTTPS everywhere; no plain HTTP exposed
-- [ ] Deploy step-ca (`platform-traefik-config`, `platform-stepca-config`)
-- [ ] Document Traefik/GitLab Nginx passthrough pattern (nginx internal on 8080, Traefik edge)
-
-### 2.2 Identity & Access
-
-- [ ] Deploy Authentik (`platform-authentik-config`)
-  - OIDC/SAML provider for all platform services
-  - Flows: login, enrollment, MFA (TOTP)
-- [ ] Deploy HashiCorp Vault OSS (`platform-vault-config`)
-  - Seal/unseal strategy defined (Shamir or auto-unseal)
-  - Secret engines: KV (platform secrets), PKI (CA chain backup), SSH (OTP for ops)
-  - AppRole + Kubernetes auth methods enabled
-- [ ] Deploy Vaultwarden (`platform-vaultwarden-config`) — human credentials, SSO via Authentik
-- [ ] Deploy **Teleport CE** (`platform-teleport-core`) — primary bastion
-  - Certificate-based SSH for all Linux VMs (replaces `authorized_keys`)
-  - K8S `kubectl` access via Teleport proxy
-  - DB access (PostgreSQL, MySQL) via Teleport DB proxy
-  - Session recording + replay enabled (audit requirement)
-  - OIDC via Authentik
-  - pfSense rule: block direct SSH port 22 to all VMs except from Teleport proxy
-- [ ] Deploy Apache Guacamole (`platform-guacamole-core`) — secondary OOB gateway
-  - Browser RDP/VNC for Windows VMs and non-technical users
-  - Behind Authentik SSO
-- [ ] Wire NetBird OIDC → Authentik
-
-### 2.3 CI/CD — GitLab + Nexus (permanent instance)
-
-- [ ] Deploy GitLab CE (`platform-gitlab-core`) — replaces bootstrap instance
-  - PostgreSQL backend (shared cluster)
-  - Redis cache (shared instance)
-  - MinIO for object storage (artifacts, LFS, registry)
-  - Container Registry enabled (built-in)
-  - Package Registry enabled (npm, NuGet, PyPI, Maven, Helm, Conan, Cargo, Terraform)
-- [ ] GitLab Runners deployed and registered (Docker executor, min. 2)
-- [ ] Kaniko integrated for rootless image builds in GitLab CI
-- [ ] **Deploy Nexus Repository OSS** (`platform-nexus-core`) — universal proxy + cache layer
-  - Proxy repos: npmjs.org, nuget.org, pkg.go.dev (GOPROXY), pypi.org, conan.io, Maven Central, Docker Hub, Helm repos
-  - Group repos: one endpoint per format combining proxy + internal (e.g. `npm-group` = npmjs proxy + GitLab internal packages)
-  - All workstations and CI pipelines configured to resolve deps via Nexus first
-  - Dockerfile `RUN` steps (inside Kaniko) resolve via Nexus — no direct internet access from build
-- [ ] Migrate all bootstrap repos into permanent GitLab
-- [ ] Configure GitHub mirrors for public repos (one-way push)
-- [ ] CI pipeline template (`tpl-pipeline-base`): lint → build (Kaniko) → Trivy scan → Gitleaks → test → deploy
-- [ ] Gitleaks pre-commit hook + CI stage active in all repos
-- [ ] release-please configured on platform repos
-
-### 2.4 IPAM & CMDB
-
-- [ ] Deploy NetBox (`platform-netbox-config`)
-  - Model all devices, VMs, VLANs, IPv4/IPv6 prefixes, VRFs, circuits
-  - Custom fields per service: `repo_url`, `prometheus_job`, `grafana_tag`, `version`, `lifecycle`
-  - Populate NetBox Ansible inventory plugin (`netbox.netbox`)
-- [ ] Deploy Neo4J Community (`platform-neo4j-cmdb`)
-  - Initial graph: nodes (services, VMs, switches, VLANs) + edges (depends-on, hosted-on, connected-to)
-  - Sync pipeline: NetBox → Neo4J (Ansible or Python script, scheduled)
-
-### 2.5 Kubernetes
-
-- [ ] Deploy k3s cluster (1 control-plane + 2 workers minimum)
-  - Dual-stack IPv4/IPv6
-  - Namespaces per scope/env: `platform-prod`, `platform-staging`, etc.
-- [ ] Deploy k9s + Headlamp (K8S UI)
-- [ ] Migrate eligible platform services to Helm charts (Vault, Authentik, Traefik, NetBox, MinIO)
-- [ ] Kaniko integrated for rootless image builds in GitLab CI
-
-### 2.6 Documentation Infrastructure
-
-- [ ] Deploy KROKI (`platform-kroki`) — self-hosted diagram renderer
-- [ ] Set up Sphinx build pipeline in `doc-runbooks` and `doc-adr`
-- [ ] ADR repo initialised: `docs/adr/0001-platform-stack-decisions.md` (all tool choices)
-- [ ] VSCode devcontainer templates published in `tpl-repo-infra` and `tpl-repo-app`
-
-**Exit criteria:** All platform services accessible at `*.org.internal` via Traefik + SSO. GitLab CI running. NetBox populated. K8S cluster operational. No plaintext secrets in repos.
-
----
-
-## Phase 3 — Observability & Security
-
-**Goal:** Full-stack observability, automated security scanning, compliance dashboards live.
-
-### 3.1 Monitoring & Observability
-
-- [ ] Deploy Prometheus + Alertmanager (`platform-monitoring-stack`)
-  - Scrape targets: all platform services, K8S cluster, Proxmox, pfSense, Arista (SNMP), NetBox
-  - Every service has `prometheus_job` set in NetBox
-- [ ] Deploy Grafana — dashboards per service (overview, logs, alerts, dependencies)
-  - Dashboard tags: `service:{name}`, `env:{env}`, `scope:{scope}`
-  - AI observability query flow: NetBox API → Prometheus API → Grafana API → Loki API → Neo4J
-- [ ] Deploy Loki (Syslog RFC5424 ingestion, MinIO S3 backend)
-  - Promtail / syslog-ng forwarder on all VMs and containers
-- [ ] Deploy Zabbix (SNMP/agentd for network devices and legacy services)
-- [ ] Alert routing: Alertmanager → Discord / email / PagerDuty (configurable per customer)
-
-### 3.2 Security Scanning Pipeline
-
-- [ ] Trivy: container scan + IaC scan + SBOM + secret detection — active in all CI pipelines
-- [ ] Checkov: IaC security scan (Terraform, Ansible, Docker, K8S manifests)
-- [ ] Semgrep: SAST — static analysis on app repos (OSS rules)
-- [ ] OWASP Dependency-Check: dependency CVE scan on app repos
-- [ ] OpenVAS / Greenbone: scheduled network vulnerability scans against all environments
-- [ ] Prowler: CIS K8S benchmark + NIS2 posture checks on K8S cluster
-- [ ] All scanner outputs feed into **DefectDojo** (`sec-defectdojo`) — single vulnerability dashboard
-
-### 3.3 SIEM & Runtime Security
-
-- [ ] Deploy Wazuh (`sec-wazuh-config`)
-  - Agents on all VMs, K8S nodes, Proxmox host
-  - Dashboards: ISO 27001, NIS1/NIS2 compliance
-  - Alerts → Alertmanager → notification channels
-- [ ] Deploy Falco (K8S Helm) — runtime behavioral detection on K8S pods
-  - Rules: privilege escalation, unexpected network connections, secret file access
-- [ ] OpenSCAP: automated CIS benchmark scans on Linux VMs (scheduled via Ansible)
-- [ ] Lynis: host hardening audit run on every new VM (post-Packer, post-Ansible)
-
-### 3.4 Compliance & GRC
-
-- [ ] Deploy CISO Assistant (`sec-ciso-assistant`) — GRC governance
-  - Frameworks loaded: ISO 27001, NIS2, DORA, GDPR
-  - Risk register, compliance evidence, audit trails
-- [ ] Deploy Eramba Community (`sec-eramba`) — ISO 27001 program, controls tracking
-- [ ] Link DefectDojo findings → CISO Assistant controls (manual or API bridge)
-- [ ] First compliance report generated: ISO 27001 gap analysis
-
-### 3.5 Host Hardening Baseline
-
-- [ ] Lynis hardening score target: ≥ 75 on all production VMs
-- [ ] OpenSCAP CIS Level 1 pass on all production VMs
-- [ ] SSH: key-only, no root login, Fail2ban active
-- [ ] Automatic unattended security updates enabled
-
-**Exit criteria:** Prometheus/Grafana/Loki operational for all services. Wazuh agents deployed everywhere. CI pipelines run full scan suite. DefectDojo aggregating findings. CISO Assistant loaded with target frameworks. Hardening baseline passed.
-
----
-
-## Phase 4a — Module: Broadcast (optional)
-
-**Trigger:** Customer project requires AES67 / SMPTE ST 2110 / PTP.
-
-- [ ] Arista switches: enable PTP (IEEE 1588 boundary clock, hardware timestamps)
-  - Ansible `mod-broadcast-ptp`: EOS PTP config automation
-- [ ] VRF layout on Arista: VRF RED (primary media), VRF BLUE (redundant — SMPTE 2022-7), VRF MGMT (leak to RED/BLUE)
-- [ ] IGMP v3 snooping + PIM sparse-mode configured per VRF
-- [ ] QoS: DSCP marking for media traffic classes
-- [ ] ptp4l on software endpoints (Linux VMs): `ptp4l` + `phc2sys` configured, synced to Arista BC
-- [ ] Deploy ptp4l Prometheus exporter → Grafana dashboard (`mod-broadcast-ptp`)
-- [ ] AES67 endpoint test: register source and destination, validate multicast stream delivery
-- [ ] SMPTE 2022-7 hitless switching test (RED/BLUE path)
-- [ ] Broadcast monitoring dashboard: PTP offset, IGMP group counts, multicast stream health
-
-**Exit criteria:** PTP lock achieved on all broadcast endpoints. AES67 stream delivered. SMPTE 2022-7 failover validated. Monitoring live.
-
----
-
-## Phase 4b — Module: VoIP (optional)
-
-**Trigger:** Customer project requires SIP, WebRTC, or unified communications.
-
-- [ ] Deploy Kamailio (`mod-voip-kamailio`)
-  - PostgreSQL: subscriber table, address whitelist/blacklist, domain table
-  - Modules: `auth_db`, `usrloc`, `registrar`, `permissions`, `domain`, `sdpops`, `rtpengine`
-- [ ] Deploy RTPEngine cluster (`mod-voip-rtpengine`)
-  - Redis cluster state (shared Redis)
-  - Call recording → MinIO S3 (`.wav` per channel or mixed)
-  - TLS: SIPS + SRTP mandatory
-- [ ] Deploy Coturn (`mod-voip-coturn`) — STUN/TURN for WebRTC NAT traversal
-- [ ] Deploy Homer (HEP) (`mod-voip-homer`) — SIP transaction capture and analysis
-- [ ] Validate WebRTC ↔ SIP bridging (Opus ↔ G.711/G.729, VP8/VP9 ↔ H.264 via RTPEngine)
-- [ ] Deploy `svc-virtual-sip-codec` — dockerised SIP UA → AES67 card bridge (Baresip PoC → PJSUA2)
-- [ ] Deploy `platform-voip-ui` — custom management UI (Go/FastAPI backend + React frontend)
-  - Subscriber management, whitelist/blacklist, live call monitoring, recording browser
-- [ ] SIP threat integration: pfBlockerNG IP feeds → Kamailio `htable` + Fail2ban sync
-- [ ] Prometheus exporters for Kamailio + RTPEngine → Grafana VoIP dashboard (calls, jitter, loss)
-
-**Exit criteria:** SIP registration working. WebRTC↔SIP call completes. Recording saved to MinIO. Homer captures full SIP transaction tree. Management UI accessible via SSO.
-
----
-
-## Phase 4c — Module: CCTV (optional)
-
-**Trigger:** Customer project requires IP camera management or AI-based video analytics.
-
-- [ ] Select NVR: Frigate (AI-first) or ZoneMinder (maturity) — document decision in ADR
-- [ ] Deploy chosen NVR (`mod-cctv-frigate` or `mod-cctv-zoneminder`)
-- [ ] Configure RTSP/RTP multicast ingestion from IP cameras
-- [ ] GPU/NPU passthrough for Frigate AI inference (if available)
-- [ ] Object detection rules configured (person, vehicle, etc.)
-- [ ] Alert flow: detection event → Alertmanager → notification channel
-- [ ] Recordings stored on MinIO or dedicated NAS volume
-- [ ] Grafana dashboard: camera uptime, detection events, stream health
-
-**Exit criteria:** Cameras ingested. Motion/object detection events firing. Alerts delivered. Recordings accessible.
-
----
-
-## Phase 5 — Customer Delivery Readiness
-
-**Goal:** Platform is replicable, documented, and safe to hand off to a customer or an internal team.
-
-### 5.1 Templates & Boilerplate
-
-- [ ] `tpl-repo-infra` — Terraform + Ansible skeleton (Commitizen, pre-commit, CI pipeline, devcontainer)
-- [ ] `tpl-repo-app` — App repo skeleton (CI pipeline, SBOM, scan stages, release-please)
-- [ ] `tpl-pipeline-base` — Reusable GitLab CI pipeline (lint → build → scan → test → deploy stages)
-- [ ] `tpl-discord-setup` — Standard Discord workspace config (channels, webhooks, roles)
-- [ ] `.commitlintrc` and `cz.toml` published in `tpl-pipeline-base`
-
-### 5.2 Documentation
-
-- [ ] `docs/adr/` — all major decisions recorded (stack, tool choices, naming)
-- [ ] `docs/runbook-*.md` — operational runbooks for: Vault backup/restore, GitLab upgrade, Proxmox snapshot, key rotation
-- [ ] `docs/raid-platform-poc.md` — Risks, Assumptions, Issues, Dependencies
-- [ ] Sphinx pipeline: docs build to HTML + PDF on `main` merge
-- [ ] KROKI diagrams: architecture overview, network topology, CI/CD flow, K8S namespace map
-
-### 5.3 Customer Onboarding Process
-
-- [ ] Customer slug registered in NetBox (tenant slug = `{customer-short-name}`)
-- [ ] GitLab subgroup created: `{customer-slug}/infra`, `{customer-slug}/platform`, `{customer-slug}/app`
-- [ ] SOW template (`tpl-sow-infra-network.md`) ready for customisation
-- [ ] Onboarding checklist: network, compute, DNS, GitLab group, Authentik tenant, Vault namespace
-- [ ] `mod-*` decision guide: which optional modules apply per customer profile
-
-### 5.4 Delivery Validation
-
-- [ ] End-to-end smoke test: new VM provisioned via Terraform → Ansible-hardened → registered in NetBox → Prometheus scraping → Grafana dashboard → Wazuh agent active
-- [ ] CI pipeline smoke test: commit → build → Trivy scan → Gitleaks → deploy to staging
-- [ ] SSO smoke test: login to GitLab, Vault, NetBox, Grafana, Teleport, Guacamole — all via Authentik
-- [ ] Bastion test: SSH to a VM via Teleport, verify session recorded and replayable
-- [ ] Security posture: DefectDojo shows no Critical/High open findings
-- [ ] Compliance: CISO Assistant ISO 27001 coverage ≥ 60%
-
-**Exit criteria:** Another engineer can stand up the full platform from templates + runbooks without tribal knowledge. Customer SOW can be generated in < 1 day. PoC is demonstrable end-to-end.
-
----
-
-## Dependencies & Sequencing Notes
-
-```
-Phase 1 (Foundation)
-  └── Phase 2 (Platform Services)          ← requires Proxmox, pfSense, DNS, storage
-        └── Phase 3 (Observability/Sec)    ← requires GitLab CI, Vault, K8S, NetBox
-              └── Phase 5 (Delivery)       ← requires all Tier 1 complete
-        └── Phase 4a (Broadcast)           ← parallel; requires Arista + Ansible
-        └── Phase 4b (VoIP)                ← parallel; requires GitLab, Vault, PostgreSQL, Redis, MinIO
-        └── Phase 4c (CCTV)                ← parallel; requires storage, networking
-```
-
-- Phases 4a/4b/4c are **independent of each other** and can proceed in parallel once Phase 2 is done.
-- Phase 5 runs concurrently with Phase 3 (templates + docs can be built while security stack is deployed).
-- PostgreSQL, Redis, MinIO start as single instances in Phase 1 and are clustered (Patroni, Sentinel) during Phase 2 or Phase 3 depending on load.
-
----
-
-## Pending Decisions (to be resolved before Phase 2 completion)
-
-| Decision | Options | ADR |
+| Layer | Name | Core ADRs |
 |---|---|---|
-| Docs build tool | Sphinx (preferred) vs MkDocs (simpler) | `adr/0002-docs-tooling.md` |
-| Mesh VPN | NetBird (current) vs Headscale (self-hosted Tailscale) | `adr/0003-mesh-vpn.md` |
-| WiFi management | UniFi Controller vs OpenWRT | `adr/0004-wifi-ap.md` |
-| Neo4J graph UI | D3.js custom vs Bloom vs neovis.js | `adr/0005-neo4j-ui.md` |
-| CCTV NVR | Frigate vs ZoneMinder | `adr/0006-cctv-nvr.md` (Phase 4c) |
+| 0 | Standards & Templates | [`infra/0002-platform-charter`](adr/infra/0002-platform-charter.md), naming scope, [`OPERATING-STANDARD.md`](../OPERATING-STANDARD.md) |
+| 1 | Proxmox Base | [`infra/0001-platform-stack`](adr/infra/0001-platform-stack.md), [`infra/0003-terraform-standard`](adr/infra/0003-terraform-standard.md), [`identity/0004-os-accounts`](adr/identity/0004-os-accounts.md), [`security/0003-hardening`](adr/security/0003-hardening.md) |
+| 2 | Vault + step-ca | [`security/0001-secret-storage`](adr/security/0001-secret-storage.md), [`security/0004-certificate-strategy`](adr/security/0004-certificate-strategy.md) |
+| 3 | Identity (Authentik) | [`identity/0001-authentication`](adr/identity/0001-authentication.md), [`identity/0002-provisioning`](adr/identity/0002-provisioning.md), [`identity/0003-machine-credentials`](adr/identity/0003-machine-credentials.md) |
+| 4 | Storage (Synology + MinIO) | [`infra/0004-network-architecture`](adr/infra/0004-network-architecture.md), [`infra/0008-backup-strategy`](adr/infra/0008-backup-strategy.md) |
+| 5 | Platform Services | [`services/0001-opnsense`](adr/services/0001-opnsense.md), [`services/0002-email-infrastructure`](adr/services/0002-email-infrastructure.md), [`services/0003-netbox-cmdb`](adr/services/0003-netbox-cmdb.md), [`services/0004-database-strategy`](adr/services/0004-database-strategy.md), [`services/0005-notifications`](adr/services/0005-notifications.md) |
 
 ---
 
-## Reference Documents
+## Layer 0 — Standards & Templates ✅
 
-- `docs/stack.md` — full technology inventory
-- `docs/naming-convention.md` — naming rules for repos, services, devices, FQDNs
-- `docs/archive/brainstorm-2026-03-25.md` — session notes, decisions made, org structure (archived)
-- `docs/adr/0001-platform-stack-decisions.md` — _(pending)_ tool choice rationale
+**Status:** Complete (2026-04-14). Covered by the 30 scoped ADRs and `OPERATING-STANDARD.md`. Remaining work is maintenance: keep templates in `docs/templates/` aligned with backport improvements from live repos.
+
+---
+
+## Layer 1 — Proxmox Base ⚠ Partial
+
+**Goal:** A reproducible Proxmox host baseline with hardened OS accounts, automated provisioning via Terraform + Ansible, and a cloud-init golden image.
+
+- [x] `srv-proxmox-poc-01` physical node operational
+- [x] `ansible-platform/roles/hardening` — sshd template, fail2ban, ufw, postfix live per [`identity/0004-os-accounts §5`](adr/identity/0004-os-accounts.md)
+- [x] Terraform state backup to Synology NAS after every apply/destroy per [`infra/0003-terraform-standard §State backend evolution`](adr/infra/0003-terraform-standard.md)
+- [ ] `ansible-platform/roles/user-mgmt` — ⚠ pending verify
+- [ ] `ansible-platform/roles/git-config` — pending write per [`git/0003-configuration`](adr/git/0003-configuration.md)
+- [ ] `ansible-platform/roles/key-mgmt` — pending write (SSH/GPG key distribution)
+- [ ] Debian cloud-init golden template — ⚠ pending verify
+- [ ] 6 pending thresholds in [`security/0003-hardening §Pending decisions`](adr/security/0003-hardening.md) resolved (patch cadence, Lynis score, Trivy CVE gate, filesystem policy, retention, Lynis scope)
+- [ ] Production Proxmox node signed off against hardening baseline
+
+**Exit criteria:** VMs provision via Terraform, hardened by Ansible on first boot, OS accounts per `identity/0004`, state backed up to NAS. All 6 `security/0003` thresholds locked.
+
+---
+
+## Layer 2 — Vault + step-ca ❌ Not started
+
+**Goal:** Single source of machine secrets and internal TLS. Unblocks every downstream layer.
+
+- [ ] Deploy HashiCorp Vault per [`security/0001-secret-storage`](adr/security/0001-secret-storage.md)
+  - Seal/unseal strategy, KV v2 paths per `§KV path convention`
+  - AppRole + Kubernetes auth methods (when K8s arrives)
+  - Transitional JSON secret state in `infra/secrets/` retired per `§Transitional state`
+- [ ] Deploy step-ca per [`security/0004-certificate-strategy`](adr/security/0004-certificate-strategy.md)
+  - Root CA + intermediate CA established
+  - ACME provisioner for internal hostnames
+- [ ] `ansible-platform/roles/ca-trust` — writes root CA to every VM's trust store per `security/0004 §Root CA distribution` (silent HTTPS breakage if skipped)
+- [ ] Vault + step-ca backed up per [`infra/0008-backup-strategy`](adr/infra/0008-backup-strategy.md) (once the 11 pending thresholds are resolved)
+- [ ] `svc-rune` API key migrated from `infra/secrets/` to Vault
+
+**Exit criteria:** All machine secrets live in Vault. Every VM trusts the internal root CA. No service uses a plaintext secret on disk.
+
+---
+
+## Layer 3 — Identity (Authentik) ❌ Not started
+
+**Goal:** Authentik is the IAM hub. Every human and service identity flows through it.
+
+- [ ] Deploy Authentik per [`identity/0001-authentication`](adr/identity/0001-authentication.md)
+- [ ] Provisioning flows per [`identity/0002-provisioning`](adr/identity/0002-provisioning.md) — Authentik → downstream tools
+- [ ] Machine credential pattern `{IDENTITY}_{PLATFORM}_TOKEN` enforced per [`identity/0003-machine-credentials`](adr/identity/0003-machine-credentials.md)
+- [ ] MFA (TOTP) required on all human accounts
+- [ ] OIDC clients registered for Layer 5 services as they come online
+
+**Exit criteria:** All platform services authenticate via Authentik OIDC/SAML. No local accounts on Layer 5 services.
+
+---
+
+## Layer 4 — Storage ⚠ Partial
+
+**Goal:** Shared storage for VM disks, object storage for artifacts/backups, backup target for Layer 2 secrets.
+
+- [x] Synology DS1513+ operational — Terraform state backup target
+- [x] `lib-synology-dsm` ships FileStation, SystemManager, SharePermissionManager (exact version + `lib/python/0001-design-standard` compliance ⚠ pending audit)
+- [ ] MinIO deployed for S3-compatible object storage
+- [ ] Backup policy fully automated — 11 pending thresholds in [`infra/0008-backup-strategy §Pending decisions`](adr/infra/0008-backup-strategy.md) (off-site target, schedules, retention, RTO, drill cadence, KMS)
+- [ ] Off-site backup target chosen and operational
+- [ ] Restore drill executed and documented
+
+**Exit criteria:** Shared + object storage operational. Backup policy fully implemented against locked thresholds. First restore drill passed.
+
+---
+
+## Layer 5 — Platform Services ❌ Not started (except OPNsense test instance)
+
+**Goal:** The services that make the platform useful: firewall/DHCP/DNS (OPNsense), CMDB (NetBox), source forge (GitLab CE), human password manager (Vaultwarden), email (Mailcow), observability, reverse proxy (Traefik), HA databases.
+
+OPNsense is documented as an **exception, not a pattern** per [`services/0001-opnsense`](adr/services/0001-opnsense.md) — six constraints break the generic Linux VM pipeline.
+
+### 5.1 OPNsense (firewall / DHCP / DNS / VPN)
+
+- [x] Test instance `vm-opnsense-01` on test VLANs (OPNsense 26.1.5)
+- [x] `lib-opnsense v1.0.0` — 54 managers, 1178 unit + 294 integration tests
+- [x] `ansible-opnsense` — 54 modules, one per manager
+- [ ] **Production OPNsense deployment** — top blocker (see [`status.md §Top blockers`](status.md))
+- [ ] `platform-setup/opnsense/bootstrap.md` runbook — pending write
+- [ ] Production VLAN registry applied per [`infra/0004-network-architecture`](adr/infra/0004-network-architecture.md)
+
+### 5.2 NetBox (CMDB — source of truth)
+
+- [ ] Deploy NetBox per [`services/0003-netbox-cmdb`](adr/services/0003-netbox-cmdb.md)
+- [ ] 19-role vocabulary loaded
+- [ ] Mandatory custom fields enforced (`env`, `repo_url`, `prometheus_job`, etc.)
+- [ ] Inventory plugin `netbox.netbox` wired into Ansible
+- [ ] Hostnames and prefixes seeded per [`naming/0001-infra`](adr/naming/0001-infra.md)
+
+### 5.3 Databases (HA from day 1)
+
+Per [`services/0004-database-strategy`](adr/services/0004-database-strategy.md), PostgreSQL and Redis run as HA clusters from the start — not single instances later upgraded.
+
+- [ ] PostgreSQL Patroni 3-node cluster
+- [ ] Redis with Sentinel
+- [ ] 4 deferred decisions resolved: pooler choice (pgbouncer vs pgpool-II), Patroni DCS (etcd vs Consul), Sentinel colocation, Redis replica count
+- [ ] Software HA limits documented per `services/0004 §Cluster placement` (protects against process/OS-level failure, not host or site)
+
+### 5.4 Reverse Proxy & TLS edge
+
+- [ ] Deploy Traefik v3
+  - Internal TLS from step-ca (Layer 2)
+  - Public TLS via Let's Encrypt DNS-01 per [`security/0004 §Public vs internal`](adr/security/0004-certificate-strategy.md)
+- [ ] HTTPS-only, no plaintext HTTP exposed
+
+### 5.5 GitLab CE + Nexus Repository OSS
+
+- [ ] Deploy GitLab CE (external PostgreSQL from 5.3, external Redis from 5.3, MinIO from Layer 4)
+  - No `:latest` tags — pin to specific versions
+  - Container Registry + Package Registry enabled
+- [ ] GitLab Runners registered (Docker executor)
+- [ ] Deploy Nexus Repository OSS as universal proxy/cache (npm, PyPI, Maven, Go, Docker Hub, Helm)
+- [ ] Migrate from GitHub per [`git/0002-platform-strategy`](adr/git/0002-platform-strategy.md)
+
+### 5.6 Vaultwarden (human credentials)
+
+- [ ] Deploy Vaultwarden per [`security/0001-secret-storage §Vaultwarden`](adr/security/0001-secret-storage.md) — SSO via Authentik
+- [ ] Machine secrets remain in Vault; humans use Vaultwarden
+
+### 5.7 Email infrastructure
+
+- [ ] Deploy Mailcow per [`services/0002-email-infrastructure`](adr/services/0002-email-infrastructure.md) — standalone/hybrid mode, official image, **internal** MariaDB + Redis (not shared — documented exception to 5.3)
+- [ ] `platform-setup/mailcow/lifecycle.md` runbook — pending write
+- [ ] SPF / DKIM / DMARC records published
+
+### 5.8 Observability
+
+- [ ] Deploy Loki + Promtail per [`infra/0006-logging`](adr/infra/0006-logging.md) — no PII, structlog JSON from all services
+- [ ] Deploy Prometheus + Grafana + Alertmanager per [`infra/0007-monitoring`](adr/infra/0007-monitoring.md)
+- [ ] `ansible-platform/roles/observability-client` — installs Promtail + node_exporter on every VM
+- [ ] Event routing per [`services/0005-notifications`](adr/services/0005-notifications.md) — `🔔 [Tool] Event` template, Discord one-way
+
+### 5.9 Compliance & GRC
+
+- [ ] Deploy `ciso-assistant-community` (intuitem) as the compliance control registry per [`security/0002-compliance-mapping`](adr/security/0002-compliance-mapping.md)
+- [ ] Target frameworks loaded: ISO 27001, NIS2, DORA, GDPR
+- [ ] Every ADR's `CISO mapping` section reconciled against loaded controls
+
+---
+
+## Cross-cutting tracks
+
+These run in parallel with layer work per the **parallel development exception** in [`infra/0002-platform-charter §Parallel development exception`](adr/infra/0002-platform-charter.md).
+
+- **Library development** — `lib-opnsense` (v1.0.0 ✅), `lib-synology-dsm` (pending audit), future per-tool libraries per [`lib/python/0001-design-standard`](adr/lib/python/0001-design-standard.md)
+- **Ansible collections** — `ansible-opnsense` (54 modules ✅), future collections as libraries land
+- **Terraform modules** — `infra-terraform-proxmox` module family per [`infra/0003-terraform-standard`](adr/infra/0003-terraform-standard.md)
+- **Runbooks** — `platform-setup` accumulates one runbook per tool as services go live
+- **Cross-repo `CLAUDE.md` updates** — backport pattern from the doc-platform-core template changes
+
+---
+
+## How to update
+
+When a layer advances or a scoped ADR changes the plan:
+
+1. Move items between layers' checkboxes as they complete
+2. Update [`status.md`](status.md) in the same change — roadmap is the *plan*, status is the *state*
+3. Never reference flat ADR numbers — always use scoped paths (`{scope}/NNNN-title`)
+4. Commit: `docs: update roadmap to YYYY-MM-DD`
