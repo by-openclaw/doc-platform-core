@@ -58,9 +58,31 @@ External users (customers, freelancers) are invited **per project**, never at su
 ### CI migration
 
 - GitHub Actions workflows → GitLab CI pipelines
-- Shared templates in `tpl/pipeline-base` — every repo inherits, DRY by design
+- Shared templates in a **dedicated `ci-templates` repo** at the org level (see `naming/0004-automation §1` for the `ci-templates` repo type)
 - Self-hosted GitLab Runner on Proxmox
 - Release-please stays the pattern, re-implemented as GitLab CI template
+
+### CI templates include pattern
+
+Every `svc-*`, `infra-*`, `lib-*`, and `ansible-*` repo's `.gitlab-ci.yml` includes from the central `ci-templates` repo using GitLab CI's `include:` directive:
+
+```yaml
+# .gitlab-ci.yml in any platform repo
+include:
+  - project: by-openclaw/ci-templates
+    file: .gitlab-ci/build.yml
+  - project: by-openclaw/ci-templates
+    file: .gitlab-ci/deploy.yml
+  - project: by-openclaw/ci-templates
+    file: .gitlab-ci/security.yml
+```
+
+**Rules:**
+- **No copy-paste.** A repo's `.gitlab-ci.yml` **never** duplicates content from `ci-templates` — it includes by reference.
+- **One source of truth** for CI stages across the platform. Updating a template in `ci-templates` propagates to every downstream repo on its next pipeline run.
+- **Template files follow the layout** `ci-templates/.gitlab-ci/{concern}.yml` — one file per concern (build, test, deploy, security, lint, release).
+- **Include order matters** — security template runs after build + test but before deploy. Templates declare their own `stage:` in jobs to enforce order.
+- Repos that don't use GitLab CI (currently GitHub Actions) ignore the `ci-templates` repo until they migrate — the include is a one-line change at migration time.
 
 ### Migration steps (executed when GitLab CE is deployed)
 
