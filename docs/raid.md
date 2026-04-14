@@ -1,141 +1,110 @@
-# ORG Platform — RAID Log
+# Platform RAID Log
 
-**Last updated:** 2026-04-01
-**Status:** Active — PoC phase
-**Related docs:** `docs/stack.md`, `docs/roadmap.md`, `docs/architecture.md`
+> **Last updated:** 2026-04-14
+> **Maintained by:** Rune — update on every sprint/phase review or when a blocker changes state
+> **Scope:** Platform-wide RAID per [`OPERATING-STANDARD.md §7.1`](../OPERATING-STANDARD.md). Per-repo RAIDs live in each repo's own `RAID.md`.
 
-> RAID = **R**isks · **A**ssumptions · **I**ssues · **D**ependencies
-> This is a living document. Update on every sprint/phase review.
+RAID = **R**isks · **A**ssumptions · **I**ssues · **D**ependencies.
 
----
-
-## R — Risks
-
-| ID | Risk | Probability | Impact | Severity | Mitigation | Owner | Status |
-|---|---|---|---|---|---|---|---|
-| R-21 | ADR number collision — lib-synology-dsm ADR-NNNN vs doc-platform-core ADR-NNNN use same numbering scheme | Low | Medium | 🟡 Medium | Add scoping note to ADR README indexes. Consider PADR- prefix for platform ADRs if collision occurs. | Platform | Open |
-| R-01 | Proxmox VE single node — no HA during PoC | High | High | 🔴 Critical | Accept for PoC; plan multi-node cluster before prod. Document recovery runbook. | Infra | Open |
-| R-02 | PostgreSQL single instance during PoC (no Patroni) | High | High | 🔴 Critical | Accept for PoC; migrate to Patroni HA cluster in Phase 2.5. Daily pg_dump to MinIO. | Platform | Open |
-| R-03 | HashiCorp Vault seal/unseal — data loss if node lost without backup | Medium | Critical | 🔴 Critical | Vault auto-unseal via cloud KMS or Shamir shares stored in Vaultwarden. Snapshot policy: daily to MinIO. | Platform | Open |
-| R-04 | Teleport CE session recording storage growth | Low | Medium | 🟡 Medium | Set retention policy (90 days). Sessions → MinIO. Monitor storage via Prometheus. | Platform | Open |
-| R-05 | Kaniko build secrets leak via `--build-arg` | Medium | High | 🔴 Critical | Policy enforced: `--build-arg` forbidden for secrets. Trivy post-build scan catches leaks. Gitleaks on Dockerfile. | DevOps | Open |
-| R-06 | Nexus OSS disk exhaustion from cache growth | Medium | Medium | 🟡 Medium | Blob store cleanup policy: remove unused after 30 days. Alert on disk > 80%. | Platform | Open |
-| R-07 | GitLab LFS storage growth (assets, media) | Medium | Low | 🟢 Low | LFS → MinIO backend. Quota per project. Monitor via Prometheus. | Platform | Open |
-| R-08 | Anthropic/OpenAI API overload during heavy agent use | High | Low | 🟡 Medium | Fallback chain configured (Anthropic → OpenAI). Token tied to MAX plan. Monitor via OpenClaw `/stats`. | DevOps | Open |
-| R-09 | Arista EOS misconfiguration causing broadcast storm | Low | Critical | 🟡 Medium | Change control via Ansible only. No manual EOS edits in prod. Pre-apply dry-run (`--check`). | Network | Open |
-| R-15 | Arista EOS version mismatch (FABRIC-1: 4.34.3.1M vs FABRIC-2: 4.33.5M) — unpredictable behavior on trunk | Medium | High | 🔴 Critical | Upgrade FABRIC-2 to 4.34.x. Schedule maintenance window (reload required). | Network | Open |
-| R-16 | Single inter-switch uplink pair (Et33/Et49 RED, Et34/Et50 BLUE) — no MLAG | Medium | Medium | 🟡 Medium | Accept for PoC. MSTP failover ~1-2s on link failure. Plan MLAG when 7048T-A replaced. | Network | Open |
-| R-17 | PTP grandmaster single point of failure — GM-02 (pve01 vmbrPTP2) not wired | Medium | High | 🟡 Medium | GM-02 to be provided by non-prod Proxmox (future). Document as known gap until wired. | Network | Open |
-| R-18 | 3com/HPE WAN switch: Telnet enabled — cleartext credentials | High | High | 🔴 Critical | Disable Telnet: `undo local-user admin service-type telnet`. SSH only. | Network | Open |
-| R-19 | synology-nfs shared between prod and non-prod Proxmox | High | High | 🔴 Critical | Create dedicated NFS exports for non-prod (nonprod-iso, nonprod-backup) in Synology File Station. | Infra | Open |
-| R-22 | vmbrMGMT + nic4 (enx0060dd44ecce) still active on srv-proxmox-poc-01 — live link to Arista prod fabric VLAN 600. Risk of PoC traffic injection into prod broadcast control plane. | High | Critical | 🔴 Critical | **Resolved 2026-04-01/2026-04-03:** Renamed `vmbrMGMT` → `vmbrFAB`. Bridge disabled. Invalid `vmbrPOC` concept removed. vmbrOOB renamed → vmbrWAN3. | Infra | ✅ Resolved |
-| R-24 | Vault BUSL 1.1 — cannot offer Vault-as-a-service to clients | Low | Medium | 🟡 Medium | Internal use + managing client infra = OK. Never resell hosted Vault access as a product. If SaaS needed → evaluate OpenBao (Apache 2.0 fork). Document in client contracts. | Legal | Open |
-| R-25 | Redis ≥7.4 license (RSALv2/SSPL) — competing product restriction | Medium | High | 🔴 Critical | **Pin to `redis:7.2.7-alpine` (BSD-3).** Do not upgrade to 7.4+ without legal review. Add version lock to Ansible/Terraform. | Platform | Open |
-| R-26 | AGPL tools (Grafana, Loki, Vaultwarden, Nextcloud, Proxmox) — SaaS modification requires source disclosure | Low | Medium | 🟡 Medium | Policy: deploy unmodified. If modifications needed → fork + open-source, or evaluate non-AGPL alternative. | Legal | Open |
-| R-23 | Nexus OSS was provisioned at 2 GB RAM — guaranteed OOM on startup (JVM heap alone ~5.4 GB). Corrected to 6 GB in Terraform but Nexus VM not yet deployed. | Low | High | 🟡 Medium | Resolved in infra-terraform-proxmox main.tf (commit 35505ba). Verify on first `terraform apply`. | Infra | Mitigated |
-| R-20 | Ansible LXC (non-prod, CT100) has no static IP — DHCP only | Medium | Medium | 🟡 Medium | Add static DHCP reservation in pfSense for MAC BC:24:11:2A:95:93. | Infra | Open |
-| R-10 | Authentik SSO outage blocks all platform access | Low | Critical | 🔴 Critical | Local admin accounts on each service as break-glass. Authentik HA in prod (Phase 2.5). | Platform | Open |
-| R-11 | Teleport CA key loss — all SSH certs revoked | Low | Critical | 🔴 Critical | Teleport CA backed up to Vault. Rotation procedure documented in runbook. | Security | Open |
-| R-12 | Nexus upstream proxy blocked (corporate firewall / ISP) | Low | Medium | 🟡 Medium | Nexus configured to use HTTP proxy if needed. pfSense egress rules explicitly allow nexus outbound. | Network | Open |
-| R-13 | License drift — tool switches from OSS to paid | Low | Medium | 🟡 Medium | All tools pinned to OSS/CE/Community editions. Version locked in Ansible/Helm. Monitored via ADR review. | Platform | Open |
-| R-14 | PII data leak via unredacted screenshots/logs in Git | Medium | High | 🔴 Critical | Presidio pre-commit hook + CI scan. Asset naming convention enforces redaction check before commit. | Security | Open |
-| R-15 | `lib-synology-dsm` `verify_ssl=False` default — MitM risk in non-lab environments | Medium | High | 🟡 Medium | Documented in CLAUDE.md HARD RULES. Blocked on platform TLS strategy (cert naming, Unbound DNS, CA choice). GitHub #64. Fix: flip default once TLS strategy decided. | Security | Open |
+Items that are now formally captured in a scoped ADR's `§Pending decisions` or `§Deferred decisions` section are tracked there, not duplicated here. This file holds cross-cutting items that don't belong to a single ADR.
 
 ---
 
-## A — Assumptions
+## R — Risks (Open)
 
-| ID | Assumption | Impact if wrong | Validation |
+| ID | Risk | Severity | Mitigation | Source / ADR |
+|---|---|---|---|---|
+| R-01 | Single Proxmox host — software HA only; host/site failure unprotected | 🔴 Critical | Documented in [`services/0004-database-strategy §Cluster placement`](adr/services/0004-database-strategy.md). Second host required for hardware HA. | [`services/0004`](adr/services/0004-database-strategy.md) |
+| R-03 | HashiCorp Vault seal/unseal — data loss if node lost without backup | 🔴 Critical | Seal strategy + daily snapshot to NAS, tracked in [`infra/0008-backup-strategy §Pending decisions`](adr/infra/0008-backup-strategy.md) (11 TBDs). Blocks Layer 2 sign-off. | [`security/0001`](adr/security/0001-secret-storage.md), [`infra/0008`](adr/infra/0008-backup-strategy.md) |
+| R-05 | Kaniko `--build-arg` secret leak in CI | 🔴 Critical | Policy forbids `--build-arg` for secrets. Gitleaks + Trivy post-build catch leaks. | [`security/0003-hardening`](adr/security/0003-hardening.md) |
+| R-10 | Authentik SSO outage blocks all platform access | 🔴 Critical | Break-glass local accounts per [`identity/0004-os-accounts §5`](adr/identity/0004-os-accounts.md). Authentik HA required before Layer 3 sign-off. | [`identity/0001`](adr/identity/0001-authentication.md), [`identity/0004`](adr/identity/0004-os-accounts.md) |
+| R-14 | PII leak via unredacted screenshots/logs in Git | 🔴 Critical | Presidio pre-commit + CI scan per [`security/0003-hardening`](adr/security/0003-hardening.md). Redaction format standard enforced. | [`security/0003`](adr/security/0003-hardening.md) |
+| R-18 | 3com/HPE WAN switch: Telnet enabled — cleartext credentials | 🔴 Critical | Disable Telnet, SSH only. Tracked until OPNsense production deployment replaces the temporary network path. | [`infra/0004-network-architecture`](adr/infra/0004-network-architecture.md) |
+| R-19 | Synology NFS shared between prod and non-prod Proxmox | 🔴 Critical | Dedicated non-prod NFS exports required before any non-prod VM mounts NAS. | [`infra/0004`](adr/infra/0004-network-architecture.md) |
+| R-06 | Nexus OSS disk exhaustion from cache growth | 🟡 Medium | Blob store cleanup policy (30-day unused removal). Disk >80% alert via Prometheus. | [`infra/0001-platform-stack`](adr/infra/0001-platform-stack.md) |
+| R-07 | GitLab LFS storage growth | 🟢 Low | LFS → MinIO backend. Per-project quota. | [`git/0002-platform-strategy`](adr/git/0002-platform-strategy.md) |
+| R-08 | Anthropic/OpenAI API overload during heavy agent use | 🟡 Medium | Fallback chain (Anthropic → OpenAI). Monitor via OpenClaw `/stats`. | — |
+| R-12 | Nexus upstream proxy blocked by corporate firewall / ISP | 🟡 Medium | OPNsense egress rule explicitly allows Nexus outbound. | [`services/0001-opnsense`](adr/services/0001-opnsense.md) |
+| R-20 | Ansible LXC (CT100) has no static IP — DHCP only | 🟡 Medium | Static DHCP reservation in OPNsense once production instance is live. | [`services/0001`](adr/services/0001-opnsense.md) |
+| R-27 | `lib-synology-dsm` `verify_ssl=False` default — MitM risk in non-lab environments | 🟡 Medium | Documented in repo CLAUDE.md HARD RULES. Flip default once step-ca + `ca-trust` roll out (Layer 2). | [`security/0004-certificate-strategy`](adr/security/0004-certificate-strategy.md) |
+
+---
+
+## A — Assumptions (Open)
+
+| ID | Assumption | Impact if wrong |
+|---|---|---|
+| A-01 | `srv-proxmox-poc-01` hardware is the only production host until a second node is procured | Hardware HA impossible; all HA is software-only per [`services/0004 §Cluster placement`](adr/services/0004-database-strategy.md) |
+| A-04 | Cloudflare is available as public DNS + DNS-01 ACME provider | Public cert issuance blocked — fallback = manual DNS-01 with alternative provider |
+| A-13 | Nexus OSS (Apache 2.0) remains free for required formats | Forced migration to paid tier; version pinned per [`feedback_never_latest_docker`] rule |
+| A-15 | Telenet provides a /27 static subnet on the WAN interface | OPNsense WAN config must match; verify before production deployment |
+
+---
+
+## I — Issues (Open)
+
+| ID | Issue | Severity | Source |
 |---|---|---|---|
-| A-01 | Bare metal hardware is available and racked before Phase 1 starts | Phase 1 blocked | Confirm hardware delivery date |
-| A-02 | Arista switches support EOS API (eAPI) and are reachable from Ansible | Network automation blocked | Verify EOS version and eAPI enabled on all switches |
-| A-03 | Internet uplink provides stable connectivity for initial package pulls (Nexus cold cache) | CI builds fail on first run | Test connectivity from Nexus host to npmjs.org, nuget.org, pkg.go.dev, pypi.org |
-| A-04 | Cloudflare is available as public DNS provider and DNS-01 ACME works | Public cert issuance blocked | Verify Cloudflare zone ownership and API token |
-| A-05 | Proxmox VE Community (no subscription) is acceptable for PoC | No enterprise support | Accepted — PoC scope |
-| A-06 | GitLab CE (MIT) covers all CI/CD requirements without EE features | May need EE for advanced compliance features | Review feature gap before prod promotion |
-| A-07 | Teleport CE provides sufficient audit logging for ISO 27001 / NIS2 | May need Teleport Enterprise for advanced compliance features | Validate against compliance checklist in Phase 3 |
-| A-08 | k3s is sufficient for PoC workloads (not full K8S) | May hit k3s limitations at scale | Evaluate at Phase 2.5; migration path to RKE2/Talos documented |
-| A-09 | HashiCorp Vault OSS is sufficient (no Vault Enterprise needed) | Namespace isolation, HSM, and some enterprise features unavailable | Accepted for PoC; re-evaluate at prod |
-| A-10 | One PostgreSQL cluster (Patroni) can host all platform services (GitLab, Vault, Authentik, NetBox, Zabbix) | Resource contention; requires DB separation | Monitor per-DB resource usage; separate clusters if needed |
-| A-11 | Mailcow on `example.com` (RFC 2606) is sufficient for non-prod email testing | May need real domain for some tests | Validated: RFC 2606 reserved, no external leak risk |
-| A-12 | ORG team has Ansible and Terraform skills for Phase 1 IaC | Phase 1 delayed | Skills assessment before start |
-| A-13 | Nexus OSS (Apache 2.0) remains free for all required formats | Forced migration to paid tier | Monitor Sonatype licensing changes; Nexus pinned to current OSS version |
-| A-14 | Customer production mail (Exchange/Google) will be available for SMTP relay config | Platform notification emails fail in prod | Collect SMTP relay credentials during customer onboarding |
-| A-15 | Telenet provides a /27 static subnet on the WAN interface (confirmed 2026-04-01) | OPNsense WAN config must use correct prefix length | Configure OPNsense WAN with /27 subnet. Verify gateway IP from ISP docs or pfSense WAN config before Phase 2 migration. |
+| I-17 | Terraform scaffold incomplete — OPNsense production VM not deployed; top blocker | High | [`status.md §Top blockers`](status.md) |
+| I-18 | NetBox not deployed — CMDB / IPAM source of truth unavailable | High | [`services/0003-netbox-cmdb`](adr/services/0003-netbox-cmdb.md) |
+| I-11 | Ansible LXC (CT100) has no backup job and no `onboot=1` | High | [`infra/0008-backup-strategy`](adr/infra/0008-backup-strategy.md) |
+| I-12 | Proxmox firewall disabled on prod and non-prod nodes | High | [`security/0003-hardening`](adr/security/0003-hardening.md) |
+| I-13 | Synology NAS firewall disabled — all services open on `10.6.0.0/20` | Critical | [`security/0003`](adr/security/0003-hardening.md) |
+| I-14 | No 2FA on any NAS human account | Critical | [`identity/0001-authentication`](adr/identity/0001-authentication.md) |
+| I-15 | DSM 7.1.1-42962 outdated — unpatched CVEs likely | High | [`security/0003`](adr/security/0003-hardening.md) |
+| I-16 | Python 2.7 (EOL) installed on NAS | High | [`security/0003`](adr/security/0003-hardening.md) |
+| I-22 | Rune VM migration runbook missing | High | `platform-setup` pending runbook |
+| I-23 | `FileStation.upload()` return dict doesn't match v1.0 contract | High | `lib-synology-dsm` audit pending |
+| I-24 | `client.py` hardcoded 30s timeout — no per-op timeout | High | `lib-synology-dsm` audit pending |
+| I-25 | Cloudflare API token rotation runbook missing | High | `platform-setup` pending runbook |
 
 ---
 
-## I — Issues
+## D — Dependencies (Open)
 
-| ID | Issue | Severity | Date raised | Resolution | Status |
-|---|---|---|---|---|---|
-| I-28 | ADR-0010 naming convention had incorrect prod examples and wrong domain (by-systems.be instead of by-research.be) | Medium | 2026-04-03 | ✅ Amended ADR-0010: prod omits env from hostname/VM name; domain examples → by-research.be. doc-platform-core PR#5, platform-setup#83. | ✅ Resolved |
-| I-29 | ADR-0015 missing WireGuard specification — no subnet, no VLAN assignment, no peer naming | Medium | 2026-04-03 | ✅ WireGuard section added: tunnel 10.100.0.0/24, no VLAN, per-device peer naming. doc-platform-core PR#5, platform-setup#83. | ✅ Resolved |
-| I-30 | ansible-platform had no OPNsense role or bootstrap playbook — firewall config undocumented and unautomated | High | 2026-04-03 | ✅ Full role scaffold + bootstrap playbook created. ansible-platform PR#4, platform-setup#85. | ✅ Resolved |
-| I-25 | Cloudflare API token rotation runbook missing — no procedure for expiry or compromise rotation before PoC go-live | High | 2026-04-01 | Follow CISO token rotation process. Runbook: locate token in Vault, issue new token per CISO process, update Vault secret, rolling Traefik restart, verify cert renewal. Add Grafana cert-expiry alert. | Open |
-| I-26 | NFS routing from scratch PoC VM to NAS (10.6.224.6) via OPNsense untested | High | 2026-04-01 | **CLOSED 2026-04-01** — Storage architecture corrected. VMs never mount NFS. NAS is host-level only (poc-iso + poc-backup on Proxmox host). Risk eliminated. GitHub #69 closed. | Closed |
-| I-23 | `FileStation.upload()` return dict returns `{"skipped": bool}` — violates ADR-0007 `{"changed": bool, "action": str}` contract | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: return `{"changed": bool, "action": "created"\|"skipped"\|"overwritten"}` | Open |
-| I-24 | `client.py` timeout hardcoded at 30s — no per-operation timeout, no streaming upload support | High | 2026-03-30 | v1.0 blocker for lib-synology-dsm. Fix: per-op timeout param with sensible defaults | Open |
-| I-27 | vmbrOOB break-glass bridge not yet created on srv-proxmox-poc-01 | Medium | 2026-04-03 | ✅ Created 2026-04-03 via Proxmox API. active=0, autostart=0, no IP, no uplink. platform-setup#77 closed. | ✅ Resolved |
-| I-17 | Terraform scaffold incomplete — OPNsense VM not deployed; PoC VMs still on vmbrWAN3 (OOB path, temp); SDN zone `poc` with VNets `mgmt`/`dmz`/`svc` not yet live | High | 2026-03-28 | Deploy OPNsense VM. Attach LAN to `vmbrAPPS` trunk and land PoC VMs on SDN VNets `mgmt`/`dmz`/`svc`. Move all PoC VMs to SDN subnets post-OPNsense. See platform-setup#58. | Open |
-| I-18 | vm-netbox-poc-01 not deployed — NetBox (CMDB/IPAM source of truth) unavailable | High | 2026-03-28 | Deploy after OPNsense. Terraform module ready. See platform-setup#59. | Open |
-| I-19 | GitHub issues #1 and #44 were stale/open despite being completed | Low | 2026-03-28 | Closed with completion comments 2026-03-28. | ✅ Resolved |
-| I-22 | Rune VM has no migration runbook — OpenClaw config, tokens, SSH keys, workspace not documented for safe transfer | High | 2026-03-29 | Write runbook: token locations, backup procedure, re-clone script, validation checklist. platform-setup#62. | Open |
-| I-20 | Terraform state had no remote backup — Rune VM loss = state loss | High | 2026-03-29 | NAS backup operational (`/by-terraform-state/poc/`). Script + wrapper in `infra-terraform-proxmox/scripts/`. ADR-0008. Phase 5: migrate to GitLab backend. platform-setup#60 | ✅ Resolved (Phase 1) |
-| I-21 | OOB gateway `10.6.255.254` used incorrectly in all repo docs (correct: `10.6.224.1` pfSense) | Low | 2026-03-29 | Fixed in all docs, CLAUDE.md, ADR-0006, MEMORY.md. platform-setup#61. | ✅ Resolved |
-| I-01 | OpenClaw Anthropic token was OpenClaw shared pool (not MAX plan) — caused overload errors | High | 2026-03-25 | Re-ran `openclaw models auth setup-token --provider anthropic` — new token tied to MAX plan. Old API key removed from config and revoked. | ✅ Resolved |
-| I-02 | Discord WebSocket instability (code 1006, 520) — intermittent reconnects | Low | 2026-03-25 | Discord-side transient issue. Gateway auto-recovered. Monitor for recurrence. | ✅ Resolved (monitoring) |
-| I-03 | `openclaw gateway restart` kills agent mid-command (self-restart) | Low | 2026-03-25 | Workaround: use `systemctl --user restart openclaw-gateway.service` from terminal. | ⚠️ Workaround |
-| I-04 | `ANTHROPIC_API_KEY` ([REDACTED]) was stored in session history JSONL | Medium | 2026-03-25 | Key revoked on Anthropic console. Session log is local-only. Config files cleaned. | ✅ Resolved |
-| I-05 | Template files used `.md.template` extension — not rendered by editors | Low | 2026-03-25 | Renamed all templates to `.tpl.md`. Convention documented in naming-convention.md §5. | ✅ Resolved |
-| I-06 | Verdaccio and Athens identified as gaps — npm/Go proxy only, not multi-format | Medium | 2026-03-25 | Replaced by Nexus OSS in stack decision. ADR and roadmap updated. | ✅ Resolved |
-| I-07 | VLAN 620/720 referenced in FABRIC-2 OSPF (`no passive-interface Vlan620/720`) but never created | Low | 2026-03-26 | Remove `no passive-interface Vlan620` and `Vlan720` from FABRIC-2 OSPF until VLANs are provisioned. | Open |
-| I-08 | `interface Vlan60` with VRRP config on FABRIC-2 — VLAN not in VLAN table (orphaned config) | Low | 2026-03-26 | Run `no interface Vlan60` on FABRIC-2. Stale from earlier design iteration. | Open |
-| I-09 | FABRIC-1 missing `ptp source ip` — uses default management IP implicitly | Low | 2026-03-26 | Add `ptp source ip 10.6.224.21` on FABRIC-1 for consistency with FABRIC-2. | Open |
-| I-10 | FABRIC-2 Priority1 not set (default 128) — should match FABRIC-1 (248) to prevent accidental GM election | Low | 2026-03-26 | Add `ptp priority1 248` on FABRIC-2. | Open |
-| I-11 | Ansible LXC (CT100, non-prod) has no backup job and no onboot flag | High | 2026-03-26 | Add daily backup job → tank-backup. Set `onboot=1` on CT100. | Open |
-| I-12 | Proxmox firewall disabled on both prod and non-prod nodes | High | 2026-03-26 | Enable firewall with INPUT DROP policy. Allow only OOB/MGMT source IPs. | Open |
-| I-13 | Synology NAS firewall completely disabled (`enable_firewall: false`) — all services open on 10.6.0.0/20 | Critical | 2026-03-27 | Enable DSM firewall; allow only OOB segment (10.6.0.0/20); drop all else. Test NFS/SMB after. | Open |
-| I-14 | No 2FA on any NAS account — `yboujraf`, `wissem.boujraf` and all admin-equivalent accounts unprotected | Critical | 2026-03-27 | Enable TOTP 2FA on all human NAS accounts via DSM Control Panel → User & Group | Open |
-| I-15 | DSM 7.1.1-42962 outdated (2+ major versions behind) — unpatched CVEs likely | High | 2026-03-27 | Upgrade to DSM 7.2.x. Take backup snapshot first. Schedule maintenance window. | Open |
-| I-16 | Python 2.7 (EOL since 2020) installed on NAS — no security updates | High | 2026-03-27 | Uninstall Python2 package from NAS unless strictly required by a specific package | Open |
+| ID | Dependency | Required by | Risk if unavailable |
+|---|---|---|---|
+| D-01 | Second Proxmox host for hardware HA | Production promotion | Host/site failure unprotected |
+| D-04 | ISP uplink (Telenet static /27) | OPNsense production | Public access blocked |
+| D-05 | Cloudflare account + API token | Public DNS + ACME | Public cert issuance blocked |
+| D-10 | Customer SMTP relay credentials | Layer 5 notifications | Platform email delivery fails in prod |
+| D-12 | NAS backup target for Vault snapshots | Layer 2 sign-off | Vault snapshot restore impossible |
+| D-13 | Authentik operational before Layer 5 OIDC wiring | Layer 3 → Layer 5 | OIDC config fails |
+| D-14 | PostgreSQL HA cluster operational before GitLab/Authentik/NetBox deploy | Layer 5 | Service startup fails |
+| D-15 | Nexus cache seeded before CI pipelines run at scale | Layer 5 | First pipelines hit internet, slow + brittle |
 
 ---
 
-## D — Dependencies
+## Resolved / closed
 
-| ID | Dependency | Type | Required by | Risk if unavailable | Owner |
-|---|---|---|---|---|---|
-| D-20 | lib-synology-dsm v1.0 depends on return dict audit across all 9 managers (ADR-0007 compliance) | Software/lib | lib-synology-dsm v1.0 | Ansible collection blocked without consistent return dict contract | Platform |
-| D-01 | Bare metal server(s) for Proxmox | Hardware | Phase 1 | Phase 1 blocked | Infra |
-| D-02 | Arista switches (7020/7060) operational; 7048T-A broken/offline | Hardware | Phase 1 | OOB switch missing — 3com WAN switch used as temp OOB | Network |
-| D-17 | Replacement/repair of Arista DCS-7048T-A (OOB switch) | Hardware | Phase 1 | Permanent OOB switch missing; 3com is temporary workaround | Network |
-| D-18 | Non-prod Proxmox node added to cluster (2-node cluster with QDevice) | Hardware/Software | Phase 2 | HA and live migration blocked | Infra |
-| D-03 | UniFi APs | Hardware | Phase 1 | Wireless access blocked | Network |
-| D-04 | ISP uplink (static IP or DDNS) | External service | Phase 1 | Public access blocked | Infra |
-| D-05 | Cloudflare account + API token | External service | Phase 1 | Public DNS + ACME blocked | Infra |
-| D-06 | Anthropic MAX plan (OpenClaw agent) | External service | Platform tooling | Agent falls back to OpenAI | DevOps |
-| D-07 | GitLab CE Docker image (hub.docker.com → Nexus mirror) | Software | Phase 2 | Bootstrap CI blocked | Platform |
-| D-08 | Teleport CE binary / Helm chart | Software | Phase 2 | Bastion deployment blocked | Security |
-| D-09 | Nexus OSS Docker image | Software | Phase 2 | Dep proxy unavailable; CI builds hit internet directly | Platform |
-| D-10 | Customer SMTP relay credentials (Exchange/Google) | Customer-provided | Phase 5 | Platform notification emails fail in prod | Customer |
-| D-11 | Customer network access (firewall rules, VPN) for site-to-site | Customer-provided | Phase 5 | Customer site integration blocked | Network |
-| D-12 | Vault backup storage (MinIO) | Internal service | Phase 2 | Vault snapshot restore impossible | Platform |
-| D-13 | Authentik SSO up before GitLab/Vault/NetBox OIDC wiring | Service ordering | Phase 2 | OIDC config fails | Platform |
-| D-14 | PostgreSQL up before GitLab/Vault/Authentik/NetBox | Service ordering | Phase 2 | Service startup fails | Platform |
-| D-15 | Nexus cache seeded before CI pipelines run at scale | Service readiness | Phase 2 | First pipeline runs hit internet; slow + brittle | Platform |
-| D-16 | Teleport deployed before pfSense blocks direct SSH | Service ordering | Phase 2 | Engineers locked out if firewall rule applied early | Security |
-| D-19 | `lib-synology-dsm` Python library — production ready before Ansible collection porting | Software/lib | Platform automation | Ansible collection blocked without it | Platform | ✅ v0.7.0 — exception hierarchy, ensure() idempotency, dry_run, 45 unit tests, CI green, commitizen |
+Captured here for audit trail. Full original entries are preserved in the pre-refactor archive at [`docs/archive/2026-04-14-pre-cleanup/`](archive/2026-04-14-pre-cleanup/) where applicable.
+
+| ID | Item | Resolved |
+|---|---|---|
+| R-21 | ADR number collision between `lib-synology-dsm` and `doc-platform-core` | 2026-04-14 — scoped refactor uses per-scope numbering, no global collision possible |
+| R-22 | `vmbrMGMT` live link to Arista prod fabric VLAN 600 | 2026-04-03 — renamed `vmbrMGMT` → `vmbrFAB`, bridge disabled |
+| R-23 | Nexus OSS VM provisioned at 2 GB RAM | 2026-04 — corrected to 6 GB in `infra-terraform-proxmox` |
+| R-02 | PostgreSQL single instance | 2026-04-13 — superseded by [`services/0004-database-strategy`](adr/services/0004-database-strategy.md) (HA from day 1) |
+| R-04, R-11 | Teleport-related risks | 2026-04 — Teleport removed from plan; OOB via `vmbrOOB` + break-glass per [`identity/0004 §5`](adr/identity/0004-os-accounts.md) |
+| R-09, R-15 (Arista), R-16, R-17 | Arista fabric risks | 2026-04 — Arista fabric out of current scope; OPNsense is the platform firewall per [`services/0001`](adr/services/0001-opnsense.md) |
+| R-13, R-24, R-25, R-26 | Licensing drift (Vault BUSL, Redis ≥7.4, AGPL tools) | 2026-04-14 — consolidated into [`security/0005-licensing-policy`](adr/security/0005-licensing-policy.md) |
+| I-26 | NFS routing from PoC VM to NAS untested | 2026-04-01 — storage architecture corrected; VMs never mount NFS directly |
+| I-27 | `vmbrOOB` break-glass bridge not created | 2026-04-03 — created via Proxmox API; `active=0`, `autostart=0` |
+| I-28 | Flat ADR-0010 naming convention had stale prod examples | 2026-04-14 — folded into [`naming/0001-infra`](adr/naming/0001-infra.md) |
+| I-29 | Flat ADR-0015 missing WireGuard specification | 2026-04-14 — folded into [`infra/0004-network-architecture`](adr/infra/0004-network-architecture.md) |
+| I-30 | `ansible-platform` had no OPNsense role or bootstrap playbook | 2026-04-03 — role scaffold + bootstrap playbook created (ansible-platform PR #4) |
+| I-19, I-20, I-21 | Stale GitHub issues, Terraform state backup, OOB gateway doc fixes | 2026-03-28/29 |
+| I-01..I-06 | OpenClaw token, Discord stability, template extensions, npm/Go proxy choice | 2026-03-25 |
 
 ---
 
 ## Review cadence
 
-| Phase | RAID review |
+| Layer (per [`status.md`](status.md)) | RAID review |
 |---|---|
-| Phase 1 (Foundation) | Weekly during active work — last review: 2026-03-30 |
-| Phase 2 (Platform Services) | Weekly |
-| Phase 3+ | Bi-weekly |
+| Layer 1 in active work | Weekly |
+| Layer 2 blocked (Vault/step-ca) | Weekly once started |
+| Layer 3+ | Bi-weekly |
 | Production promotion | Full RAID review required before go-live |
 
 ---
@@ -147,6 +116,3 @@
 | 🔴 Critical | Immediate attention required |
 | 🟡 Medium | Monitor and plan mitigation |
 | 🟢 Low | Accept or defer |
-| ✅ Resolved | Closed |
-| ⚠️ Workaround | Mitigated, not fixed |
-| 🔵 Deferred | Accepted for later phase |
