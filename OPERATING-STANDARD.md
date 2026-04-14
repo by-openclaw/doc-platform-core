@@ -267,6 +267,82 @@ Every automation action is safe to run repeatedly:
 - `dry_run=True` previews without mutations
 - Check before create, check before delete
 
+### 5.3.1 Shell script patterns — `apply` / `clean` pairs
+
+When automation is implemented as shell scripts (install scripts, bootstrap helpers, tool-specific provisioning under `platform-setup/tools/{tool}/scripts/`), every script pair follows the **present / absent** intent pattern:
+
+| Script | Intent |
+|---|---|
+| `{name}-apply.sh` | Ensure resource **present** — create or update to match spec. Idempotent. |
+| `{name}-clean.sh` | Ensure resource **absent** — remove cleanly. No data loss unless `--purge` is passed explicitly. |
+
+`apply` = desired state enforced. `clean` = resource removed. Never ambiguous.
+
+**Orchestrators** call single-purpose scripts in order. No monoliths.
+
+```
+core-apply.sh       → installs base dependency
+service-apply.sh    → configures the service
+dns-sync-apply.sh   → manages DNS records
+bootstrap-apply.sh  → orchestrates: core → service → dns
+destroy-all.sh      → full teardown in reverse order
+```
+
+### 5.3.2 Dry-run is a hard gate
+
+Every `apply` script supports `--dry-run` (or `--check`):
+
+- Validates all prerequisites (dependency versions, config files present, credentials available, spec compliance)
+- Reports what **would** change — no writes, no mutations
+- **If any check fails: exit non-zero. Apply is blocked until dry-run is clean.**
+- CI pipelines run dry-run first. Apply only executes if dry-run exits 0.
+
+A failed dry-run is a hard stop. Not a warning, not a suggestion.
+
+### 5.3.3 Spec validation before apply
+
+Before any `apply` script performs a mutation, it validates that the environment matches the declared spec:
+
+- Required tool versions are present (e.g. `nginx >= 1.24`, `python >= 3.11`)
+- Required config files exist and parse correctly
+- Required credentials or tokens are retrievable (from Vault or the declared credential source)
+- Declared instances and resources are internally consistent
+
+**Spec validation failure → no apply. Ever.** The script exits non-zero and emits a specific error pointing at the failed check.
+
+### 5.3.4 Runtime config in YAML, not command-line flags
+
+Runtime configuration lives in a YAML file (`instances.yml`, `credentials.yml`, `{tool}-config.yml`). Scripts **read** config; they do not **take** config as command-line arguments.
+
+Command-line flags are reserved for **modifiers**, not data:
+
+| Allowed flags | Purpose |
+|---|---|
+| `--dry-run` / `--check` | Preview without mutation |
+| `--purge` | Data-loss opt-in on `clean` scripts |
+| `--status` | Report current state without changes |
+| `--test` | Run a self-test without modifying production state |
+
+Any other data input (hostnames, credentials, instance lists, versions) goes in the YAML config file.
+
+### 5.3.5 Per-script documentation
+
+Every script directory contains a `{name}-report.md` (or `README.md`) with:
+
+- **Structure** — what each script does, what it touches
+- **Usage** — exact commands, flags, order of execution
+- **Verification** — commands to confirm the desired state after apply
+- **Rollback** — how to recover if something goes wrong
+- **TODO** — known gaps, planned improvements
+
+Scripts without this document are considered incomplete per the §5.1 Definition of Done.
+
+### 5.3.6 Logging and output
+
+- Use consistent prefixes: `[INFO]`, `[WARN]`, `[ERROR]`, `[DRY-RUN]`
+- Dry-run output is clearly prefixed: `[DRY-RUN] would create ...`
+- No silent failures. Exit codes are meaningful and documented per script.
+
 ### 5.5 CI Workflow changes — Opus review + @yboujraf approval required
 
 Any change to `.github/workflows/` requires:
