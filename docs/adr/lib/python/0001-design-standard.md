@@ -1,7 +1,7 @@
 # lib/python/0001 — Python Library Design Standard
 
 **Status:** Draft
-**Date:** 2026-04-14 (supersedes flat ADR-0029 v2, 2026-04-08, which itself superseded v1 dated 2026-04-04)
+**Date:** 2026-05-24 (amends 2026-04-14: adds §1.4 singleton + service base patterns to support OPNsense modules — Dnsmasq, radvd, future ABSENT singletons — that do not fit the CRUD-with-UUIDs shape of `BaseManager`. Supersedes flat ADR-0029 v2 (2026-04-08), which superseded v1 (2026-04-04).)
 **Scope:** OOP architecture, class hierarchy, transport, async, match keys, validators, error handling, logging, testing, packaging, and the lib-specific PR contract for Python libraries (`lib-*` repos). Does not define generic git workflow, platform-wide redaction, credential storage, or CI hardening gates — each has its own authoritative ADR.
 **Related:** `git/0001-workflow`, `security/0001-secret-storage`, `security/0003-hardening`, `identity/0003-machine-credentials`, `naming/0004-automation`, `infra/0001-platform-stack`
 
@@ -42,10 +42,12 @@ src/{product}/
 │   ├── redaction.py         # Redactor — delegates to security/0001 redaction format
 │   ├── validation.py        # FieldValidator protocol + registry + built-in types
 │   ├── endpoint.py          # EndpointResolver — URL construction from config
-│   └── logging_helpers.py   # ManagerLogBuilder — structured log construction + timing
+│   ├── logging_helpers.py   # ManagerLogBuilder — structured log construction + timing
+│   ├── base_singleton.py    # BaseSingletonManager — fetch/diff/set for singleton config
+│   └── base_service.py      # BaseServiceManager — idempotent daemon state control
 │
 ├── managers/
-│   ├── base.py              # BaseManager — thin orchestrator (≤ 200 lines)
+│   ├── base.py              # BaseManager — CRUD-with-UUIDs orchestrator (≤ 200 lines)
 │   ├── protocols.py         # Manager typing.Protocol for DI
 │   └── {domain}/{entity}.py # Concrete managers — config only (≤ 40 lines)
 │
@@ -75,8 +77,41 @@ Directory layout follows `naming/0004-automation §4` — hierarchical `managers
 | `core/validation.py` | Everything | Validate input in CLI tools, Ansible modules, Terraform providers |
 | `core/identity.py` | Manager (needs list_fn) | Find resource by composite keys in any list of dicts |
 | `core/endpoint.py` | Everything | Generate API URLs for docs, curl scripts, API explorers |
+| `core/base_singleton.py` | Manager (needs client) | Drive any `settings/get`+`settings/set` daemon config endpoint |
+| `core/base_service.py` | Manager (needs client) | Control any `service/{status,start,stop,restart,reconfigure}` daemon |
 | `exceptions.py` | Everything | Catch typed errors in any consumer |
 | `models/base.py` | Everything | `EnsureResult` usable in any ensure-style function |
+
+#### 1.4 Three manager base patterns — choose the one that matches the API shape
+
+Vendor APIs expose resources in three distinct shapes. Each shape gets its own base class — do not force a singleton config through `BaseManager`.
+
+| API shape | Endpoints | Identity | Base class |
+|---|---|---|---|
+| **List of resources** (CRUD with UUIDs) | `search{Entity}`, `get{Entity}/{uuid}`, `add{Entity}`, `set{Entity}/{uuid}`, `del{Entity}/{uuid}` | `_match_keys` resolve a row in the list | **`BaseManager`** |
+| **Singleton config document** | `{module}/settings/get`, `{module}/settings/set` (no UUIDs, no list) | The resource IS the module — no key needed | **`BaseSingletonManager`** |
+| **Service controller** | `{module}/service/{status,start,stop,restart,reconfigure}` (no CRUD) | Target state, not a row | **`BaseServiceManager`** |
+
+**Choosing rule:** if the API surface has both per-resource CRUD AND global settings, write **two managers** — one `BaseManager` subclass per entity collection (e.g. `DnsmasqHostManager`, `DnsmasqRangeManager`), one `BaseSingletonManager` for the module-wide config (e.g. `DnsmasqSettingsManager`), and one `BaseServiceManager` for the daemon (e.g. `DnsmasqServiceManager`). Do not collapse them.
+
+**`BaseSingletonManager` contract:**
+
+- `get() → dict` — fetch current settings (inner payload, unwrapped from `_payload_key`).
+- `set(params, check_mode=False) → EnsureResult` — fetch → diff → POST only if drifted → reconfigure (when `_apply_endpoint` is set).
+- `ensure(state="present", params, check_mode=False) → EnsureResult` — only `state='present'` is supported; `state='absent'` raises `ValueError` (a singleton config cannot be deleted, only updated).
+- Validators (`_validators`), redaction (`REDACT_FIELDS`), and the §8 logging contract apply unchanged.
+
+**`BaseServiceManager` contract:**
+
+- `status() → str` — current daemon status (`'running'` | `'stopped'` | `'disabled'` | `'unknown'`).
+- `start() / stop() / restart() / reconfigure()` — direct action methods (NOT idempotent on their own).
+- `ensure(state, check_mode=False) → EnsureResult` with valid states:
+  - `'running'`      — start if not in `{running}`, noop otherwise.
+  - `'stopped'`      — stop if not in `{stopped, disabled, unknown}`, noop otherwise.
+  - `'reconfigured'` — **always** acts (no noop semantics — caller is explicitly asking for a config re-read).
+- Severity per action: DEBUG=noop, INFO=start/restart/reconfigure, WARNING=stop, ERROR=failure.
+
+Both bases honor the §3 transport contract, §6 validation, §7 exceptions, §8 logging contract, and §10.2 mandatory test set unchanged.
 
 ### 2. Dependency injection
 
@@ -467,6 +502,7 @@ Ansible modules and Terraform providers consume the library via the current inst
 
 Revise this ADR when:
 - A new domain-specific pattern is needed that doesn't fit the current `core/` component set
+- A vendor API exposes a resource shape that fits neither `BaseManager` (CRUD-with-UUIDs), `BaseSingletonManager` (settings get/set), nor `BaseServiceManager` (service controller) — add a fourth base
 - An additional exception type is needed across all libraries
 - The match-key pattern is insufficient for a new resource class (unlikely — composite keys cover every case so far)
 - A new testing framework replaces `pytest`
