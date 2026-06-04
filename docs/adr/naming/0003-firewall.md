@@ -33,6 +33,28 @@ The **`alias_` prefix is not used** — every object in this section is already 
 - One atomic alias per distinct concept. Duplicates (`net_mgmt` + `net_management`) are a violation.
 - The first token (`net`, `host`, `port`, `url`) is the **kind**, and it determines the OPNsense alias type (Network, Host, Port, URL). Ansible-managed aliases derive the OPNsense type from this token.
 
+### 1a. Dual-stack family suffix (IPv4 / IPv6)
+
+OPNsense evaluates firewall rules **per address family** — a rule is `inet` or
+`inet6`, and an alias referenced by an IPv4 rule must hold IPv4 content. A
+dual-stack deployment therefore maintains **separate IPv4 and IPv6 alias
+families**. To distinguish them, the kind token MAY carry a `4` / `6` suffix:
+
+| Pattern | Example |
+|---|---|
+| `net{4,6}_{zone}` | `net4_mgmt`, `net6_mgmt` |
+| `grp_net{4,6}_{scope}` | `grp_net4_internal`, `grp_net6_internal` |
+| `host{4,6}_{service}` | `host4_fw_gateways`, `host6_fw_gateways` |
+
+**Rules:**
+- The suffix is used **only** for the v4/v6 split. A single-family or
+  mixed-content alias keeps the unsuffixed form (`host_adguard`, `port_https`,
+  `host_public_resolvers`).
+- Both families of a zone share the same `{zone}` token so they read as a pair
+  (`net4_mgmt` ↔ `net6_mgmt`).
+- All other §1 rules still apply (lowercase, one concept per alias, no `alias_`
+  prefix, the kind token determines the OPNsense alias type).
+
 ### 2. Group aliases — only with semantic justification
 
 Group aliases exist **only** when a shared policy concept can be stated in one sentence.
