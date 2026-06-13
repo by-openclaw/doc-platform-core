@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.0](https://github.com/by-openclaw/doc-platform-core/compare/v0.6.0...v0.7.0) (2026-06-04)
+
+
+### Features
+
+* centralize agent contract files — single source of truth ([7349b86](https://github.com/by-openclaw/doc-platform-core/commit/7349b866dfdd5a2a7687d3e54d58d4a8ee04836c))
+
+
+### Bug Fixes
+
+* **agents:** link to doc-platform-core for agent contract files ([ce0dd9e](https://github.com/by-openclaw/doc-platform-core/commit/ce0dd9e81524c9385d8f50900c6f43f05f6c7a25))
+* **agents:** remove unreachable OPERATING-STANDARD.md link ([87fd763](https://github.com/by-openclaw/doc-platform-core/commit/87fd76318faca453b3f6b5737466c21c0c07ebab))
+* **agents:** restore OPERATING-STANDARD reference as plain text ([f0dd35e](https://github.com/by-openclaw/doc-platform-core/commit/f0dd35eb8af100d8c4926a7d9e3ef98ccdbd8e4e))
+
 ## [0.6.0](https://github.com/by-openclaw/doc-platform-core/compare/v0.5.1...v0.6.0) (2026-04-11)
 
 
