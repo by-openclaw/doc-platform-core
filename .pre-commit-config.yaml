@@ -1,0 +1,29 @@
+repos:
+  # Secret detection — blocks commits containing passwords, API tokens, private keys
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: |
+          (?x)^(
+            \.secrets\.baseline|
+            tests/integration/.*\.sh|
+            \.env\.example
+          )$
+
+  # General hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+
+  # No language linter here: this repo is not a Python library, and CI owns
+  # its own linting. This config exists for the secret guard.
