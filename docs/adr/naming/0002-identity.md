@@ -91,13 +91,15 @@ Linux groups are **bare names** (no prefix), matching Linux convention (`sudo`, 
 
 There are two kinds of Linux groups on this platform, and they are named differently:
 
+> **`{org}` — deployment variable.** The deployment's organisation short-name, resolved from the domain per [`naming/0001-infra §9`](0001-infra.md): **`by-research`** for the `by-research.be` deployment (a future client `client-xyz.com` → `client-xyz`). The **local break-glass admin account and its primary group are named `{org}`** — a placeholder resolved from the deployment manifest, exactly like `{domain}`/`{env}`, **never a hardcoded literal.** (Distinct from the human-admin email domain `@by-systems.be` in §2, which is the operator's own domain.)
+
 #### 5.1 User primary groups — created with each account
 
 Every user account has a primary group with the **same name as the user**, auto-created by `useradd` (Linux default). The SSH-allowed list in sshd hardening references these primary groups directly.
 
 | Group | Created with user | Auth method | In sshd `AllowGroups`? |
 |---|---|---|---|
-| `by-systems` | **Local break-glass** (always in `/etc/passwd`, never Authentik) | Key from anywhere + **password from OOB CIDR** (via `break-glass` role group, see §5.2) | ✅ (default) |
+| `{org}` | **Local break-glass** (always in `/etc/passwd`, never Authentik) | Key from anywhere + **password from OOB CIDR** (via `break-glass` role group, see §5.2) | ✅ (default) |
 | `rune` | `svc-rune-{env}` — interactive service account (human at keyboard via Rune agent) | Key only | ✅ (default) |
 | `ansible` | `svc-ansible-{env}` — non-interactive automation account (playbooks, CI) | Key only + `ansible_become_pass` from Vault | ⏸ will be added when that account is provisioned (planned, post-Vault) |
 | `adm_yboujraf` | Human admin account (Authentik when live, local fallback) | Key only | Added on hosts where admin presence is required |
@@ -105,7 +107,7 @@ Every user account has a primary group with the **same name as the user**, auto-
 
 These names are **not a naming convention** — they are mechanical consequences of account creation (`useradd foo` creates `foo:foo`). Adding a new user that should SSH means adding the corresponding primary group to `hardening_ssh_allow_groups`.
 
-**Critical — only `by-systems` can use password auth.** All other accounts (`svc-rune-*`, `svc-ansible-*`, `adm_*`, standard humans) are **key-only, always**, regardless of source network. The OOB password fallback is reserved exclusively for the local-only break-glass identity. This is enforced by the `break-glass` role group membership (§5.2), which contains only `by-systems`.
+**Critical — only `{org}` can use password auth.** All other accounts (`svc-rune-*`, `svc-ansible-*`, `adm_*`, standard humans) are **key-only, always**, regardless of source network. The OOB password fallback is reserved exclusively for the local-only break-glass identity. This is enforced by the `break-glass` role group membership (§5.2), which contains only `{org}`.
 
 **Passphrase-less SSH keys are forbidden — all credentials via Vault:**
 
@@ -115,7 +117,7 @@ The passphrase itself is never stored on disk and never carried in the account. 
 
 | Account | Passphrase source | Retrieved by |
 |---|---|---|
-| `by-systems` | Operator memory (primary) + Vault KV (backup) | Typed at console / SSH during break-glass |
+| `{org}` | Operator memory (primary) + Vault KV (backup) | Typed at console / SSH during break-glass |
 | `svc-rune-{env}` | **Vault KV** (`secret/{env}/svc-rune/ssh-passphrase`) | Rune agent at session start — `ssh-add` with Vault-sourced passphrase |
 | `svc-ansible-{env}` | **Vault KV** (`secret/{env}/svc-ansible/ssh-passphrase`) | Ansible runtime — `ssh-agent` populated via Vault lookup |
 | `adm_yboujraf` | Operator memory + personal Vaultwarden (see §2 note on Vaultwarden vs HashiCorp Vault) | Typed by human at session start |
@@ -148,7 +150,7 @@ Role groups are created by Ansible, not by `useradd`. They represent capabilitie
 
 | Group | Members | Purpose | Referenced by |
 |---|---|---|---|
-| **`break-glass`** | `by-systems` only | **SSH gate AND password-auth fallback from OOB CIDR** — both via one group | `ansible-platform/roles/hardening/templates/sshd_config.j2` — appears in `AllowGroups` **and** in the `Match Group ... Address <oob-cidr>` block |
+| **`break-glass`** | `{org}` only | **SSH gate AND password-auth fallback from OOB CIDR** — both via one group | `ansible-platform/roles/hardening/templates/sshd_config.j2` — appears in `AllowGroups` **and** in the `Match Group ... Address <oob-cidr>` block |
 | `sudo` | Selected users per host | Sudo access (standard Linux, sudoers) | PAM, `/etc/sudoers.d/*` |
 | `docker` | `svc-rune` on container hosts only | Docker ops — root-equivalent, restricted per `identity/0004 §7` | Docker daemon |
 
