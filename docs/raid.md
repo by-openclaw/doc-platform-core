@@ -1,6 +1,6 @@
 # Platform RAID Log
 
-> **Last updated:** 2026-04-14
+> **Last updated:** 2026-08-29
 > **Maintained by:** Rune — update on every sprint/phase review or when a blocker changes state
 > **Scope:** Platform-wide RAID per [`OPERATING-STANDARD.md §7.1`](../OPERATING-STANDARD.md). Per-repo RAIDs live in each repo's own `RAID.md`.
 
@@ -27,6 +27,7 @@ Items that are now formally captured in a scoped ADR's `§Pending decisions` or 
 | R-12 | Nexus upstream proxy blocked by corporate firewall / ISP | 🟡 Medium | OPNsense egress rule explicitly allows Nexus outbound. | [`services/0001-opnsense`](adr/services/0001-opnsense.md) |
 | R-20 | Ansible LXC (CT100) has no static IP — DHCP only | 🟡 Medium | Static DHCP reservation in OPNsense once production instance is live. | [`services/0001`](adr/services/0001-opnsense.md) |
 | R-27 | `lib-synology-dsm` `verify_ssl=False` default — MitM risk in non-lab environments | 🟡 Medium | Documented in repo CLAUDE.md HARD RULES. Flip default once step-ca + `ca-trust` roll out (Layer 2). | [`security/0004-certificate-strategy`](adr/security/0004-certificate-strategy.md) |
+| R-28 | Privileged-access **MFA not enforced** — `adm_*`, break-glass `{org}`, and interactive `svc-*` logins are key/password-only, no second factor | 🟡 Medium | Structural controls present (admin/user split, group RBAC, sudo-password, bastion session recording, VPN-only admin). **MFA on privileged logins via Authentik is the outstanding control** — effectively required by **NIS2 Art. 21(2)(j)** / **ISO 27001 A.8.5**; blocks privileged-access compliance sign-off. `identity/0004` CISO map already flags NIS2 "⚠ partial — MFA via Authentik future". | [`identity/0001`](adr/identity/0001-authentication.md), [`identity/0004-os-accounts`](adr/identity/0004-os-accounts.md) |
 
 ---
 
