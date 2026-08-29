@@ -17,13 +17,15 @@ The platform runs service accounts (`svc-rune`), automation accounts (`svc-ansib
 
 | Account | Type | Purpose | Source | Always available |
 |---|---|---|---|---|
-| `svc-rune` | Service | Interactive ops, API, git | Authentik (future), local (now) | Depends on Authentik |
-| `svc-ansible` | Automation | Ansible, CI/CD, non-interactive | Local | ✅ |
-| `by-systems` | Local admin | OOB/break-glass, console | Always local (`/etc/passwd`) | ✅ |
+| `svc-rune-{env}` | Service | Interactive ops, API, git | Authentik (future), local (now) | Depends on Authentik |
+| `svc-ansible-{env}` | Automation | Ansible, CI/CD, non-interactive | Local | ✅ |
+| `{org}` | Local admin | OOB/break-glass, console | Always local (`/etc/passwd`) | ✅ |
+
+**Names are authoritative in [`naming/0002-identity`](../naming/0002-identity.md)** — service accounts `svc-{function}-{env}` (§3), primary groups `{org}`/`rune`/`ansible` and the role groups (§5), and the `{org}` break-glass account. **There is no `sshuser` group** (§5.3). This ADR governs account **lifecycle**, not names; any account/group names in the prose below are illustrative.
 
 **Rules:**
-- `by-systems` is never deleted — last-resort break-glass.
-- `svc-rune` (human at keyboard) is separate from `svc-ansible` (automation). Compromised CI token must not give interactive access.
+- `{org}` is never deleted — last-resort break-glass. Teardown is **disable, never delete**.
+- `svc-rune-{env}` (human at keyboard) is separate from `svc-ansible-{env}` (automation). Compromised CI token must not give interactive access.
 
 ### 2. SSH keys
 
@@ -99,17 +101,12 @@ Implementation: `ansible-platform/roles/hardening/templates/sshd_config.j2`.
 
 ### 7. Groups
 
-| Group | Members | Purpose |
-|---|---|---|
-| `sshuser` | svc-rune, by-systems | `AllowGroups` in sshd hardening |
-| `sudo` | svc-rune, by-systems | Sudo access |
-| `break-glass` | by-systems | Password fallback from OOB CIDR (§5) |
-| `docker` | svc-rune **only** | Docker ops — **on container hosts only** |
+Group **names and membership** are authoritative in [`naming/0002-identity §5`](../naming/0002-identity.md) — not duplicated here. sshd `AllowGroups` uses the **bare primary groups** (`{org}`, `rune`, and `ansible` once `svc-ansible-{env}` is provisioned) plus `break-glass` (§5.1/§5.3) — **there is no `sshuser` group.** `sudo`, `break-glass`, and `docker` are role groups created by Ansible (§5.2). This section adds only the lifecycle rule below.
 
 **`docker` group rules:**
 - Group membership is created **only on VMs where Docker is installed** (Ansible `user-mgmt` role, conditional on `docker_installed` fact).
-- **Only `svc-rune`** is added. `by-systems` is **not** added — docker group = root equivalence, which conflicts with the least-privilege break-glass role.
-- `by-systems` can still run docker in emergencies via `sudo docker ...` (slower, audited, acceptable for break-glass).
+- **Only `svc-rune`** is added. `{org}` is **not** added — docker group = root equivalence, which conflicts with the least-privilege break-glass role.
+- `{org}` can still run docker in emergencies via `sudo docker ...` (slower, audited, acceptable for break-glass).
 
 ### 8. Agent autoload (`.bashrc`)
 

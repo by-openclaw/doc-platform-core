@@ -77,6 +77,27 @@ This is enforced in `ansible-platform/roles/ca-trust` (new, to be created as par
 - LE wildcards require DNS-01 challenge — Cloudflare API token is stored in Vault at `secret/prod/traefik/cloudflare-api-token`.
 - step-ca wildcards are issued via ACME with HTTP-01 or DNS-01, internal-only resolver. No per-hostname cert generation — Traefik reuses the zone wildcard.
 
+### Device / appliance certificates
+
+Not every TLS endpoint sits behind Traefik. The rule:
+
+- **Fronted by Traefik** (the device's UI/API is proxied) → Traefik terminates TLS with the zone wildcard; the device needs **no cert of its own**. Reachability (internet or internal) follows the exposure model — split-DNS overlay for on-net clients, public DNS for external.
+- **Terminates its own TLS** (an appliance/controller that forces `https`/`wss` on itself, or the edge firewall which sits *in front of* Traefik and cannot be fronted by it) → a cert is **issued and installed onto the device** by the shared **`cert-issue`** role:
+  - real FQDN + ACME-capable (e.g. OPNsense) → **LE** via DNS-01, the device renews itself;
+  - real FQDN, not ACME-capable → **LE** zone wildcard pushed by `cert-issue`, or a step-ca leaf;
+  - internal-only name, IANA-reserved (`example.com`/lab), or air-gapped → **step-ca** leaf via `cert-issue`; the device trusts the chain because `ca-trust` distributed the step-ca root.
+- **No self-signed anywhere**, on any device.
+
+`cert-issue` is a **shared, reusable role** (same pattern as the Traefik-route include) — cert issuance/install logic lives once and is consumed by each device/service role that terminates its own TLS. It is distinct from `ca-trust` (root distribution) and Traefik's ACME resolver (fronted services).
+
+### Client / mTLS certificates
+
+Client-authentication (mTLS, and WSS-with-client-auth) is **in scope**, issued by **step-ca only** — LE issues server certs, never client certs:
+
+- `cert-issue` requests a **client leaf** from step-ca for the calling identity.
+- The app imports the client cert + the step-ca root; the server validates the presented chain against the step-ca root.
+- Used for service-to-service mTLS and dev/lab endpoints requiring client-auth. Internal-CA + split-DNS is the resolution/trust path (see §Device certificates).
+
 ### Cross-OS note
 
 Certificate strategy is **transport-agnostic** — it applies identically to Linux hosts (current) and Windows 11 / Windows Server hosts (future, WinRM transport — see `git/0003-configuration §11`). The difference is in root CA distribution:
@@ -104,7 +125,7 @@ Revise when:
 - step-ca is replaced by a different internal PKI (HashiCorp Vault PKI engine, cfssl, etc.)
 - Cloudflare is replaced as the DNS provider for LE DNS-01 challenges
 - Wildcard issuance becomes insufficient (e.g. a per-service cert is required for pinning or compliance)
-- Client-auth certs (mTLS) are introduced at scale — current scope is server certs only
+- Client-auth certs (mTLS) — now defined (step-ca via `cert-issue`, see §Client / mTLS certificates); revise if a different client CA or a hardware-token model is introduced
 - Windows hosts are introduced and the `ca-trust` role gains a Windows branch
 
 ## CISO mapping
