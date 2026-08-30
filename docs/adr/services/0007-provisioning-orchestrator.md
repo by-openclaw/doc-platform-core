@@ -143,6 +143,30 @@ Decommissioning runs the same 8 steps in reverse, each as `state=absent`:
 2. Release IP back to IPAM
 1. Mark identity as decommissioned in NetBox (never deleted — history preserved)
 
+### 7.1 Lifecycle applies to EVERY object class (2026-08-30)
+
+Provision/decommission symmetry is not a service-only rule. **Every object
+that exists in the platform has a managed lifecycle with BOTH directions**
+(`state: present` / `state: absent` — absent meaning the class's contract
+teardown, e.g. disable-never-delete for accounts, archive-before-destroy for
+data):
+
+| Object class | Owner of the lifecycle |
+|---|---|
+| Services (full chain) | this ADR §1/§7 + `service_decommission` |
+| OS accounts & groups | `identity/0004` (disable, never delete) |
+| Databases + roles | `services/0004` (dump + drop via decommission) |
+| S3 buckets + identities | `services/0009` (archive-before-destroy) |
+| Guests (VM/LXC) | Terraform (destroy) after the Ansible reverse chain |
+| Network: VLANs, FW aliases/rules, DHCP leases | `services/0006` catalog (state per entry) |
+| IPs + FQDNs (public + split-DNS) | steps 2/5 of this chain, reversed |
+| Certificates | `security/0004` (revoke/retire with the endpoint) |
+| Secrets | `security/0001` (retire to archive, never orphan) |
+| Mailboxes | `services/0002` (registry-driven add/remove) |
+
+A resource with no absent-path is a contract violation — nothing may exist in
+the platform that cannot be cleanly removed by code.
+
 ### 8. Cross-OS scope
 
 The chain is the same for Linux VMs, LXCs, FreeBSD (OPNsense), Windows VMs (future). Per-OS specifics live in Step 6 (Ansible role); the orchestrator does not branch on OS at steps 1–5 or 7–8.
