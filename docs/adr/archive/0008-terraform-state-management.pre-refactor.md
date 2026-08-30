@@ -1,8 +1,8 @@
 # ADR-0008 — Terraform State Management
 
-**Status:** Accepted  
-**Date:** 2026-03-29  
-**Author:** @yboujraf + Rune  
+**Status:** Accepted
+**Date:** 2026-03-29
+**Author:** @yboujraf + Rune
 
 ---
 
@@ -22,8 +22,8 @@ The Rune VM is ephemeral by nature (PoC, not HA). A remote backend is required t
 
 State is backed up to **Synology NAS** after every `apply` or `destroy`:
 
-- **NAS path:** `/by-terraform-state/<env>/terraform.tfstate`  
-- **Backup script:** `infra-terraform-proxmox/scripts/backup-state.py`  
+- **NAS path:** `/by-terraform-state/<env>/terraform.tfstate`
+- **Backup script:** `infra-terraform-proxmox/scripts/backup-state.py`
 - **Wrapper:** `infra-terraform-proxmox/scripts/tf.sh` — replaces bare `terraform` invocations
 
 Backup is triggered automatically by `tf.sh` on successful `apply` or `destroy`.

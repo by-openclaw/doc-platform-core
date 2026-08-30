@@ -1,6 +1,6 @@
 # PoC Platform Design — BY-SYSTEMS
-> Status: Phase 1 — Install Only  
-> Last updated: 2026-04-01  
+> Status: Phase 1 — Install Only
+> Last updated: 2026-04-01
 > Owner: yboujraf / Rune
 
 ---

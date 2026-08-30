@@ -1,9 +1,9 @@
 # ADR 0001 — Platform Stack Decisions
 
-**Date:** 2026-03-25  
-**Status:** Accepted  
+**Date:** 2026-03-25
+**Status:** Accepted
 **Scope:** BY-SYSTEMS internal DevOps PoC platform (Tier 1 base + Tier 2 optional modules)
-**Authors:** BY-SYSTEMS platform team  
+**Authors:** BY-SYSTEMS platform team
 **Related docs:** `docs/stack.md`, `docs/naming-convention.md`, `docs/archive/brainstorm-2026-03-25.md`
 
 ---

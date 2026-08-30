@@ -1,6 +1,6 @@
 # BY-SYSTEMS — Naming Convention
-**Last updated:** 2026-04-01  
-**Status:** Draft — living document  
+**Last updated:** 2026-04-01
+**Status:** Draft — living document
 **Scope:** All projects (internal + customer deployments)
 
 > **Key principle:** One slug, three systems.
@@ -123,7 +123,7 @@ org-tpl/
 ```
 {customer-short-name}
 ```
-Examples: `acme`, `client-a`, `telenet`, `isp1`  
+Examples: `acme`, `client-a`, `telenet`, `isp1`
 Must match NetBox **tenant slug**.
 
 ---
@@ -219,7 +219,7 @@ Closes #42
 ```
 
 ### Breaking changes
-Add `!` after type/scope OR add `BREAKING CHANGE:` footer.  
+Add `!` after type/scope OR add `BREAKING CHANGE:` footer.
 Breaking changes bump MAJOR version.
 
 ---
@@ -231,7 +231,7 @@ Breaking changes bump MAJOR version.
 {type}-{subject}-{YYYY-MM-DD}.md
 ```
 
-Subject: lowercase, hyphens, descriptive.  
+Subject: lowercase, hyphens, descriptive.
 Date: ISO 8601 (`YYYY-MM-DD`).
 
 ### Document types
@@ -369,7 +369,7 @@ vm-db-prod-02
 ```
 
 ### Service naming in NetBox
-Service name = component slug from repo name.  
+Service name = component slug from repo name.
 Matches FQDN prefix and Prometheus job label.
 
 | NetBox service name | Repo | FQDN | Prometheus job |
@@ -587,7 +587,7 @@ deploy@platform-gitlab-core 2026-03-25
 | `acceptance` | Acceptance | UAT, customer sign-off |
 | `prod` | Production | Live |
 
-**Lite track** (simple SME): `dev → staging → prod`  
+**Lite track** (simple SME): `dev → staging → prod`
 **Full track**: `dev → test → staging → acceptance → prod`
 
 Environment appears in: branch names, FQDNs, K8S namespaces, image tags, Grafana tags, NetBox device names.
@@ -609,7 +609,7 @@ assets/
   media/        # screen recordings, demo videos (.mp4, compressed via Handbrake)
 ```
 
-> `assets/exports/` is what `.md` files link to. Never link directly to `assets/diagrams/`.  
+> `assets/exports/` is what `.md` files link to. Never link directly to `assets/diagrams/`.
 > `assets/media/` files must be compressed before commit (Handbrake, target ≤ 50 MB per file).
 
 ### Git LFS tracked extensions (`.gitattributes`)
@@ -701,18 +701,18 @@ Relative paths only. No absolute paths, no external image URLs in committed docs
 | `dev` / `test` / `staging` / `acceptance` | **Mailcow** (self-hosted) | `example.com` (internal) | Full stack: SMTP, IMAP, CalDAV, CardDAV |
 | `prod` | External provider | real domain | Microsoft Exchange, Google Workspace, or equivalent |
 
-> **Why `example.com` for non-prod?**  
+> **Why `example.com` for non-prod?**
 > RFC 2606 reserves `example.com` — safe to use internally with no risk of leaking mail externally. Mailcow is configured to be authoritative for this domain on the internal DNS (`*.poc.by-systems.be`).
 
 ---
 
 ### Mailcow (non-prod)
 
-**Service name:** `platform-mailcow-{env}` (e.g. `platform-mailcow-dev`)  
-**FQDN:** `mail.example.com` (internal DNS only)  
-**Webmail:** `https://mail.example.com`  
-**SMTP:** `smtp.example.com:587` (STARTTLS)  
-**IMAP:** `imap.example.com:993` (TLS)  
+**Service name:** `platform-mailcow-{env}` (e.g. `platform-mailcow-dev`)
+**FQDN:** `mail.example.com` (internal DNS only)
+**Webmail:** `https://mail.example.com`
+**SMTP:** `smtp.example.com:587` (STARTTLS)
+**IMAP:** `imap.example.com:993` (TLS)
 **CalDAV/CardDAV:** `https://mail.example.com` (via SOGo)
 
 #### Test domains per environment

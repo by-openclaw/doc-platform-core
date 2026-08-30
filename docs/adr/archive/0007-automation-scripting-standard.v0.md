@@ -1,8 +1,8 @@
 # ADR-0007 — Automation & Scripting Standard
 
-**Status:** Accepted  
-**Date:** 2026-03-29  
-**Author:** @yboujraf + Rune  
+**Status:** Accepted
+**Date:** 2026-03-29
+**Author:** @yboujraf + Rune
 
 ---
 
