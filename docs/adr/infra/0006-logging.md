@@ -1,6 +1,7 @@
 # infra/0006 — Logging
 
 **Status:** Draft
+> ⚠ **Implementation gap (verified 2026-08-30):** Loki runs (`lxc-monitoring-01`, SeaweedFS backend) but **Promtail is not deployed on the fleet** — nothing ships yet, including the auditd trail `security/0003 §8` depends on. Shipping lands with the monitoring workstream.
 **Date:** 2026-04-13 (supersedes flat ADR-0017, 2026-04-02)
 **Scope:** Platform-wide log aggregation — Loki + Promtail, object storage backend, retention, and the no-PII rule. Does not define monitoring (metrics), audit logging policy beyond retention, or per-service log format.
 **Related:** `infra/0007-monitoring`, `security/0001-secret-storage` (Vault audit log target), `security/0003-hardening §8` (audit logging requirement), `infra/0008-backup-strategy`
@@ -37,10 +38,10 @@ Loki uses **S3-compatible object storage** as the backend. Two deployment modes:
 
 | Phase | Backend | Location |
 |---|---|---|
-| **Current / small scale** | MinIO on-prem | `vm-minio-01` in SVC zone |
+| **Current / small scale** | SeaweedFS on-prem (see `services/0009-object-storage`) | `lxc-seaweedfs-01` in SVC zone |
 | **Larger scale** | Contabo S3 | Off-site, encrypted at rest |
 
-Boundary between the two is sized by log volume and retention — the platform may run both (MinIO for recent logs, Contabo for cold archive). Boundary details are operational, not architectural.
+Boundary between the two is sized by log volume and retention — the platform may run both (SeaweedFS for recent logs, Contabo for cold archive). Boundary details are operational, not architectural.
 
 ### Retention
 
@@ -105,7 +106,7 @@ Alerting on log patterns is **not** in this ADR — it lives in `infra/0007-moni
 - **Every service emits structured JSON.** Services that can't (legacy components) use syslog, which is an exception requiring justification in the service's `docs/monitoring.md`.
 - **Secrets in logs are a hard violation, not a soft warning.** Caught via application-level masking, pre-commit hooks, and manual review during PR — never via Loki-side scrubbing.
 - **Audit logs and normal application logs share one stack.** Differentiation is by label and retention class, not by separate infrastructure.
-- **No ELK, no Splunk, no commercial log management.** Loki + MinIO is the only supported stack.
+- **No ELK, no Splunk, no commercial log management.** Loki + SeaweedFS S3 is the only supported stack.
 
 ## Revision triggers
 
