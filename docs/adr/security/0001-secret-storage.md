@@ -128,7 +128,7 @@ Vaultwarden (Bitwarden-compatible, self-hosted, OSS) stores **human-facing crede
 2. Master password for Vaultwarden is memorized + stored **nowhere else** — if forgotten, the vault is unrecoverable (design)
 3. 2FA on Vaultwarden is mandatory — TOTP via Authentik
 4. Break-glass: a printed recovery kit is held in a physical safe for the org-shared vault only, containing the recovery key. Never printed for personal vaults.
-5. Vaultwarden deployment details (backup, HA, network exposure) are defined in future `services/0006-password-manager`
+5. Vaultwarden deployment details (backup, HA, network exposure) are defined in a future `services/` ADR (number assigned when written — `services/0006` is taken by firewall-services). Vaultwarden itself is deployed (`lxc-vaultwarden-01`).
 
 ### Redaction
 
@@ -150,15 +150,17 @@ Any time a secret appears in committed text (docs, issues, PR descriptions, comm
 
 This ADR is **platform-scoped only**. How individual libraries (`lib-opnsense`, `lib-synology-dsm`) accept credentials at their API boundary is governed by each library's own ADRs (typically a `CredentialProvider` abstraction — see `lib/python/0001-design-standard` when refactored from flat 0029). This ADR tells you **where credentials live on the platform**, not how a library receives them.
 
-## Transitional state — pre-Vault
+## Operating model — fabric working copy + Vault mirror (current), AppRole reads (target)
 
-HashiCorp Vault is not yet deployed. The current transitional state uses flat JSON files in `workspace/infra/secrets/*.json` with the Vault path embedded as a metadata field, so migration is mechanical:
+HashiCorp Vault **is deployed** (raft storage, HTTPS, daily raft-snapshot DR). The operating model has two stages:
 
-```
-vault kv put secret/{env}/{service}/{key} field1=value1 field2=value2
-```
+**Current (fabric + mirror):**
 
-**The transitional JSON schema and migration commands are runbook content, not architecture** — they live in `platform-setup/runbooks/secrets-migration.md`, not in this ADR. When Vault is deployed, the runbook executes once, then the JSON files are deleted. This ADR defines only the target state.
+- The controller holds per-credential JSON **fabric files** (`workspace/infra/secrets/fabric/`, mode 0600) — the **deploy-time working copy**: Ansible roles generate-if-absent and read these at provisioning time, so deployments work even while Vault is sealed or being restored.
+- `ansible-platform/playbooks/secrets-to-vault.yml` mirrors every fabric file into Vault KV v2 at the §path convention (write-if-absent, drift-reported); `secrets-validate.yml` authenticates each mirrored secret against its **live** service. **Vault is the authoritative mirror and the DR source** — the fabric copy is rebuildable from Vault, and vice versa.
+- **Exception that must stay a file:** Vault's own bootstrap (unseal material) can never live only inside Vault; it is held off-platform per §Rules (cold storage), never in the running cluster.
+
+**Target (AppRole runtime reads):** services and rotation workflows read from Vault directly via AppRole + per-service policies (§Per-service access policies); fabric files then shrink to bootstrap-only. Moving a consumer from fabric-read to Vault-read is a per-service change tracked in the roadmap — until then the fabric copy is the contract for deploy-time reads.
 
 ## Consequences
 
