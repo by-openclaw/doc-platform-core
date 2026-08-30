@@ -1,6 +1,6 @@
 # `{{REPO_NAME}}`
 
-> **Scope:** `{{SCOPE}}` | **Component:** `{{COMPONENT}}` | **Status:** `{{STATUS}}`  
+> **Scope:** `{{SCOPE}}` | **Component:** `{{COMPONENT}}` | **Status:** `{{STATUS}}`
 > **GitLab:** `org/{{SCOPE}}/{{REPO_NAME}}` | **License:** `{{LICENSE}}`
 
 <!-- One or two sentences. What does this repo do and why does it exist? -->
@@ -166,7 +166,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 <!-- Link to diagrams or embed a simple ASCII/PlantUML diagram here -->
 
-Diagrams: [`docs/diagrams/`](docs/diagrams/)  
+Diagrams: [`docs/diagrams/`](docs/diagrams/)
 ADRs: [`docs/adr/`](docs/adr/)
 
 ```

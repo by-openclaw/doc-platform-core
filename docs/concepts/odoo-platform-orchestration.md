@@ -1,8 +1,8 @@
 # Concept: Odoo → Platform Orchestration
 
-**Status:** Concept — not scheduled  
-**Date:** 2026-03-29  
-**Author:** @yboujraf + Rune  
+**Status:** Concept — not scheduled
+**Date:** 2026-03-29
+**Author:** @yboujraf + Rune
 
 ---
 

@@ -1,6 +1,6 @@
 # BY-SYSTEMS Platform — Technology Stack
-**Last updated:** 2026-04-01  
-**Status:** Locked (PoC phase)  
+**Last updated:** 2026-04-01
+**Status:** Locked (PoC phase)
 **Philosophy:** Open source, self-hosted, free tier — no vendor lock-in
 
 All tools run on Docker (minimum) with Kubernetes migration path via Helm.
@@ -181,9 +181,9 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 | **CISO Assistant** (intuitem) | GRC platform — Risk, Compliance, Audit, TPRM, Privacy (ISO 27001, NIS2, NIST, SOC2, DORA, GDPR, 100+ frameworks) | AGPL v3 | ✅ Self-hosted | ✅ | ✅ |
 | **Eramba** | ISO 27001 program management, risk register, controls | AGPL v3 | ✅ Community | ✅ | — |
 
-> **Standards targeted:** ISO 27001, NIS1, NIS2, DORA, GDPR  
-> **CISO Assistant** = GRC governance layer (risk register, compliance evidence, audit trails)  
-> **DefectDojo** = vulnerability aggregation layer (all scanner outputs in one dashboard)  
+> **Standards targeted:** ISO 27001, NIS1, NIS2, DORA, GDPR
+> **CISO Assistant** = GRC governance layer (risk register, compliance evidence, audit trails)
+> **DefectDojo** = vulnerability aggregation layer (all scanner outputs in one dashboard)
 > **Scan layers:** code (Semgrep) → dependencies (OWASP DC) → IaC (Checkov) → containers (Trivy) → network (OpenVAS) → runtime (Falco) → compliance (Wazuh + OpenSCAP) → GRC (CISO Assistant)
 
 ---
@@ -195,8 +195,8 @@ All tools run on Docker (minimum) with Kubernetes migration path via Helm.
 | Mailcow | Self-hosted mail stack: SMTP, IMAP, CalDAV, CardDAV, Webmail (SOGo) | MIT | ✅ Self-hosted | ✅ | — |
 | Thunderbird | Mail/calendar client for dev/test/staging validation | MPL 2.0 | ✅ | — | — |
 
-> **Non-prod only.** Mailcow runs against internal `example.com` domain (RFC 2606 reserved) for dev/test/staging/acceptance environments.  
-> Production mail uses the customer's existing provider (Exchange, Google Workspace, etc.).  
+> **Non-prod only.** Mailcow runs against internal `example.com` domain (RFC 2606 reserved) for dev/test/staging/acceptance environments.
+> Production mail uses the customer's existing provider (Exchange, Google Workspace, etc.).
 > Outbound relay from platform services (GitLab, Grafana, Authentik) uses SMTP relay → customer SMTP in prod.
 
 ---
@@ -403,10 +403,10 @@ Lite track (simple SME): `dev → staging → prod`
 
 ## IPv4 + IPv6
 
-All services bind dual-stack.  
-NetBox manages both address families.  
-DNS: A + AAAA records for every FQDN.  
-pfSense: IPv4 + IPv6 firewall rules per VLAN.  
+All services bind dual-stack.
+NetBox manages both address families.
+DNS: A + AAAA records for every FQDN.
+pfSense: IPv4 + IPv6 firewall rules per VLAN.
 K8S: dual-stack service/pod CIDR.
 
 ---

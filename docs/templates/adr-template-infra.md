@@ -21,7 +21,7 @@
 
 ## Context
 
-<!-- 
+<!--
   What problem is this solving? Which environment tier(s) are affected?
   - State the situation before the decision was made.
   - Reference relevant prior ADRs if applicable.
@@ -31,7 +31,7 @@
 
 ## Decision
 
-<!-- 
+<!--
   One clear statement of what was decided.
   Start with a bold summary sentence, then detail below.
   Example: "**Deploy Vault on SVC VLAN using step-ca TLS with internal root CA.**"
@@ -39,7 +39,7 @@
 
 ## VM / Resource Spec
 
-<!-- 
+<!--
   OMIT THIS SECTION if the decision does not involve VM provisioning.
   Fill in all rows; write "N/A" if a field does not apply.
 -->

@@ -1,5 +1,5 @@
 # ORG DevOps Platform — Brainstorm Session
-**Date:** 2026-03-25  
+**Date:** 2026-03-25
 **Status:** In progress — decisions locked, formal docs pending
 
 ---
