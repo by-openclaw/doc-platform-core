@@ -1,4 +1,4 @@
-# services/0008 — Object Storage (S3)
+# services/0009 — Object Storage (S3)
 
 **Status:** Draft
 **Date:** 2026-08-29

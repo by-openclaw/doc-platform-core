@@ -89,10 +89,10 @@ The following policy thresholds must be set by @yboujraf before this ADR moves f
 
 | # | Decision | Options / reference | Status |
 |---|---|---|---|
-| 1 | **Off-site backup target** | Contabo S3, Backblaze B2, Hetzner Storage Box, AWS S3 Glacier, rsync.net | ⚠ TBD |
+| 1 | **Off-site backup target** | **LOCKED 2026-08-30: Contabo S3** (live: PBS S3 datastore + Vault snapshots + `infra-backup-s3-contabo`) | ✅ locked |
 | 2 | **PostgreSQL backup schedule** | Daily `pg_dump` + continuous WAL archiving? PITR window length? | ⚠ TBD |
 | 3 | **Redis backup schedule** | `BGSAVE` hourly / daily? RDB + AOF hybrid? | ⚠ TBD |
-| 4 | **Vault Raft snapshot schedule** | Hourly (typical) or daily? | ⚠ TBD |
+| 4 | **Vault Raft snapshot schedule** | **LOCKED 2026-08-30: daily** raft snapshot → NFS + S3 + controller (`roles/vault_backup`) | ✅ locked |
 | 5 | **GitLab application backup schedule** | Daily? Delta or full? | ⚠ TBD |
 | 6 | **Retention — hot (NAS)** | Typical: 7–14 days | ⚠ TBD |
 | 7 | **Retention — cold (off-site)** | Typical: 30 days to 1 year depending on tier | ⚠ TBD |
@@ -128,3 +128,8 @@ Revise when:
 | ISO 27001:2022 | A.8.13 (information backup — documented policy), A.5.30 (ICT readiness for business continuity — ⚠ partial, drill cadence TBD), A.8.14 (redundancy — ⚠ partial, off-site target TBD) |
 | NIS2 | Art. 21(2)(c) (backup management, disaster recovery, crisis management — ⚠ partial pending off-site + drill cadence) |
 | GDPR | Art. 32(1)(c) (ability to restore availability — drill-tested restore is the evidence) |
+
+## Locked operational rules (codified 2026-08, `playbooks/pbs-pve-storage.yml`)
+
+- The PBS VM never backs up into its own S3 datastore (circular — its DR copy goes to NFS); excluded by VMID auto-detection.
+- OPNsense (FreeBSD) runs with `freeze-fs-on-backup=0` — fs-freeze deadlocks the guest; flag is Ansible-owned, applied via `qm reboot` (a guest reboot does not cycle QEMU).

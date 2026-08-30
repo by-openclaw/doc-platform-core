@@ -110,7 +110,7 @@ All administrative actions are logged. Log destination is Loki (see `infra/0006-
 **Rules:**
 - Host-level auditd enabled on all VMs, forwarded to Loki via promtail
 - SSH session activity logged via sshd + PAM, forwarded to Loki
-- Bastion / jump host session recording via Teleport (future — see revision triggers)
+- Bastion / jump host session recording via **JumpServer CE** (deployed: `lxc-jumpserver-01`, Authentik SSO, asset-scoped accounts, session replays stored in S3)
 - Audit log retention: **180 days** (doubles the NIS2 Art. 23 minimum; matches ISO 27001 auditor expectations)
 - Audit logs themselves are immutable from the perspective of platform service accounts — write-once to Loki
 
@@ -164,7 +164,7 @@ Revise when:
 - Trivy is replaced by a different scanner (Snyk, Grype, etc.)
 - Lynis is replaced or a Windows equivalent is added
 - A new CVE severity level or scoring system supersedes CVSS 3.x
-- Teleport is deployed for session recording (adds §8 details)
+- JumpServer is replaced as the bastion (e.g. Teleport) — §8 changes with it
 - Wazuh is deployed for host-based intrusion detection (adds §8 details)
 - Windows 11 / Windows Server hosts are introduced (adds §10 Windows baseline)
 - A new compliance framework (DORA, SOC 2, PCI-DSS) forces a threshold change

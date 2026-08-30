@@ -65,6 +65,12 @@ The **site code answers "where does this asset logically live"**, not "which phy
 - Cloud assets use a **per-provider** code (`cb` for Contabo, `ht` reserved for Hetzner, etc.). Migrating between providers is rare and major — a rename then is acceptable and explicit.
 - Adding a new site requires updating this table via ADR amendment.
 
+### 4.1 Physical node + PVE storage naming — `poc` token retired (2026-08-30)
+
+- The token `poc` is **retired from all names** (it was never a site code in §4 and reads as an env tier, which `infra/0005` forbids). The live node `srv-proxmox-poc-01` is renamed per this ADR's pattern — target **`br-pmox-01`** (§3's own example) — with `br-pmox-02` for the second physical host. The rename is executed by the **PVE node provisioning workstream** (fresh provisioning / maintenance window), never as ad-hoc surgery.
+- **PVE storage IDs** are env- and site-free, `{content}-{backend}`: `data-zfs` (guest disks), `iso-nfs` (ISO/templates), `pbs-s3` (backup datastore). Current `poc-data` / `poc-iso` migrate at the same workstream (storage IDs are referenced by every guest config — rename only with the tooling, in a window).
+- ⚠ **Pending decision (fleet naming):** the live fleet uses `{type}-{fullservice}-{seq}` (`vm-adguard-01`, `lxc-traefik-01`) while §3/§4 contract `{site}-{svc}-{seq}` with LXCs under `vm-` (`vm-adgd-01`). Either the ADR is amended to bless the live convention, or guests are renamed at rebuild. Owner: @yboujraf.
+
 ### 5. Service codes
 
 Service codes are lowercase, 3-7 chars, chosen to be unambiguous and readable. The **canonical list lives in NetBox** as the platform's service/role vocabulary (see `services/0003-netbox-cmdb` §Roles). This ADR lists examples only — the authoritative list is maintained alongside the NetBox deployment.
