@@ -54,6 +54,15 @@ families**. To distinguish them, the kind token MAY carry a `4` / `6` suffix:
   (`net4_mgmt` ↔ `net6_mgmt`).
 - All other §1 rules still apply (lowercase, one concept per alias, no `alias_`
   prefix, the kind token determines the OPNsense alias type).
+- **Rules are dual-stack by intent**: every rule on a dual-stack interface exists
+  as an `inet` + `inet6` pair (same description, the v6 twin suffixed `v6`).
+- **Single-family interfaces (transitional).** During the pfSense → OPNsense
+  migration some interfaces carry one address family only — the OOB management
+  network, and the Proximus WAN while Telenet still terminates on the PROD
+  pfSense. Rules on those interfaces are legitimately single-family and need no
+  twin. The catalog names them explicitly (`opn_single_family_interfaces`); an
+  entry is removed the day its interface becomes dual-stack, and the catalog
+  lint then demands the twin. This exception disappears with the migration.
 
 ### 2. Group aliases — only with semantic justification
 
