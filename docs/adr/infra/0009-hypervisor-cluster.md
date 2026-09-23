@@ -38,7 +38,7 @@ A hardware refresh is on the table (vendor build sheet of 2026-09), and the plat
 | Network | 2 × 25 GbE SFP28 (storage and cluster mesh) + 4 × 1 GbE (management, corosync ring 0 and 1, OOB) | corosync wants its own low-latency link; storage traffic never shares it |
 | Power / BMC | dual PSU on two feeds; BMC on the OOB zone (`infra/0004` zone 1) | |
 | Reference builds | the "Small A" class (single-socket EPYC 9355P) meets every row; the equivalent Dell 1U chassis meets it **when ordered with the same CPU** and its RAID controller in HBA mode | the 128- to 192-core builds of the same sheet are rejected: lower clock, twice the power, cores the platform cannot use |
-| 100 GbE (optional) | a dual-port NVIDIA ConnectX is optional for Ceph rebuild bandwidth | **mandatory only where a node also serves media workloads built on the NVIDIA Rivermax stack, which runs on NVIDIA ConnectX / BlueField adapters only. Such real-time media workloads do not share a node with this platform** (§6) |
+| 100 GbE (optional) | a dual-port NVIDIA ConnectX is optional for Ceph rebuild bandwidth | **mandatory only for media hosts built on the NVIDIA Rivermax stack, which runs on NVIDIA ConnectX / BlueField adapters only. Those hosts run the vendor's own bare-metal Ubuntu image and are never virtualised, so they are never nodes of this cluster** (§6) |
 
 ### 3. Networks the cluster uses (zones per `infra/0004`)
 
@@ -66,7 +66,7 @@ A hardware refresh is on the table (vendor build sheet of 2026-09), and the plat
 
 ### 6. The Kubernetes layer
 
-Proxmox with Ceph is the substrate for what is not container-shaped: the firewall pair, the backup server, jump host, customer workstations. The Kubernetes cluster (k3s or RKE2, `infra/0001`) runs as three control-plane VMs spread over the three nodes plus worker VMs; its persistent volumes come from the same Ceph through the CSI driver (block for databases, object for what the S3 service does today). Services move to it as they are containerised; the hardware does not change. Real-time media workloads (§2, Rivermax class) run on their own certified hosts, never as guests of this cluster.
+Proxmox with Ceph is the substrate for what is not container-shaped: the firewall pair, the backup server, jump host, customer workstations. The Kubernetes cluster (k3s or RKE2, `infra/0001`) runs as three control-plane VMs spread over the three nodes plus worker VMs; its persistent volumes come from the same Ceph through the CSI driver (block for databases, object for what the S3 service does today). Services move to it as they are containerised; the hardware does not change. Real-time media workloads (§2, Rivermax class) run bare-metal on the vendor's Ubuntu image on their own certified hosts, never as guests or nodes of this cluster; the same node class may be bought for them (spares, support), with the ConnectX added, and they enter the platform as a **vendor-appliance** service class: BMC on the OOB zone, media VLANs per `infra/0004`, administration through the bastion, configuration backup, monitoring only as the vendor permits, no platform hardening beyond what the vendor supports.
 
 ### 7. Resilience targets enabled by three nodes (each is a service pass, tracked separately)
 
