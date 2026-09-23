@@ -44,7 +44,7 @@ A hardware refresh is on the table (vendor build sheet of 2026-09), and the plat
 
 - **Corosync:** dedicated 1 GbE link pair (ring 0 and ring 1), never on the storage or guest networks.
 - **Ceph public and cluster:** the 25 GbE mesh, in the Storage zone.
-- **Guest networks:** every node port that carries guests is an **identical trunk** of all platform VLANs **and both ISP VLANs**, so the firewall VM, and later its CARP pair, can run on any node. Bridge and SDN zone names are identical on every node (`infra/0004 §Proxmox SDN`). The ISP handoffs therefore terminate on the switch, not on a node port.
+- **Guest networks:** every node port that carries guests is an **identical trunk** of all platform VLANs **and both ISP VLANs**, so the firewall VM, and later its CARP pair, can run on any node. Bridge and SDN zone names are identical on every node (`infra/0004 §Proxmox SDN`). The ISP handoffs already arrive this way — a dedicated ISP switch distributes them as tagged VLANs and the current node takes them as VLAN sub-interfaces (`nic0.<wan1>`, `nic1.<wan2>`), not as raw ports — so adding a node is a **port-configuration task on that switch**, not re-cabling.
 - **Management and OOB:** per `infra/0004`; the BMCs and the switch console stay in the OOB zone.
 
 ### 4. Storage tiers
@@ -58,7 +58,7 @@ A hardware refresh is on the table (vendor build sheet of 2026-09), and the plat
 
 ### 5. Growth path and the cutover from the current node
 
-1. Switch: identical trunks on the node ports, ISP VLANs included.
+1. Switch: give the new node's ports the same VLANs the current node's carry — the platform VLANs and both ISP VLANs (already distributed by the dedicated ISP switch).
 2. Node one installed as cluster node one, ZFS on its NVMe, subscription taken.
 3. The current node **joins the cluster**; VMs migrate live (the platform already pins a CPU type both generations share), containers move with a short restart; the firewall moves inside a maintenance window using the proven rebuild or a migration once its ISP VLANs are on the trunk; the old node leaves the cluster.
 4. Node two: ZFS replication + quorum device. Node three: Ceph, guests move to it, ZFS data pools retired.
@@ -80,7 +80,7 @@ Firewall pair (CARP), PostgreSQL replica (`services/0004`), ingress pair, identi
 ## Consequences
 
 **Enables:** host resilience, live migration for maintenance, a real Kubernetes cluster, workstations at scale, retirement of the 2012 node.
-**Constrains:** node one must be bought with its NVMe and 25 GbE ports even though a single node does not need the mesh; the switch must trunk the ISP VLANs before the firewall can leave the old node; hostnames and corosync addresses are final once joined.
+**Constrains:** node one must be bought with its NVMe and 25 GbE ports even though a single node does not need the mesh; each new node's switch ports must carry the same VLANs (platform + both ISP) before the firewall can run there; hostnames and corosync addresses are final once joined.
 **Known risks:** two-node interim depends on the external quorum device; Ceph at three nodes gives 15 TB usable from 46 TB raw (three replicas), which is ample today but sets the growth unit to "one node with four drives".
 
 ## Revision triggers
