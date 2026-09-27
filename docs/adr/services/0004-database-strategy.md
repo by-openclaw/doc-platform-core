@@ -122,6 +122,8 @@ Every service that consumes the shared PostgreSQL has:
 | NetBox | `netbox` | CMDB records — the authoritative platform catalog |
 | Vaultwarden | `vaultwarden` | User vault metadata (encrypted vault data is stored in Vaultwarden's own structure, not raw in PG) |
 | Nextcloud | `nextcloud` | File metadata, shares, user accounts (when Nextcloud is deployed) |
+| NetBird | `netbird` + `netbird_events` | Management store (accounts, peers, routes, policies) and the activity-event store — migrated from SQLite in the container volume, 2026-09-27 |
+| pgAdmin | `pgadmin` | pgAdmin's own state (users, per-user servers, preferences) — moved from SQLite in the container volume, 2026-09-27 |
 
 **Adding a new PostgreSQL consumer** = add a row to this table via ADR amendment.
 
