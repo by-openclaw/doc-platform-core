@@ -124,6 +124,9 @@ Every service that consumes the shared PostgreSQL has:
 | Nextcloud | `nextcloud` | File metadata, shares, user accounts (when Nextcloud is deployed) |
 | NetBird | `netbird` + `netbird_events` | Management store (accounts, peers, routes, policies) and the activity-event store — migrated from SQLite in the container volume, 2026-09-27 |
 | pgAdmin | `pgadmin` | pgAdmin's own state (users, per-user servers, preferences) — moved from SQLite in the container volume, 2026-09-27 |
+| Harbor | `harbor` | Registry metadata (image blobs are in SeaweedFS S3, not in PG) — on the shared PostgreSQL since first deployment, 2026-08-28 |
+| Grafana (`monitoring`) | `grafana` | Grafana's own state (users, dashboards, preferences) — on the shared PostgreSQL since first deployment (never on SQLite), 2026-08-26 |
+| CISO Assistant (`grc`) | `grc` | Compliance posture (frameworks, perimeters, applied controls; evidence files are in SeaweedFS S3, not in PG) — on the shared PostgreSQL since first deployment, 2026-09-24 |
 
 **Adding a new PostgreSQL consumer** = add a row to this table via ADR amendment.
 
@@ -149,7 +152,6 @@ These services are listed explicitly to prevent accidental "let's connect them t
 | **Traefik** | None | Config is static / API, not database-backed. |
 | **Vault (HashiCorp)** | Own Raft storage | Vault's integrated Raft is the supported backend. Using PostgreSQL as Vault backend is supported by HashiCorp but is not used on this platform. |
 | **step-ca** | File-based | step-ca's BadgerDB / file backend is sufficient. |
-| **Grafana** | SQLite default (small scale) or shared PostgreSQL (if scale requires) | **Decision deferred** — start with SQLite (simplest, native), migrate to shared PostgreSQL if Grafana grows beyond single-instance. If migrated, Grafana is added to the §Per-service database table and to `services/0003-netbox-cmdb §3 role=mon` entry. |
 
 **Rule:** a service is a consumer only if it appears in the §Per-service database table (PostgreSQL) or the §Redis consumers table. Everything else is explicitly a non-consumer.
 
@@ -265,7 +267,6 @@ Revise this ADR when:
 - A service is explicitly moved **off** the shared instances (rare — would be a major deployment change)
 - PostgreSQL is replaced by a different relational DB (very unlikely)
 - Redis is replaced by a different cache / queue (more likely — e.g. Valkey fork, KeyDB)
-- Grafana is migrated from SQLite to shared PostgreSQL (add Grafana to §Per-service database table)
 - Vaultwarden encrypted vault storage moves to PostgreSQL (currently uses its own structure)
 - Patroni is replaced by a different HA mechanism (e.g. CloudNativePG if the platform moves fully to Kubernetes)
 - Any §Deferred decision is resolved
