@@ -1,7 +1,7 @@
 # services/0004 — Database Strategy
 
 **Status:** Draft
-**Date:** 2026-04-14 (supersedes flat ADR-0018, 2026-04-02)
+**Date:** 2026-04-14 (supersedes flat ADR-0018, 2026-04-02); amended 2026-09-29 — isolation is ownership + owner-only `CONNECT`, credentials at `db-pgsql` (the text now matches what the platform enforces)
 **Scope:** Centralized PostgreSQL and Redis for platform services — who consumes them, how they are isolated, how credentials flow, and the HA roadmap. Does not define backup mechanics (see `infra/0008-backup-strategy`), exporter configuration (see `infra/0007-monitoring`), or specific VM names / IPs (those live in NetBox).
 **Related:** `security/0001-secret-storage`, `services/0003-netbox-cmdb`, `infra/0007-monitoring`, `infra/0008-backup-strategy`, `services/0002-email-infrastructure`
 
@@ -22,7 +22,7 @@ The policy must be explicit about both concerns: **shared but isolated** at the 
 - **PostgreSQL cluster** (Patroni, 3 nodes) hosts **all platform services that use PostgreSQL**. No single-instance deployment.
 - **Redis cluster** (Sentinel, 3 sentinels + primary + replica) hosts **all platform services that use Redis**. No single-instance deployment.
 - Each service gets its own **database** (not schema) on PostgreSQL. No schema-sharing between services.
-- Each service gets its own **database user** with grants scoped to **its own database only**. Cross-service queries are impossible at the database layer.
+- Each service gets its own **database** and a login **role that owns it**; only the owner may connect (`PUBLIC` holds no `CONNECT` or `TEMPORARY` on any application database). Cross-service access is impossible at the database layer.
 - Each service that uses Redis gets its own **logical database number** (`SELECT n` per client connection) or its own key prefix, per service's native support.
 
 **Rule:** no platform service depends on a single-instance PostgreSQL or Redis. A node loss must not cause service outage — it must cause at most a brief reconnection pause while the cluster re-elects.
@@ -112,8 +112,8 @@ Every service that consumes the shared PostgreSQL has:
 
 1. Its own database (name = service short code from `naming/0001-infra §5`)
 2. Its own dedicated user (`{service}_app` or similar — per-service convention allowed, tracked in NetBox)
-3. Grants: `CONNECT` + `USAGE` on its own schema, `SELECT/INSERT/UPDATE/DELETE` on its own tables — **nothing else**
-4. Credentials stored in HashiCorp Vault at `secret/{env}/{service}/db-password` per `security/0001-secret-storage`
+3. Ownership, not table grants: the role **owns** its database, because every application runs its own schema migrations (DDL) — **nothing beyond it**: owner-only `CONNECT`, no superuser, no grants to or from other roles
+4. Credentials stored in HashiCorp Vault at `secret/{env}/{service}/db-pgsql` per `security/0001-secret-storage`
 
 | Service | Database name | Purpose |
 |---|---|---|
@@ -160,26 +160,28 @@ These services are listed explicitly to prevent accidental "let's connect them t
 Credentials never appear in git, in docker-compose files, in environment variables, or in service config outside of Vault:
 
 ```
-1. Ansible creates the database + user during Layer 5 service deployment
-   (role: shared-db-provisioning — reads service list from NetBox)
+1. Each service's own deployment creates its database + owner role
+   (the reusable postgres_db role; the consumers are the services catalog
+   entries marked as shared-PostgreSQL users)
 
-2. Ansible generates a random password (≥32 chars, alphanumeric + symbols)
+2. Ansible generates a random password (≥32 chars) the first time only —
+   Vault get-or-create — and Vault stays the source of truth afterwards
 
-3. Ansible writes the password to Vault at:
-     secret/{env}/{service}/db-password
+3. The password lives in Vault at:
+     secret/{env}/{service}/db-pgsql
 
-4. Ansible configures the service (docker-compose, systemd, Helm) to read
-   the credential at runtime via Vault Agent sidecar or environment
-   injection — never from a static file on disk.
+4. At deploy time Ansible reads the credential from Vault and renders it
+   into the service's own configuration on its host (compose environment,
+   config file). Nothing is committed to git. Runtime injection (Vault Agent)
+   is a possible later step, not the current mechanism.
 
-5. Password rotation is a one-command Ansible task:
-     - generate new password
-     - ALTER USER on PostgreSQL
-     - update Vault
-     - restart the service (service re-reads Vault at startup)
+5. Password rotation = write the new password to Vault, then re-run the
+   service's deployment: postgres_db sets the role's password from Vault
+   (it re-syncs any drift on every run), the configuration is re-rendered
+   and the service restarted.
 ```
 
-All grants are applied with `GRANT ... ON DATABASE <service>` and `GRANT ... ON ALL TABLES IN SCHEMA public TO {service}_app`. No `GRANT ALL PRIVILEGES ON ALL DATABASES` anywhere.
+Isolation is enforced by **ownership plus owner-only access**: each database is created with its service role as owner, and `CONNECT` + `TEMPORARY` are revoked from `PUBLIC` on every database except the maintenance one (the cluster role re-applies this on every run). Remote connections are `hostssl` with `scram-sha-256`. No role other than the cluster superuser (used by backups) has rights outside its own database.
 
 ### Failover behavior
 
@@ -277,4 +279,4 @@ Revise this ADR when:
 |---|---|
 | ISO 27001:2022 | A.8.6 (capacity management — ⚠ partial, single instance is a PoC trade-off), A.8.13 (backup — delegated to `infra/0008`), A.8.27 (secure system architecture — per-service DB users with least-privilege grants, no schema sharing) |
 | NIS2 | Art. 21(2)(c) (business continuity — ⚠ partial, single PostgreSQL is a known SPOF until Phase 2 Patroni HA) |
-| GDPR | Art. 32(1)(b) (integrity, confidentiality — per-service DB users with least-privilege grants prevent cross-service data access) |
+| GDPR | Art. 32(1)(b) (integrity, confidentiality — per-service owner roles with owner-only `CONNECT` prevent cross-service data access) |
