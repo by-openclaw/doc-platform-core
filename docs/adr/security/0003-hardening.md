@@ -1,7 +1,7 @@
 # security/0003 — Platform Hardening Baseline
 
 **Status:** Accepted
-**Date:** 2026-04-14 (thresholds locked; supersedes flat ADR-0021, 2026-04-02); amended 2026-10-02 — §4: vendor images are scanned at the registry (Harbor) with a block on fixable Critical; the zero-high gate stays for images the platform builds
+**Date:** 2026-04-14 (thresholds locked; supersedes flat ADR-0021, 2026-04-02); amended 2026-10-02 — §1: vendor images that start as root and drop privileges are an accepted, registered exception; §4: vendor images are scanned at the registry (Harbor) with a block on fixable Critical; the zero-high gate stays for images the platform builds
 **Scope:** Platform-wide hardening baseline — non-root processes, image hygiene, patch cadence, scanning gates, audit logging.
 **Related:** `security/0001-secret-storage`, `security/0004-certificate-strategy`, `identity/0004-os-accounts §5` (SSH break-glass), `git/0003-configuration`, `infra/0006-logging` (future)
 
@@ -22,6 +22,8 @@ Every container and service process **must** run as a non-root UID. No exception
 - Host services (systemd units) use dedicated system users, not `root`
 - Init containers that need privileged capabilities drop them before the main process starts
 - `docker run --user` override is not a workaround — the image itself must ship non-root
+
+**Vendor images that start as root and drop privileges:** an upstream image whose entrypoint runs as root only to prepare the filesystem and then serves every request from non-root workers (the Apache/nginx master–worker model, uid 33/101) is accepted when (1) the image is pinned and the platform does not build it, (2) the root process is the vendor master only — every worker, cron and sidecar process runs as a non-root UID (`docker exec … ps` proves it), (3) the entry is in the service's override register (`docs/override-hardening.md`: image, the UIDs the workers run as, review date), and (4) a rootless upstream variant replaces it when one exists. This is the exception path of §1, not a relaxation: a service process serving requests as root remains a finding.
 
 ### 2. Image hygiene
 
