@@ -1,7 +1,7 @@
 # naming/0001 — Infrastructure Naming
 
 **Status:** Draft
-**Date:** 2026-04-13 (supersedes part of flat ADR-0010, 2026-03-31)
+**Date:** 2026-04-13 (supersedes part of flat ADR-0010, 2026-03-31); amended 2026-10-02 — §6.1: in the internal split-DNS zone a proxied service URL is a host *alias* of the proxy asset's override (the resolver has no CNAME override); PTR stays with the asset
 **Scope:** Patterns for physical hosts, VMs, LXCs, DNS names, and related infrastructure assets.
 **Related:** `naming/0002-identity`, `services/0003-netbox-cmdb` (future, from flat 0009), `infra/0005-environment-tiers` (future, from flat 0012)
 
@@ -129,13 +129,13 @@ Every asset and every service URL must resolve **both** IPv4 and IPv6. Single-st
 |---|---|---|
 | **Asset FQDN** — physical host, VM, LXC | `A` + `AAAA` | Direct IPv4 + IPv6 of the asset (NetBox `primary_ip4` + `primary_ip6`) |
 | **Asset FQDN** — asset behind NAT / no public IPv6 | `A` + `AAAA` (ULA or RFC1918/GUA as applicable) | Internal IPv4 + IPv6 via internal resolver |
-| **Service URL** — user-facing via reverse proxy | `CNAME` → `{proxy-asset-fqdn}` | The proxy (e.g. `vm-trfk-01`) which has its own `A` + `AAAA` |
+| **Service URL** — user-facing via reverse proxy | public zone: `CNAME` → `{proxy-asset-fqdn}`; internal split-DNS zone: host **alias** of the proxy asset's override | The proxy (e.g. `vm-trfk-01`) which has its own `A` + `AAAA`. The internal resolver (Unbound on the firewall) has no CNAME override type; an alias expands to the asset's `A` + `AAAA`, follows the asset when it moves, and never carries a `PTR` |
 | **Service URL** — direct-served (rare, no proxy) | `A` + `AAAA` | Same IPs as the underlying asset |
 | **Reverse DNS** | `PTR` (both `in-addr.arpa` and `ip6.arpa`) | Matching asset FQDN |
 
 **Rules:**
 1. **No `A`-only or `AAAA`-only records.** Every asset and every service URL must have both. If IPv6 is not yet provisioned for an asset, that asset is not considered complete — track as a NetBox gap, not a permanent state.
-2. **Service URLs are always `CNAME` when possible.** Direct `A` + `AAAA` for a service URL is allowed only when there is no reverse proxy in front (e.g. `ntp.by-research.be` for an NTP server). This must be documented on the NetBox record.
+2. **Service URLs are always `CNAME` when possible** — in the public zone a `CNAME`, in the internal split-DNS zone a host alias of the proxy asset's override (same property: one change when the backend moves). A standalone `A` + `AAAA` override for a service URL is allowed only when there is no reverse proxy in front (e.g. `ntp.{domain}` for an NTP server). This must be documented on the NetBox record.
 3. **`CNAME` must not be mixed with other records at the same label.** Per RFC 1912, a `CNAME` cannot coexist with `A` / `AAAA` / `MX` / `TXT` at the same name. This rules out `CNAME` at the zone apex.
 4. **Reverse DNS (`PTR`) is mandatory for every asset.** Both `in-addr.arpa` (IPv4) and `ip6.arpa` (IPv6) — mail, logs, and some TLS validators need them. `PTR` points back at the asset FQDN, not the service URL.
 5. **No hard-coded IPs in application config.** Applications reference FQDNs. IPs are an implementation detail owned by NetBox + DNS.
