@@ -1,7 +1,7 @@
 # security/0003 — Platform Hardening Baseline
 
 **Status:** Accepted
-**Date:** 2026-04-14 (thresholds locked; supersedes flat ADR-0021, 2026-04-02)
+**Date:** 2026-04-14 (thresholds locked; supersedes flat ADR-0021, 2026-04-02); amended 2026-10-02 — §4: vendor images are scanned at the registry (Harbor) with a block on fixable Critical; the zero-high gate stays for images the platform builds
 **Scope:** Platform-wide hardening baseline — non-root processes, image hygiene, patch cadence, scanning gates, audit logging.
 **Related:** `security/0001-secret-storage`, `security/0004-certificate-strategy`, `identity/0004-os-accounts §5` (SSH break-glass), `git/0003-configuration`, `infra/0006-logging` (future)
 
@@ -57,6 +57,8 @@ Trivy runs in every repo that builds a container image. A CI gate blocks image p
 - Scan results are archived per build for evidence
 - Suppression (`.trivyignore`) requires a documented justification **per suppression entry** (CVE ID, reason, expiry date)
 - Expired suppressions re-fail the gate automatically on next run
+
+**Vendor images (not built on the platform):** every service image is pulled through the platform registry's proxy cache (Harbor) and scanned there (Trivy) on pull and on each database update. The registry's gate **blocks pulling an image with a fixable Critical CVE**; High findings are reported on the registry dashboard and alerted, non-blocking — upstream base layers rarely reach zero-high and the platform cannot rebuild them. Allowlisting a CVE at the registry follows the `.trivyignore` rule above (CVE ID, reason, expiry) as a registry CVE allowlist entry. Pinning a new vendor image version = reading its scan first.
 
 ### 5. Host hardening — Lynis
 
