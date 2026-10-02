@@ -1,7 +1,7 @@
 # identity/0001 — Authentication
 
 **Status:** Draft
-**Date:** 2026-04-12 (supersedes flat ADR-0004, 2026-03-27)
+**Date:** 2026-04-12 (supersedes flat ADR-0004, 2026-03-27); amended 2026-10-02 — HA target stays 2 active/active instances, reached on the container platform; the single-instance interim is an accepted, registered risk
 **Scope:** Platform IAM — who you are when you log in to any tool.
 **Related:** `identity/0002-provisioning`, `identity/0003-machine-credentials`, `identity/0004-os-accounts`
 
@@ -66,7 +66,7 @@ Tools only ever talk to Authentik. The upstream directory is invisible to them.
 
 - Authentik is the only mandatory identity component
 - MFA is enforced centrally (TOTP), independent of upstream
-- **Deployment:** Authentik runs as 2 instances (active/active HA) to eliminate SPOF
+- **Deployment:** target = 2 Authentik instances (active/active HA) to eliminate the SPOF, delivered when the service moves to the container platform (k3s) where a second replica is a scaling decision, not a second VM. **Interim (accepted):** one instance on its own guest, restart-on-failure, backed up (PBS) and restorable; the SPOF is a registered risk in the GRC registry with this ADR as the owner of its closure.
 
 ## CISO mapping
 
