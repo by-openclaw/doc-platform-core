@@ -1,7 +1,7 @@
 # identity/0002 — Provisioning & Sync
 
 **Status:** Draft
-**Date:** 2026-04-12 (supersedes flat ADR-0024, 2026-04-02)
+**Date:** 2026-04-12 (supersedes flat ADR-0024, 2026-04-02); amended 2026-10-02 — break-glass = the bootstrap admin credential at `secret/{env}/{tool}/admin`, alert on any read by a non-deploy identity; the 4-hour reconciliation runs as a GitLab scheduled pipeline on the platform runner
 **Scope:** How identity propagates from Authentik to platform tools.
 **Related:** `identity/0001-authentication`, `naming/0001-naming-convention` §Authentik groups, `security/0001-secret-storage`
 
@@ -18,7 +18,7 @@ Authentik tells a tool who a user is. It does **not** create the user inside tha
 1. **Authentik = IAM source of truth** — users, groups, policies live in Authentik. Tools are downstream consumers.
 2. **Vault = credentials source of truth** — all API tokens, client secrets in Vault.
 3. **Ansible = provisioning engine** — one generic `identity-sync` role, per-tool adapters.
-4. **Manual changes in tool UIs = break-glass only** — reconciliation cron corrects drift within 4h.
+4. **Manual changes in tool UIs = break-glass only** — reconciliation corrects drift within 4h. The reconciliation is a **GitLab scheduled pipeline** (every 4h) on the platform runner, running the identity playbook with the deploy AppRole; on-demand runs from an operator workstation are for development and incident response, never the only path.
 5. **Webhook = trigger only** — Ansible re-reads Authentik API before applying. Never trust webhook payload as state.
 
 ## Architecture
@@ -123,7 +123,7 @@ Every tool follows 3 steps:
 | 2. Rotate | Ansible rotates post-deploy |
 | 3. Federate | Day-to-day via Authentik SSO |
 
-Break-glass path: `secret/{env}/{tool}/break-glass`. Wazuh alert on any use.
+Break-glass credential = the bootstrap admin of step 1, at `secret/{env}/{tool}/admin` (one path per tool; no separate copy — a second path would be a second secret to rotate and audit). **Alert on any use:** Vault's audit log is shipped to the log platform; a read of any `secret/{env}/*/admin` path by an identity other than the deploy AppRole raises an alert (Wazuh/Alertmanager) to the on-call channel.
 
 **Vault special case:** root token revoked after init; unseal keys in encrypted cold storage.
 
