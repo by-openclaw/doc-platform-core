@@ -24,6 +24,19 @@ OPNsense (FreeBSD appliance) exposes an MVC REST API, but on the deployed build 
 | NetFlow capture enable (`setconfig`) | ❌ rejected on this build |
 | CrowdSec | ✅ |
 
+**Re-verified on 26.7.5 (2026-10-03, read-only):**
+
+| Operation | MVC API on 26.7.5 | Consequence |
+|---|---|---|
+| Interface **assignment** | ✅ `/api/interfaces/assignment/*` (the Assignments page is MVC) | cannot leave the seed alone: in `config.xml` the assignment and the IP are one `<optN>` element |
+| Interface **IP** config | ❌ still the legacy page (`interfaces.php`) | seed |
+| PPPoE device (Point-to-Point) | ❌ legacy page, API 404 | seed |
+| System general / administration (hostname, web GUI, SSH), LDAP server | ❌ legacy pages | seed |
+| Local users and groups | ✅ `/api/auth/*` (already used by the catalog) | **proposed:** the seed keeps only `root` and the genesis identity; `by-research` and `svc-ansible-prod` move to the catalog |
+| NetFlow capture | ✅ model readable (`/api/diagnostics/netflow/getconfig`); the write is to re-test on a non-production firewall | **proposed:** move the capture step from the seed tool to the catalog |
+
+Both proposals need the reproducibility gate (seed + Ansible, green twice on a throwaway firewall) before the production seed changes.
+
 Because interface **assignment + IP** and **NetFlow capture** have no working API, they can only be set in `config.xml` — i.e. the **seed**. Repeated sessions lost the working firewall config because a *minimal* seed (4 interfaces only) was deployed and the assumption "Ansible MVC will add the rest" was false for those operations. This ADR fixes the boundary so it cannot be lost again, and so config is **generated** (reproducible), never restored from a frozen backup whose per-FW details (IPs, certs, keys) would be wrong on the next FW.
 
 ## Decision
