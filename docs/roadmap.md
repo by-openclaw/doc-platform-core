@@ -39,7 +39,7 @@ For live state (what is deployed today vs pending), see [`status.md`](status.md)
 - [ ] `ansible-platform/roles/user-mgmt` — ⚠ pending verify
 - [ ] `ansible-platform/roles/git-config` — pending write per [`git/0003-configuration`](adr/git/0003-configuration.md)
 - [ ] `ansible-platform/roles/key-mgmt` — pending write (SSH/GPG key distribution)
-- [x] Debian cloud images as VM templates + the Debian 13 LXC template (Terraform); 29 of 31 Linux guests on Debian 13 (2026-10-03) — the mail VM and the CI-runner VM are still on Debian 12 (in-place upgrade playbook exists, held until the pool disk is replaced)
+- [x] Debian cloud images as VM templates + the Debian 13 LXC template (Terraform); every Linux guest on Debian 13 since 2026-10-03 (the four Debian 12 VMs were upgraded in place)
 - [x] 6 thresholds in [`security/0003-hardening §Pending decisions`](adr/security/0003-hardening.md) resolved (patch cadence, Lynis score, Trivy CVE gate, filesystem policy, retention, Lynis scope)
 - [x] Hypervisor as code (`roles/pve_host`): release pin + ladder, declared identities, firewall, config export to PBS (audit record 2026-10-03)
 

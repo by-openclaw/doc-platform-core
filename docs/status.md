@@ -15,7 +15,7 @@ Per [`infra/0002-platform-charter §Layer model`](adr/infra/0002-platform-charte
 | Layer | Name | Status | Notes |
 |---|---|---|---|
 | 0 | Standards & Templates | ✅ **Complete** | Scoped ADRs under `docs/adr/`, `OPERATING-STANDARD.md`. Open proposals: PRs #60, #65–#69. |
-| 1 | Proxmox Base | ✅ **Operational** | The hypervisor is built from the repo (`ansible-platform/roles/pve_host`, release pin + ladder); every guest carries the hardening baseline. **Open:** one pool disk failed on 2026-10-03 (pool degraded, kernel reboot held until it is replaced). |
+| 1 | Proxmox Base | ✅ **Operational** | The hypervisor is built from the repo (`ansible-platform/roles/pve_host`, release pin + ladder); every guest carries the hardening baseline and a declared start order. On 2026-10-03 a pool disk's logical volume failed on the storage controller and was brought back (resilver and scrub clean); the node was rebooted into its staged kernel. **Open:** ageing drives (a spare is advised), the controller's cache module is disabled. |
 | 2 | Vault + step-ca | ✅ **Deployed** (single instance) | Vault 2.1.1 (AppRole deploy model, boot-time unseal by the warden), step-ca 0.30.2, platform CA trusted on every guest. **Open:** HA (charter: 2 instances), offline custody of the unseal kit and of the root CA key. |
 | 3 | Identity (Authentik) | ✅ **Deployed** (single instance) | People and groups from one source (`people.yml`), OIDC / forwardAuth on every service, MFA enrolment enforced. **Open:** HA (proposal #66). |
 | 4 | Storage | ✅ **Deployed** | Synology NAS (NFS) + SeaweedFS as the S3 store (replaced MinIO per [`services/0009`](adr/services/0009-object-storage.md)); backups: PBS on S3, NAS copy with retention, off-site replication. |
@@ -30,9 +30,9 @@ Against the original stack decision (flat ADR-0001, 2026-03-25) and the current 
 | Listed tool | State | Decision |
 |---|---|---|
 | Neo4J graph CMDB | not deployed | waits for the NetBox population (owner: wait) |
-| PostgreSQL Patroni cluster + Redis Sentinel | single instance each | to build ([`services/0004`](adr/services/0004-database-strategy.md)) — after the pool disk is replaced |
-| Vault HA, Authentik HA | single instance each | to build — same condition |
-| Headlamp + k9s | not deployed | to build |
+| PostgreSQL Patroni cluster + Redis Sentinel | single instance each | to build ([`services/0004`](adr/services/0004-database-strategy.md)) — its four deferred decisions first |
+| Vault HA, Authentik HA | single instance each | to build — with the data layer |
+| Headlamp + k9s | **deployed 2026-10-03** (Headlamp signs in through Authentik; k9s on the node) | — |
 | Nexus Repository OSS | not deployed | **dropped by the owner** (Community Edition is capped); GitLab CE + Harbor + Verdaccio are the repositories |
 | Sphinx | not deployed | **replaced by the owner**: Markdown + PlantUML + Kroki |
 | Packer | not used | proposal: drop (guests come from Debian cloud images through Terraform) |
@@ -65,13 +65,13 @@ Source hosting: the repositories are still on GitHub; GitLab CE is deployed and 
 
 | # | Item | Owner |
 |---|---|---|
-| 1 | Replace the failed pool disk on the hypervisor, then resilver; then the held kernel reboot | owner (hardware), then Rune |
-| 2 | HA data layer and HA for Vault / Authentik | Rune, after item 1 |
+| 1 | A spare 300 GB SAS drive on site (several pool drives carry grown defects); the storage controller's cache module is disabled | owner (hardware) |
+| 2 | HA data layer and HA for Vault / Authentik | Rune — design proposal first (four deferred decisions of `services/0004`) |
 | 3 | ADR proposals #60, #65–#69 | owner (merge) |
 | 4 | NetBox population | waiting (owner) |
 | 5 | IoT, CCTV, RADIUS modules | design proposed; build needs the devices on their VLANs |
-| 6 | Debian 13 for the mail VM and the CI-runner VM (in-place upgrade playbook exists) | Rune, after item 1 |
-| 7 | Custody: Vault unseal kit, step-ca root key offline; mail reverse DNS at the ISPs; revoke the retired relay key | owner |
+| 7 | Native-service certificates (hypervisor and backup server consoles), read-only root filesystems, per-consumer Redis logins | Rune — next working sessions, one service at a time |
+| 6 | Custody: Vault unseal kit, step-ca root key offline; mail reverse DNS at the ISPs; revoke the retired relay key | owner |
 
 ---
 
@@ -79,7 +79,7 @@ Source hosting: the repositories are still on GitHub; GitLab CE is deployed and 
 
 | Date | What changed |
 |---|---|
-| 2026-10-03 | ADR compliance walk closed: 32 of 32 services audited, fixed, applied twice, merged. Maintenance window: PostgreSQL data checksums, Vault 2.1.1, Debian 13 on the k3s and resolver VMs (the mail and CI-runner VMs remain on Debian 12), firewall 26.7.5, object-storage quota, NAS backup retention. Monitoring reduced to the liveness set (owner direction). A pool disk failed during the window. |
+| 2026-10-03 | ADR compliance walk closed: 32 of 32 services audited, fixed, applied twice, merged. Maintenance window: PostgreSQL data checksums, Vault 2.1.1, Debian 13 on the four VMs that were still on Debian 12, firewall 26.7.5, hypervisor kernel reboot, object-storage quota, NAS backup retention. Monitoring reduced to the liveness set (owner direction). A pool disk's logical volume failed during the window and was recovered the same evening; the reboot exposed three cold-start defects (node route, no start order, Harbor), all fixed; Headlamp + k9s deployed. The mail VM's upgrade caused a 30-minute mail outage (a host mail daemon installed by the upgrade took port 25), fixed and guarded. |
 | 2026-10-01 | Service contract complete: every service containerised and on the contract (32 of 32). |
 | 2026-09 | Platform build-out: firewall rebuilt from the seed on 26.7, GitLab CE, Harbor, Verdaccio, JumpServer, Wazuh, CISO Assistant, SeaweedFS, monitoring and alerting, backups. |
 | 2026-04-14 | Scoped ADR refactor complete (flat ADRs archived). |
