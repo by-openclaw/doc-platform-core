@@ -1,31 +1,48 @@
 # Platform Status
 
-> **Last updated:** 2026-04-14
+> **Last updated:** 2026-10-03
 > **Maintained by:** Rune — update after any release, layer change, or RAID update
 > **Reading order:** `status.md` → `roadmap.md` → [`docs/adr/README.md`](adr/README.md) → relevant repo `CLAUDE.md`
 
----
-
-## Refactor milestone — 2026-04-14
-
-The scoped ADR refactor is **complete**. 30 scoped ADRs across 7 scopes under [`docs/adr/`](adr/) replace the 34 pre-refactor flat ADRs. Loose documentation files that predated the refactor are archived under [`docs/archive/2026-04-14-pre-cleanup/`](archive/2026-04-14-pre-cleanup/). Top-level repo metadata (`README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, `RAID.md`) is refreshed and consistent with the scoped structure.
-
-This `status.md` tracks platform **deployment and delivery state** — not the documentation refactor, which is done.
+This page tracks platform **deployment and delivery state**. The per-service detail (host, exposure, SSO, pin, backup, monitoring, audit record) is generated in `ansible-platform/docs/register.md` — this page does not copy it.
 
 ---
 
 ## Layer progress
 
-Per [`infra/0002-platform-charter §Layer model`](adr/infra/0002-platform-charter.md). Each layer must be documented, tested, and signed off before the next begins.
+Per [`infra/0002-platform-charter §Layer model`](adr/infra/0002-platform-charter.md).
 
 | Layer | Name | Status | Notes |
 |---|---|---|---|
-| 0 | Standards & Templates | ✅ **Complete** | 30 scoped ADRs, `OPERATING-STANDARD.md` current. Refactor completed 2026-04-14. |
-| 1 | Proxmox Base | ⚠ **Partial** | `srv-proxmox-poc-01` operational. `ansible-platform/roles/hardening` live (sshd, fail2ban, ufw, postfix). Cloud-init template + `user-mgmt` role ⚠ pending verify. |
-| 2 | Vault + step-ca | ❌ Not started | Blocker for every downstream layer. `ansible-platform/roles/ca-trust` and Vault policies pending. |
-| 3 | Identity (Authentik) | ❌ Not started | Blocked on Layer 2. |
-| 4 | Storage (Synology + MinIO) | ⚠ **Partial** | Synology DS1513+ operational, used for Terraform state backup per [`infra/0003-terraform-standard §State backend evolution`](adr/infra/0003-terraform-standard.md). MinIO not yet deployed. `lib-synology-dsm` exists and ships FileStation manager. |
-| 5 | Platform Services | ❌ Not started | NetBox, GitLab CE, Vaultwarden, observability stack, Traefik — all blocked on Layers 2–4. OPNsense is the only Layer 5–adjacent service with a live test instance (see below). |
+| 0 | Standards & Templates | ✅ **Complete** | Scoped ADRs under `docs/adr/`, `OPERATING-STANDARD.md`. Open proposals: PRs #60, #65–#69. |
+| 1 | Proxmox Base | ✅ **Operational** | The hypervisor is built from the repo (`ansible-platform/roles/pve_host`, release pin + ladder); every guest carries the hardening baseline. **Open:** one pool disk failed on 2026-10-03 (pool degraded, kernel reboot held until it is replaced). |
+| 2 | Vault + step-ca | ✅ **Deployed** (single instance) | Vault 2.1.1 (AppRole deploy model, boot-time unseal by the warden), step-ca 0.30.2, platform CA trusted on every guest. **Open:** HA (charter: 2 instances), offline custody of the unseal kit and of the root CA key. |
+| 3 | Identity (Authentik) | ✅ **Deployed** (single instance) | People and groups from one source (`people.yml`), OIDC / forwardAuth on every service, MFA enrolment enforced. **Open:** HA (proposal #66). |
+| 4 | Storage | ✅ **Deployed** | Synology NAS (NFS) + SeaweedFS as the S3 store (replaced MinIO per [`services/0009`](adr/services/0009-object-storage.md)); backups: PBS on S3, NAS copy with retention, off-site replication. |
+| 5 | Platform Services | ✅ **32 services deployed** | All on the service contract; the ADR compliance walk closed on 2026-10-03 (one audit record per service). |
+
+---
+
+## What the ADR tool list still misses
+
+Against the original stack decision (flat ADR-0001, 2026-03-25) and the current scoped ADRs. Owner decisions of 2026-10-03 are marked.
+
+| Listed tool | State | Decision |
+|---|---|---|
+| Neo4J graph CMDB | not deployed | waits for the NetBox population (owner: wait) |
+| PostgreSQL Patroni cluster + Redis Sentinel | single instance each | to build ([`services/0004`](adr/services/0004-database-strategy.md)) — after the pool disk is replaced |
+| Vault HA, Authentik HA | single instance each | to build — same condition |
+| Headlamp + k9s | not deployed | to build |
+| Nexus Repository OSS | not deployed | **dropped by the owner** (Community Edition is capped); GitLab CE + Harbor + Verdaccio are the repositories |
+| Sphinx | not deployed | **replaced by the owner**: Markdown + PlantUML + Kroki |
+| Packer | not used | proposal: drop (guests come from Debian cloud images through Terraform) |
+| Checkov, Gitleaks, OWASP Dependency-Check | not used | proposal: drop (the CI gate is Trivy: vulnerabilities, secrets, misconfiguration) |
+| DefectDojo, OpenVAS, Falco, OpenSCAP, Prowler | not deployed | proposal: not adopted (Wazuh covers host vulnerabilities and CIS checks) |
+| WireGuard on the firewall | not configured | NetBird is the VPN (WireGuard is its data plane) |
+| Teleport, Guacamole | not deployed | replaced by JumpServer CE ([`security/0003 §8`](adr/security/0003-hardening.md)) |
+| Pi-hole, MinIO, Zabbix | not deployed | replaced by AdGuard and SeaweedFS; Zabbix excluded by [`infra/0007`](adr/infra/0007-monitoring.md) |
+
+New modules asked by the owner on 2026-10-03, not in any ADR yet: **IoT** (Zigbee coordinator, MQTT broker, sensor values to Prometheus/Grafana), **CCTV** (stream recorder with history, NFS + S3 storage), **RADIUS** (network access for IoT, switches, Wi-Fi access points).
 
 ---
 
@@ -33,36 +50,28 @@ Per [`infra/0002-platform-charter §Layer model`](adr/infra/0002-platform-charte
 
 | Repo | Role | State |
 |---|---|---|
-| `doc-platform-core` | Platform documentation | ✅ Post-refactor clean — 30 scoped ADRs, 3 active `docs/` loose files, archives in place |
-| `lib-opnsense` | Python library wrapping OPNsense API | ✅ `v1.0.0` — 54 managers, 1178 unit tests, 294 integration tests, bcrypt password verification, composite match keys, `AmbiguousMatchError`, field validators, structlog with Loki JSON output. Matches [`lib/python/0001-design-standard`](adr/lib/python/0001-design-standard.md). |
-| `ansible-opnsense` | Ansible collection wrapping `lib-opnsense` | ✅ 54 modules (one per `lib-opnsense` manager). CRUD + error-path test playbooks per domain. Verbosity logging via `-v` / `-vv`. |
-| `ansible-platform` | Ansible roles for platform-wide OS config | ⚠ Partial — `hardening` role live (sshd template with OOB break-glass per [`identity/0004-os-accounts §5`](adr/identity/0004-os-accounts.md)). `user-mgmt`, `git-config`, `key-mgmt`, `ca-trust`, `observability-client` roles ⚠ pending verify / pending write. |
-| `infra-terraform-proxmox` | Terraform modules for Proxmox provisioning | ⚠ Partial — `vm-opnsense` module exists. State backed up to Synology NAS after every `apply`/`destroy` per [`infra/0003-terraform-standard`](adr/infra/0003-terraform-standard.md). OPNsense production VM ⚠ not yet deployed (test instance exists, see Top Blockers). |
-| `lib-synology-dsm` | Python library wrapping Synology DSM API | ✅ FileStation + SystemManager + SharePermissionManager. Exact version and `lib/python/0001-design-standard` compliance status ⚠ pending audit. |
-| `platform-setup` | Per-tool configs, runbooks, security hardening | ⚠ Partial — runbooks `opnsense/bootstrap.md` and `mailcow/lifecycle.md` ⚠ pending write (referenced from `services/0001-opnsense` and `services/0002-email-infrastructure` respectively). |
+| `doc-platform-core` | Platform documentation | ADRs current; this page and `roadmap.md` refreshed 2026-10-03 |
+| `ansible-platform` | Roles and playbooks for the whole platform | 32 services on the contract, one role per concern, register generated from the catalog |
+| `infra-terraform-proxmox` | Guests (VM/LXC) and the firewall seed | prod environment live; firewall built from the seed |
+| `lib-opnsense` / `ansible-opnsense` | Firewall library and collection | firewall catalog applied through them; API verified on OPNsense 26.7.5 (probe data for 26.7.5 still to record from a non-production firewall) |
+| `lib-synology-dsm` | NAS library | unchanged |
+| `platform-setup` | Runbooks | unchanged |
+
+Source hosting: the repositories are still on GitHub; GitLab CE is deployed and the migration of [`git/0002`](adr/git/0002-platform-strategy.md) has not started.
 
 ---
 
-## OPNsense — the one Layer 5 service with a live instance
+## Open items
 
-- **Test instance:** `vm-opnsense-01` on test VLANs (`10.11.x.x`), running OPNsense 26.1.5
-- **Production instance:** ⚠ not yet deployed — tracked as top blocker
-- **`svc-rune` API key:** stored in Vault once Vault is deployed; currently in `infra/secrets/` per the transitional JSON state noted in [`security/0001-secret-storage §Transitional state`](adr/security/0001-secret-storage.md)
-- **Integration coverage:** live probe against 200/200 endpoints per earlier session work (2026-04-05). Used for `ansible-opnsense` integration test playbooks.
-
----
-
-## Top blockers
-
-Per [`docs/raid.md`](raid.md) and the scoped ADRs' `§Pending decisions` / `§Deferred decisions` sections.
-
-| # | Item | Blocks | Source |
-|---|---|---|---|
-| 1 | **OPNsense production deployment** (only test instance exists today) | All Layer 2+ work — OPNsense is the platform firewall/DHCP/DNS/VPN router | [`services/0001-opnsense`](adr/services/0001-opnsense.md) + [`infra/0004-network-architecture`](adr/infra/0004-network-architecture.md) |
-| 2 | **HashiCorp Vault deployment** | Layer 2 complete → unblocks Layers 3, 4, 5 | [`security/0001-secret-storage`](adr/security/0001-secret-storage.md) + [`infra/0002-platform-charter §Layer 2`](adr/infra/0002-platform-charter.md) |
-| 3 | **step-ca deployment + `ca-trust` Ansible role** | All internal TLS services — missing root CA distribution silently breaks every internal HTTPS client | [`security/0004-certificate-strategy §Root CA distribution`](adr/security/0004-certificate-strategy.md) |
-| 4 | **11 `⚠ TBD` thresholds** in `infra/0008-backup-strategy` | Backup policy cannot be fully automated until thresholds are locked (off-site target, schedules, retention, RTO, drill cadence, KMS) | [`infra/0008-backup-strategy §Pending decisions`](adr/infra/0008-backup-strategy.md) |
-| 5 | **4 deferred decisions** in `services/0004-database-strategy` | PostgreSQL pooler choice (`pgbouncer` vs `pgpool-II`), Patroni DCS (`etcd` vs `Consul`), Sentinel colocation, Redis replica count | [`services/0004-database-strategy §Deferred decisions`](adr/services/0004-database-strategy.md) |
+| # | Item | Owner |
+|---|---|---|
+| 1 | Replace the failed pool disk on the hypervisor, then resilver; then the held kernel reboot | owner (hardware), then Rune |
+| 2 | HA data layer and HA for Vault / Authentik | Rune, after item 1 |
+| 3 | ADR proposals #60, #65–#69 | owner (merge) |
+| 4 | NetBox population | waiting (owner) |
+| 5 | IoT, CCTV, RADIUS modules | design proposed; build needs the devices on their VLANs |
+| 6 | Debian 13 for the mail VM and the CI-runner VM (in-place upgrade playbook exists) | Rune, after item 1 |
+| 7 | Custody: Vault unseal kit, step-ca root key offline; mail reverse DNS at the ISPs; revoke the retired relay key | owner |
 
 ---
 
@@ -70,14 +79,10 @@ Per [`docs/raid.md`](raid.md) and the scoped ADRs' `§Pending decisions` / `§De
 
 | Date | What changed |
 |---|---|
-| 2026-04-14 | `security/0003-hardening` moved from Draft to **Accepted** — all 6 thresholds locked (patch cadence, Lynis ≥80, Trivy zero-crit-zero-high, read-only root + tmpfs, 180d audit retention, Lynis Linux-only). |
-| 2026-04-14 | **Refactor complete.** Loose `docs/` files archived (PR #38). Top-level repo metadata refreshed (PR #40) — `SOUL.md` + `USER.md` deleted as workspace duplicates per `OPERATING-STANDARD.md §3.2`. `docs/status.md`, `roadmap.md`, `raid.md` refreshed (this PR). |
-| 2026-04-14 | Scoped ADR refactor merged — the final 12 PRs (#13 through #36) split 34 flat ADRs into 30 scoped ADRs across 7 scopes (identity / git / naming / security / infra / services / lib-python). `OPERATING-STANDARD.md §4.4` added (PR Content Standard). `OPERATING-STANDARD.md §§5.3.1–5.3.6` added (script-writing patterns from archived flat ADR-0007). |
-| 2026-04-13 | Identity / git / naming / security / infra / services / lib refactors merged. `poc` dropped as env tier — 6 tiers only (`dev` / `test` / `staging` / `acc` / `prod` / `drp`). HA database clusters from day 1 per [`services/0004-database-strategy`](adr/services/0004-database-strategy.md). |
-| 2026-04-12 | Repos moved from `~/.openclaw/workspace/repos/` to `~/repos/`. Workspace git uncommitted count went from ~420 to 0. |
-| 2026-04-11 | `ansible-opnsense` — 54 modules implemented, one per `lib-opnsense` manager. Enum validators fixed against OPNsense 26.1.5 API probe (14 enum mismatches corrected). bcrypt password verification in `DiffEngine`. Integration test playbooks split per domain. |
-| 2026-04-10 | `lib-opnsense v1.0.0` — 54 managers, 1178 unit tests, 294 integration tests. Composite match keys + `AmbiguousMatchError`. `try/except/log/raise` on every method that can throw. structlog with Loki JSON output. |
-| 2026-04-05 | `lib-opnsense` 200/200 live probe coverage against OPNsense 26.1.5 (test instance). Field validators extracted from MVC model definitions. |
+| 2026-10-03 | ADR compliance walk closed: 32 of 32 services audited, fixed, applied twice, merged. Maintenance window: PostgreSQL data checksums, Vault 2.1.1, Debian 13 on the k3s and resolver VMs (the mail and CI-runner VMs remain on Debian 12), firewall 26.7.5, object-storage quota, NAS backup retention. Monitoring reduced to the liveness set (owner direction). A pool disk failed during the window. |
+| 2026-10-01 | Service contract complete: every service containerised and on the contract (32 of 32). |
+| 2026-09 | Platform build-out: firewall rebuilt from the seed on 26.7, GitLab CE, Harbor, Verdaccio, JumpServer, Wazuh, CISO Assistant, SeaweedFS, monitoring and alerting, backups. |
+| 2026-04-14 | Scoped ADR refactor complete (flat ADRs archived). |
 
 ---
 
@@ -85,9 +90,7 @@ Per [`docs/raid.md`](raid.md) and the scoped ADRs' `§Pending decisions` / `§De
 
 After any release or layer change:
 
-1. Update the relevant row in §Per-repo status
-2. Update §Layer progress if a layer state changes
-3. Update §Top blockers — add or remove as RAID / pending decisions change
-4. Add a row to §Recent updates (keep newest first)
-5. Commit: `docs: update platform status to YYYY-MM-DD`
-6. Cross-update `docs/raid.md` if a blocker becomes resolved or a new risk appears
+1. Update §Layer progress and §Open items
+2. Update the "missing" table when a tool is deployed, dropped or replaced
+3. Add a row to §Recent updates (newest first)
+4. Commit: `docs: update platform status to YYYY-MM-DD`

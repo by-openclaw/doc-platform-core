@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> **Last updated:** 2026-04-14
+> **Last updated:** 2026-10-03
 > **Maintained by:** Rune — update when a layer advances or a scoped ADR changes the plan
 > **Reading order:** [`status.md`](status.md) → this file → [`docs/adr/README.md`](adr/README.md)
 
@@ -29,7 +29,7 @@ For live state (what is deployed today vs pending), see [`status.md`](status.md)
 
 ---
 
-## Layer 1 — Proxmox Base ⚠ Partial
+## Layer 1 — Proxmox Base ✅ Operational
 
 **Goal:** A reproducible Proxmox host baseline with hardened OS accounts, automated provisioning via Terraform + Ansible, and a cloud-init golden image.
 
@@ -39,63 +39,63 @@ For live state (what is deployed today vs pending), see [`status.md`](status.md)
 - [ ] `ansible-platform/roles/user-mgmt` — ⚠ pending verify
 - [ ] `ansible-platform/roles/git-config` — pending write per [`git/0003-configuration`](adr/git/0003-configuration.md)
 - [ ] `ansible-platform/roles/key-mgmt` — pending write (SSH/GPG key distribution)
-- [ ] Debian cloud-init golden template — ⚠ pending verify
-- [ ] 6 pending thresholds in [`security/0003-hardening §Pending decisions`](adr/security/0003-hardening.md) resolved (patch cadence, Lynis score, Trivy CVE gate, filesystem policy, retention, Lynis scope)
-- [ ] Production Proxmox node signed off against hardening baseline
+- [x] Debian cloud images as VM templates + the Debian 13 LXC template (Terraform); 29 of 31 Linux guests on Debian 13 (2026-10-03) — the mail VM and the CI-runner VM are still on Debian 12 (in-place upgrade playbook exists, held until the pool disk is replaced)
+- [x] 6 thresholds in [`security/0003-hardening §Pending decisions`](adr/security/0003-hardening.md) resolved (patch cadence, Lynis score, Trivy CVE gate, filesystem policy, retention, Lynis scope)
+- [x] Hypervisor as code (`roles/pve_host`): release pin + ladder, declared identities, firewall, config export to PBS (audit record 2026-10-03)
 
 **Exit criteria:** VMs provision via Terraform, hardened by Ansible on first boot, OS accounts per `identity/0004`, state backed up to NAS. All 6 `security/0003` thresholds locked.
 
 ---
 
-## Layer 2 — Vault + step-ca ❌ Not started
+## Layer 2 — Vault + step-ca ✅ Deployed (single instance; HA open)
 
 **Goal:** Single source of machine secrets and internal TLS. Unblocks every downstream layer.
 
-- [ ] Deploy HashiCorp Vault per [`security/0001-secret-storage`](adr/security/0001-secret-storage.md)
+- [x] Deploy HashiCorp Vault per [`security/0001-secret-storage`](adr/security/0001-secret-storage.md)
   - Seal/unseal strategy, KV v2 paths per `§KV path convention`
   - AppRole + Kubernetes auth methods (when K8s arrives)
   - Transitional JSON secret state in `infra/secrets/` retired per `§Transitional state`
-- [ ] Deploy step-ca per [`security/0004-certificate-strategy`](adr/security/0004-certificate-strategy.md)
+- [x] Deploy step-ca per [`security/0004-certificate-strategy`](adr/security/0004-certificate-strategy.md)
   - Root CA + intermediate CA established
   - ACME provisioner for internal hostnames
-- [ ] `ansible-platform/roles/ca-trust` — writes root CA to every VM's trust store per `security/0004 §Root CA distribution` (silent HTTPS breakage if skipped)
-- [ ] Vault + step-ca backed up per [`infra/0008-backup-strategy`](adr/infra/0008-backup-strategy.md) (once the 11 pending thresholds are resolved)
+- [x] `ansible-platform/roles/ca-trust` — writes root CA to every VM's trust store per `security/0004 §Root CA distribution` (silent HTTPS breakage if skipped)
+- [x] Vault + step-ca backed up per [`infra/0008-backup-strategy`](adr/infra/0008-backup-strategy.md) (once the 11 pending thresholds are resolved)
 - [ ] `svc-rune` API key migrated from `infra/secrets/` to Vault
 
 **Exit criteria:** All machine secrets live in Vault. Every VM trusts the internal root CA. No service uses a plaintext secret on disk.
 
 ---
 
-## Layer 3 — Identity (Authentik) ❌ Not started
+## Layer 3 — Identity (Authentik) ✅ Deployed (single instance; HA open)
 
 **Goal:** Authentik is the IAM hub. Every human and service identity flows through it.
 
-- [ ] Deploy Authentik per [`identity/0001-authentication`](adr/identity/0001-authentication.md)
-- [ ] Provisioning flows per [`identity/0002-provisioning`](adr/identity/0002-provisioning.md) — Authentik → downstream tools
+- [x] Deploy Authentik per [`identity/0001-authentication`](adr/identity/0001-authentication.md)
+- [x] Provisioning flows per [`identity/0002-provisioning`](adr/identity/0002-provisioning.md) — Authentik → downstream tools
 - [ ] Machine credential pattern `{IDENTITY}_{PLATFORM}_TOKEN` enforced per [`identity/0003-machine-credentials`](adr/identity/0003-machine-credentials.md)
-- [ ] MFA (TOTP) required on all human accounts
-- [ ] OIDC clients registered for Layer 5 services as they come online
+- [x] MFA (TOTP) required on all human accounts
+- [x] OIDC clients registered for Layer 5 services as they come online
 
 **Exit criteria:** All platform services authenticate via Authentik OIDC/SAML. No local accounts on Layer 5 services.
 
 ---
 
-## Layer 4 — Storage ⚠ Partial
+## Layer 4 — Storage ✅ Deployed
 
 **Goal:** Shared storage for VM disks, object storage for artifacts/backups, backup target for Layer 2 secrets.
 
 - [x] Synology DS1513+ operational — Terraform state backup target
 - [x] `lib-synology-dsm` ships FileStation, SystemManager, SharePermissionManager (exact version + `lib/python/0001-design-standard` compliance ⚠ pending audit)
-- [ ] MinIO deployed for S3-compatible object storage
+- [x] S3-compatible object storage deployed — SeaweedFS (MinIO replaced per [`services/0009`](adr/services/0009-object-storage.md))
 - [ ] Backup policy fully automated — 11 pending thresholds in [`infra/0008-backup-strategy §Pending decisions`](adr/infra/0008-backup-strategy.md) (off-site target, schedules, retention, RTO, drill cadence, KMS)
-- [ ] Off-site backup target chosen and operational
+- [x] Off-site backup target chosen and operational
 - [ ] Restore drill executed and documented
 
 **Exit criteria:** Shared + object storage operational. Backup policy fully implemented against locked thresholds. First restore drill passed.
 
 ---
 
-## Layer 5 — Platform Services ❌ Not started (except OPNsense test instance)
+## Layer 5 — Platform Services ✅ 32 services deployed (see `status.md` for what the ADR list still misses)
 
 **Goal:** The services that make the platform useful: firewall/DHCP/DNS (OPNsense), CMDB (NetBox), source forge (GitLab CE), human password manager (Vaultwarden), email (Mailcow), observability, reverse proxy (Traefik), HA databases.
 
@@ -106,13 +106,13 @@ OPNsense is documented as an **exception, not a pattern** per [`services/0001-op
 - [x] Test instance `vm-opnsense-01` on test VLANs (OPNsense 26.1.5)
 - [x] `lib-opnsense v1.0.0` — 54 managers, 1178 unit + 294 integration tests
 - [x] `ansible-opnsense` — 54 modules, one per manager
-- [ ] **Production OPNsense deployment** — top blocker (see [`status.md §Top blockers`](status.md))
+- [x] **Production OPNsense deployment** — built from the seed + Ansible, on 26.7.5 since 2026-10-03
 - [ ] `platform-setup/opnsense/bootstrap.md` runbook — pending write
-- [ ] Production VLAN registry applied per [`infra/0004-network-architecture`](adr/infra/0004-network-architecture.md)
+- [x] Production VLAN registry applied per [`infra/0004-network-architecture`](adr/infra/0004-network-architecture.md)
 
 ### 5.2 NetBox (CMDB — source of truth)
 
-- [ ] Deploy NetBox per [`services/0003-netbox-cmdb`](adr/services/0003-netbox-cmdb.md)
+- [x] Deploy NetBox per [`services/0003-netbox-cmdb`](adr/services/0003-netbox-cmdb.md)
 - [ ] 19-role vocabulary loaded
 - [ ] Mandatory custom fields enforced (`env`, `repo_url`, `prometheus_job`, etc.)
 - [ ] Inventory plugin `netbox.netbox` wired into Ansible
@@ -122,48 +122,48 @@ OPNsense is documented as an **exception, not a pattern** per [`services/0001-op
 
 Per [`services/0004-database-strategy`](adr/services/0004-database-strategy.md), PostgreSQL and Redis run as HA clusters from the start — not single instances later upgraded.
 
-- [ ] PostgreSQL Patroni 3-node cluster
-- [ ] Redis with Sentinel
+- [ ] PostgreSQL Patroni 3-node cluster — **single instance today** (PostgreSQL 17, data checksums on)
+- [ ] Redis with Sentinel — **single instance today**
 - [ ] 4 deferred decisions resolved: pooler choice (pgbouncer vs pgpool-II), Patroni DCS (etcd vs Consul), Sentinel colocation, Redis replica count
 - [ ] Software HA limits documented per `services/0004 §Cluster placement` (protects against process/OS-level failure, not host or site)
 
 ### 5.4 Reverse Proxy & TLS edge
 
-- [ ] Deploy Traefik v3
+- [x] Deploy Traefik v3
   - Internal TLS from step-ca (Layer 2)
   - Public TLS via Let's Encrypt DNS-01 per [`security/0004 §Public vs internal`](adr/security/0004-certificate-strategy.md)
-- [ ] HTTPS-only, no plaintext HTTP exposed
+- [x] HTTPS-only, no plaintext HTTP exposed
 
-### 5.5 GitLab CE + Nexus Repository OSS
+### 5.5 GitLab CE, Harbor, Verdaccio (Nexus dropped by the owner, 2026-10-03)
 
-- [ ] Deploy GitLab CE (external PostgreSQL from 5.3, external Redis from 5.3, MinIO from Layer 4)
+- [x] Deploy GitLab CE (shared PostgreSQL and Redis from 5.3, S3 from Layer 4)
   - No `:latest` tags — pin to specific versions
   - Container Registry + Package Registry enabled
-- [ ] GitLab Runners registered (Docker executor)
-- [ ] Deploy Nexus Repository OSS as universal proxy/cache (npm, PyPI, Maven, Go, Docker Hub, Helm)
+- [x] GitLab Runners registered (Docker executor)
+- [x] Registries: Harbor (OCI images, Helm OCI, proxy cache), Verdaccio (npm proxy), GitLab package registry — Nexus Repository is **dropped** (Community Edition capped)
 - [ ] Migrate from GitHub per [`git/0002-platform-strategy`](adr/git/0002-platform-strategy.md)
 
 ### 5.6 Vaultwarden (human credentials)
 
-- [ ] Deploy Vaultwarden per [`security/0001-secret-storage §Vaultwarden`](adr/security/0001-secret-storage.md) — SSO via Authentik
-- [ ] Machine secrets remain in Vault; humans use Vaultwarden
+- [x] Deploy Vaultwarden per [`security/0001-secret-storage §Vaultwarden`](adr/security/0001-secret-storage.md) — SSO via Authentik
+- [x] Machine secrets remain in Vault; humans use Vaultwarden
 
 ### 5.7 Email infrastructure
 
-- [ ] Deploy Mailcow per [`services/0002-email-infrastructure`](adr/services/0002-email-infrastructure.md) — standalone/hybrid mode, official image, **internal** MariaDB + Redis (not shared — documented exception to 5.3)
+- [x] Deploy Mailcow per [`services/0002-email-infrastructure`](adr/services/0002-email-infrastructure.md) — standalone/hybrid mode, official image, **internal** MariaDB + Redis (not shared — documented exception to 5.3)
 - [ ] `platform-setup/mailcow/lifecycle.md` runbook — pending write
-- [ ] SPF / DKIM / DMARC records published
+- [x] SPF / DKIM / DMARC records published
 
 ### 5.8 Observability
 
-- [ ] Deploy Loki + Promtail per [`infra/0006-logging`](adr/infra/0006-logging.md) — no PII, structlog JSON from all services
-- [ ] Deploy Prometheus + Grafana + Alertmanager per [`infra/0007-monitoring`](adr/infra/0007-monitoring.md)
-- [ ] `ansible-platform/roles/observability-client` — installs Promtail + node_exporter on every VM
-- [ ] Event routing per [`services/0005-notifications`](adr/services/0005-notifications.md) — `🔔 [Tool] Event` template, Discord one-way
+- [x] Deploy Loki + Promtail per [`infra/0006-logging`](adr/infra/0006-logging.md) — no PII, structlog JSON from all services
+- [x] Deploy Prometheus + Grafana + Alertmanager per [`infra/0007-monitoring`](adr/infra/0007-monitoring.md)
+- [x] Promtail + node_exporter on every guest (`roles/promtail`, `roles/node_exporter`)
+- [x] Event routing per [`services/0005-notifications`](adr/services/0005-notifications.md) — `🔔 [Tool] Event` template, Discord one-way
 
 ### 5.9 Compliance & GRC
 
-- [ ] Deploy `ciso-assistant-community` (intuitem) as the compliance control registry per [`security/0002-compliance-mapping`](adr/security/0002-compliance-mapping.md)
+- [x] Deploy `ciso-assistant-community` (intuitem) as the compliance control registry per [`security/0002-compliance-mapping`](adr/security/0002-compliance-mapping.md)
 - [ ] Target frameworks loaded: ISO 27001, NIS2, DORA, GDPR
 - [ ] Every ADR's `CISO mapping` section reconciled against loaded controls
 
