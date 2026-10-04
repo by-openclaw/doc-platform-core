@@ -261,6 +261,25 @@ These are intentionally empirical — resolve at deployment time, not in this AD
 | Sentinel colocation | 3 dedicated Sentinel VMs **or** 1 dedicated + 2 colocated on Redis nodes |
 | Redis replica count | Minimum 1 replica (2 total Redis nodes) vs 2 replicas (3 total Redis nodes) — deferred until load testing |
 
+### Resolved at deployment (2026-10-04) — PROPOSED, approve by merging
+
+The cluster was deployed on 2026-10-04 (owner "go" of 2026-10-03, capacity checked: memory and disk are plentiful, CPU is the thin resource of the single host). Two rows follow the options above; three depart from them and need the owner's approval. Each departure is reversible without touching a consumer, because consumers only know the endpoint's name.
+
+| Decision | Resolution | Against the options above |
+|---|---|---|
+| Redis replica count | 1 replica (2 Redis nodes) | as listed |
+| Sentinel colocation | 2 colocated on the Redis nodes, the third on the endpoint guest | as listed (the "dedicated" Sentinel shares the endpoint guest instead of having its own) |
+| Patroni DCS | `etcd`, 3 members **colocated on the three PostgreSQL guests** | **departs**: not a dedicated tier. Three more guests on a host whose CPU is the limit buy nothing: on one hypervisor a dedicated tier fails together with the database guests anyway. Revisit with the second host. |
+| PostgreSQL frontend | **TCP router** (HAProxy) on one endpoint guest: it asks each member's Patroni REST API which one leads and routes there. No pooling, no TLS termination — the client's TLS session and its login end on PostgreSQL. | **departs**: neither `pgbouncer` nor `pgpool-II`. A pooler in transaction mode is incompatible, without per-application work, with several consumers (prepared statements, session state); in session mode it adds an authentication layer and a TLS hop for no pooling gain; and neither follows Patroni by itself — a router is needed in both cases. Connections are not the constraint today (ceiling 200, alert at 80 %). A pooler can be placed behind the same endpoint name when a measured need appears. |
+| Redis client discovery (§Cluster architecture, not a deferred row) | Consumers connect to the **same endpoint guest**, which routes to the member that answers `role:master`; the Sentinels still decide who that is. | **departs** from "Sentinel-aware client". Nextcloud's PHP client has no Sentinel support, so one consumer needs the router in any case; one mechanism for all four consumers is simpler to operate than two. A consumer can move to Sentinel discovery later without any change on the cluster. |
+
+Also resolved, within the ADR's text:
+
+- **Guests** are LXC containers named `lxc-pgsql-01` … `-03`, `lxc-pgpool-01` (the endpoint), `lxc-redis-01` / `-02` — the platform's guest type and naming, as for every other service.
+- **Synchronous replication** is Patroni's `synchronous_mode` (it maintains `synchronous_standby_names`): one replica confirms every commit; with no replica available the leader keeps accepting writes rather than stopping the platform.
+- **Per-service Redis identity**: one ACL login per consumer (everything except administration commands). Database numbers stay the separation between consumers' keys — an ACL cannot restrict a login to a database number.
+- **Single endpoint guest**: stateless, restarts in seconds; while it is down consumers cannot reach the leader. A second endpoint with a floating address belongs with the second host.
+
 ## Revision triggers
 
 Revise this ADR when:
