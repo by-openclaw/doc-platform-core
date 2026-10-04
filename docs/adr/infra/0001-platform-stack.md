@@ -1,7 +1,7 @@
 # infra/0001 — Platform Stack
 
 **Status:** Draft
-**Date:** 2026-04-13 (supersedes flat ADR-0001, 2026-03-25)
+**Date:** 2026-04-13 (supersedes flat ADR-0001, 2026-03-25) — revised 2026-10-03 (owner decisions on the tool list, see §6)
 **Scope:** Tool inventory for the BY-SYSTEMS platform. This ADR lists **what** tools are chosen. Decisions about **how** they are used live in specialized scoped ADRs.
 **Related:** `infra/0002-platform-charter`, `infra/0003-terraform-standard`, `infra/0004-network-architecture`, `git/0002-platform-strategy`, `identity/*`, `naming/*`, `security/*`
 
@@ -30,12 +30,12 @@ Flat ADR-0001 (the source) was written as a bootstrap document before proper ADR
 | k3s | Lightweight Kubernetes distribution | Apache 2.0 |
 | k9s + Headlamp | Kubernetes operations (CLI + web UI) | Apache 2.0 / Apache 2.0 |
 | Kaniko | Rootless container image builds in CI | Apache 2.0 |
-| Packer | Golden image builds | MPL 2.0 |
 
 **Rationale:**
 - Proxmox replaces VMware — zero licensing cost, KVM + LXC support, active community
 - k3s is the lightest production-ready Kubernetes — appropriate for SME scale without full k8s overhead
 - Kaniko enables rootless CI image builds — no Docker daemon required
+- Guest images are **not baked**: VMs are cloned from Debian cloud-image templates and LXCs from the Proxmox Debian template, both provisioned by Terraform and configured by Ansible. Packer (listed in the 2026-03-25 decision, BUSL since 1.10) is not used.
 - Kubernetes migration path: all Layer 5 tools ship with both Docker Compose and Helm deployment options — start with Docker, switch to k3s when load justifies it
 
 ### 2. Infrastructure as Code
@@ -59,7 +59,7 @@ Terraform state management, backend, and provider constraints are in `infra/0003
 |---|---|---|
 | PostgreSQL (Patroni) | Primary relational DB for platform tools (GitLab, Vault, NetBox, Authentik, Grafana) | PostgreSQL License / Apache 2.0 |
 | Redis (Sentinel) | Cache, sessions, queues | BSD 3-Clause / BSD 3-Clause |
-| MinIO | S3-compatible object storage (Loki backend, backups, CI artifacts) | AGPL v3 |
+| SeaweedFS | S3-compatible object storage (PBS datastore, GitLab, Harbor, Loki, session replays) — replaced MinIO, see `services/0009-object-storage` | Apache 2.0 |
 | Neo4J Community | Graph CMDB — dependency and relationship mapping | GPL v3 |
 
 **Strategy:** start single-instance, scale to cluster when load justifies it. Patroni for PostgreSQL HA, Sentinel for Redis HA.
@@ -74,13 +74,12 @@ Database per-service deployment, backup, and operational rules are in `infra/000
 |---|---|---|
 | Markdown + PlantUML | Source format for ADRs, runbooks, standards | Various / MIT-like |
 | Kroki | Self-hosted diagram renderer (PlantUML, Mermaid, D3, BPMN, Graphviz) | MIT |
-| Sphinx | Build engine — multi-format output (PDF, HTML, DOCX) | BSD 2-Clause |
 | Draw.io (desktop) | Architecture diagrams authored outside Git | Apache 2.0 |
 
 **Rationale:**
 - **Docs-as-code** — all documentation lives in Git, versioned alongside the infrastructure it describes
 - **Kroki** renders PlantUML, Mermaid, D3, BPMN, Graphviz from one self-hosted container — no external renderer dependency, no SaaS call
-- **Sphinx** provides professional multi-format output (PDF, HTML, DOCX) for customer-facing deliverables
+- **No separate build engine**: Markdown + PlantUML rendered through Kroki is the documentation toolchain (owner decision 2026-10-03 — Sphinx, listed in the 2026-03-25 decision, is dropped)
 - **Draw.io** is allowed for complex architecture diagrams that don't render well in text-based formats; source `.drawio` files are committed alongside the rendered export
 
 **Rules:**
@@ -88,7 +87,41 @@ Database per-service deployment, backup, and operational rules are in `infra/000
 - Every diagram has both source and rendered output committed
 - No Notion / Confluence / GitBook — SaaS documentation tools are explicitly out of scope
 
-### 5. Cross-reference — decisions owned by other scopes
+### 5. Package and artifact repositories
+
+| Tool | Role | License |
+|---|---|---|
+| GitLab CE | Source, CI, and the package registry for what the platform publishes itself (npm, PyPI, Maven, NuGet, Helm, Terraform modules, generic files) | MIT (CE) |
+| Harbor | OCI images and Helm charts (OCI), vulnerability scan on push, **proxy cache** of Docker Hub (GHCR and Quay are supported by the same mechanism, not enabled yet) | Apache 2.0 |
+| Verdaccio | npm proxy cache + private npm packages | MIT |
+
+**Nexus Repository is dropped** (owner decision 2026-10-03): the Community Edition is capped (40,000 components, 100,000 requests per day) and the three tools above cover what the platform builds and consumes. What they do not cover is an on-demand **cache** of PyPI and of the Debian archive; neither is required today. If one becomes required, the candidates without an edition cap are devpi (MIT) and apt-cacher-ng.
+
+### 6. Tools of the 2026-03-25 list that are not part of the stack
+
+| Tool | State | Why |
+|---|---|---|
+| Nexus Repository OSS | dropped (owner, 2026-10-03) | §5 |
+| Sphinx | dropped (owner, 2026-10-03) | §4 |
+| Packer | **proposed: drop** | §1 — nothing is baked |
+| Checkov, Gitleaks, OWASP Dependency-Check | **proposed: drop** | the CI gate is Trivy with its three scanners (vulnerabilities, secrets, misconfiguration) + Semgrep + SBOM, in the shared GitLab CI template (`security/0003 §4`); these three overlap it |
+| DefectDojo, OpenVAS / Greenbone, Falco, OpenSCAP, Prowler | **proposed: not adopted** | Wazuh (deployed) covers host vulnerability detection and CIS checks; Harbor scans images; a findings hub, a network scanner and a kernel-event sensor are not justified at the platform's size — revisit with a second site or an external audit requirement |
+| WireGuard server on the firewall | not configured | NetBird is the VPN; WireGuard is its data plane |
+| Teleport CE, Apache Guacamole | replaced | JumpServer CE is the bastion (`security/0003 §8`) |
+| Pi-hole | replaced | AdGuard Home in front of Unbound |
+| Zabbix | excluded | `infra/0007-monitoring` |
+
+### 7. Modules requested by the owner (2026-10-03) — proposed tool choices
+
+| Module | Purpose | Proposed tools |
+|---|---|---|
+| IoT | Zigbee sensors (temperature, switches, power, CO) on the IoT zone; values and alerts through the existing monitoring | SMLIGHT SLZB-06M coordinator (Ethernet) → Zigbee2MQTT (GPL-3.0) → Mosquitto (EPL-2.0) → an MQTT exporter (MIT) → Prometheus / Alertmanager / Grafana. No Home Assistant: Grafana is the dashboard |
+| CCTV | Record RTSP, HTTP and multicast streams, play back from history, store on NFS and S3 | MediaMTX (MIT) for ingest and recording, Frigate (MIT) for the timeline and detection (Hailo-8 accelerator), recordings on NFS with a copy to the platform S3 |
+| RADIUS | Network access control for IoT devices, switches and Wi-Fi access points | FreeRADIUS (GPL-2.0) for 802.1X / MAC authentication with certificates from step-ca; Authentik's RADIUS provider for administrator logins on network devices |
+
+Each module becomes a service of the catalog (one role, one playbook, SSO, backup, monitoring) when it is built; its own scoped ADR records the decision.
+
+### 8. Cross-reference — decisions owned by other scopes
 
 The following concerns are intentionally NOT in this ADR. Each scope owns its own set of decisions; this table is grouped by scope for navigation.
 
