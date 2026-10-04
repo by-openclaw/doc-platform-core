@@ -1,7 +1,7 @@
 # services/0009 — Object Storage (S3)
 
 **Status:** Draft
-**Date:** 2026-08-29
+**Date:** 2026-08-29; amended 2026-10-02 — §4: user data at an external object-storage provider is either application-encrypted or an interim mirrored into the platform S3; the platform S3 is the target primary
 **Scope:** Platform S3-compatible object storage — which engine, bucket/identity model, endpoint exposure, consumer contract. Closes the gap found in the ADR↔implementation review: object storage was core infrastructure with no owning ADR.
 **Related:** `security/0001-secret-storage`, `security/0004-certificate-strategy`, `infra/0008-backup-strategy`, `naming/0001-infra §9`, `services/0004-database-strategy` (the analogous shared-datastore contract)
 
@@ -31,6 +31,8 @@ One S3 endpoint per deployment: `s3.{domain}` — TLS at Traefik (LE zone wildca
 ### 4. Consumer contract
 
 A service consuming S3 declares: bucket name(s), identity name, and endpoint — all via role defaults consuming `{{ platform_domain }}` (no hardcoded endpoints). Blob data lives in S3; service-local disk holds only caches/logs. Decommission reverses it: the `service_decommission` catalog removes the bucket (archive-before-destroy per platform rule) and the identity.
+
+**External provider (a bucket outside the platform, e.g. the object store a service was first deployed on):** the platform S3 is the target primary for every service; an external bucket is tolerated only as a documented interim, declared in ONE inventory definition (`platform_external_s3`), and under two conditions. (a) **Second copy:** the bucket is mirrored daily into the platform S3 (`seaweedfs_mirrors`: scoped identity, changed/deleted objects kept 30 days in a trash bucket) — provider loss or a credential compromise never costs the data. (b) **Confidentiality:** user data held there is either encrypted at rest by the application (server-side encryption for object storage) or its cleartext exposure is a registered risk with the move date as its closure; the move flips the mirror's direction and the external bucket becomes the encrypted offsite copy only (`infra/0008`).
 
 ### 5. Backup interplay
 
