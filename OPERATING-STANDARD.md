@@ -267,30 +267,22 @@ Every automation action is safe to run repeatedly:
 - `dry_run=True` previews without mutations
 - Check before create, check before delete
 
-### 5.3.1 Shell script patterns — `apply` / `clean` pairs
+### 5.3.1 Provisioning is Ansible — no scripts
 
-When automation is implemented as shell scripts (install scripts, bootstrap helpers, tool-specific provisioning under `platform-setup/tools/{tool}/scripts/`), every script pair follows the **present / absent** intent pattern:
+Platform hosts and services are provisioned by the roles and playbooks of `ansible-platform` and by nothing else: no shell, bash, Python or other program inside a task, a scheduled job or a role's files. The rule, what it forbids, its exceptions and how CI enforces it are in **`docs/adr/infra/0010-provisioning-ansible-only.md`**.
 
-| Script | Intent |
+The intent pair stays, expressed as state instead of as two scripts:
+
+| State | Intent |
 |---|---|
-| `{name}-apply.sh` | Ensure resource **present** — create or update to match spec. Idempotent. |
-| `{name}-clean.sh` | Ensure resource **absent** — remove cleanly. No data loss unless `--purge` is passed explicitly. |
+| `present` | Ensure the resource exists and matches the spec. Idempotent. |
+| `absent` | Remove it cleanly. No data loss unless a purge is asked for explicitly. |
 
-`apply` = desired state enforced. `clean` = resource removed. Never ambiguous.
-
-**Orchestrators** call single-purpose scripts in order. No monoliths.
-
-```
-core-apply.sh       → installs base dependency
-service-apply.sh    → configures the service
-dns-sync-apply.sh   → manages DNS records
-bootstrap-apply.sh  → orchestrates: core → service → dns
-destroy-all.sh      → full teardown in reverse order
-```
+A playbook composes single-purpose roles in order; a teardown runs them in reverse.
 
 ### 5.3.2 Dry-run is a hard gate
 
-Every `apply` script supports `--dry-run` (or `--check`):
+Every apply supports a dry run (`--check` for a playbook, `dry_run=True` for a library call):
 
 - Validates all prerequisites (dependency versions, config files present, credentials available, spec compliance)
 - Reports what **would** change — no writes, no mutations
