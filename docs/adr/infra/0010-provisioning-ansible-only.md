@@ -1,7 +1,7 @@
 # infra/0010 — Provisioning Standard: Ansible Only
 
-**Status:** Proposed — awaiting owner approval
-**Date:** 2026-10-05
+**Status:** Accepted
+**Date:** 2026-10-05 (proposed), accepted by the owner on 2026-10-08
 **Scope:** How configuration reaches a host or a service of the platform: the roles and playbooks of `ansible-platform`. Not in scope: guest creation (`infra/0003-terraform-standard`), application source code, the checks that guard the repository itself.
 **Related:** `services/0007-provisioning-orchestrator` (Ansible-first), `infra/0003-terraform-standard`, `security/0001-secret-storage`, `security/0003-hardening`, `OPERATING-STANDARD.md §5.3.1`
 
