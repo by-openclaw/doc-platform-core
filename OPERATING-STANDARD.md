@@ -360,7 +360,7 @@ CI workflow = platform gate. Same weight as an ADR. Zero tolerance for unilatera
 
 > **MANDATORY READING before touching any credential:**
 > 1. This section (the rules)
-> 2. `workspace/infra/secrets/README.md` (the structure + Vault migration map)
+> 2. `docs/adr/security/0001-secret-storage.md` (where a secret lives, who reads it)
 > 3. `lib-synology-dsm/docs/adr/0009-secrets-json-schema.md` (the decision — why this format)
 
 - **Never** commit credentials, tokens, passwords, private keys
@@ -371,16 +371,16 @@ CI workflow = platform gate. Same weight as an ADR. Zero tolerance for unilatera
 
 | Location | Format | Purpose | Who writes |
 |---|---|---|---|
-| `workspace/infra/secrets/*.json` | Vault KV v2 JSON | **Master store** — one file per credential | @yboujraf only |
+| HashiCorp Vault | KV v2 | **The store** — every credential automation creates or reads | Ansible roles (`vault_secret`) |
+| `workspace/infra/secrets/` | Vault KV v2 JSON | **Only what opens Vault** — the files declared in `ansible-platform` (`controller_files.yml`); any other file fails `playbooks/controller-files.yml` | Ansible roles |
 | `{repo}/.env` | Flat key=value | **Consumer** — local runtime for tests/scripts (gitignored) | Developer (manual) |
-| HashiCorp Vault (Phase 2) | KV v2 | **Target** — replaces JSON files when deployed | Vault admin |
 
 **Rules for agents:**
 - **Read** credentials from environment variables (`os.environ`, `python-dotenv`), never from JSON directly
 - **Never** paste credential values in chat, docs, memory, CHANGELOG, or committed files
 - **Never** hardcode credentials in scripts — use `source .env` or `dotenv` loading
 - If you find a plaintext password in any file → redact immediately with `<REDACTED:{type}>` and flag in RAID.md
-- `workspace/infra/secrets/` is not git-tracked — it lives on the Rune VM only
+- `workspace/infra/secrets/` is not git-tracked — it lives on the Rune VM only. Never add a file there: a new credential goes to Vault
 
 > **Compliance:** ISO A.9.4.3 — Password management; ISO A.10.1.1 — Cryptographic controls policy; NIS2 Art.21(2)(e) — Security in network/information systems
 

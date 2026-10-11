@@ -2,6 +2,7 @@
 
 **Status:** Draft
 **Date:** 2026-04-13 (supersedes flat ADR-0011, 2026-03-31 + flat ADR-0016, 2026-04-02)
+**Amended:** 2026-10-11 (approved by the owner) — people read in Vault what is meant for them (§People reading in Vault); the controller keeps only what opens Vault (§Operating model)
 **Scope:** Where platform secrets live, who reads them, and how they are organized. Covers two complementary tools: HashiCorp Vault (machine secrets) and Vaultwarden (human password manager).
 **Related:** `identity/0003-machine-credentials`, `identity/0004-os-accounts §11`, `naming/0001-infra`, `infra/0005-environment-tiers` (future)
 
@@ -25,13 +26,14 @@ This ADR defines **two storage tools** with a hard boundary between them — Has
 
 | Tool | Purpose | Kind of secrets | Consumers |
 |---|---|---|---|
-| **HashiCorp Vault** | Programmatic machine secret store | API tokens, SSH passphrases, service account credentials, `ansible_become_pass`, OIDC client secrets, database credentials, TLS private keys, webhook HMAC keys | Ansible, CI/CD, applications, service accounts — never humans browsing a UI |
-| **Vaultwarden** | Human password manager | Operator passwords for web app logins (Grafana, NetBox, Proxmox WebUI, GitLab, Authentik admin UIs), personal TOTP backup codes | Humans via browser extension / mobile app |
+| **HashiCorp Vault** | Programmatic machine secret store | API tokens, SSH passphrases, service account credentials, `ansible_become_pass`, OIDC client secrets, database credentials, TLS private keys, webhook HMAC keys | Ansible, CI/CD, applications, service accounts — and, read-only, the people a document is meant for (§People reading in Vault) |
+| **Vaultwarden** | Human password manager | What a person creates and keeps: app passwords of mail programs, recovery and TOTP backup codes, logins of outside portals (suppliers, registrars) | Humans via browser extension / mobile app |
 
 **The boundary is strict:**
 
 - Machine processes read from **Vault** via API (AppRole / token) — never from Vaultwarden
-- Humans store web-app passwords in **Vaultwarden** — never in Vault
+- A login that automation creates and uses — a service's local administrator, an emergency account — lives in **Vault** only. The people entitled to it read it there (§People reading in Vault); it is never copied into Vaultwarden
+- What a person creates for themselves lives in **Vaultwarden** — never in Vault. Nothing is written into Vault by hand
 - SSH key passphrases for service accounts (`svc-rune-{env}`, `svc-ansible-{env}`) live in **Vault** — not Vaultwarden (per `identity/0004-os-accounts §2`)
 - SSH key passphrases for human operators (`yboujraf`, `adm_yboujraf`) live in the operator's memory with **Vaultwarden** as personal backup — not Vault
 
@@ -103,6 +105,19 @@ path "secret/metadata/dev/gitlab/*" {
 - Dynamic secrets (database credentials, AWS/Azure STS, etc.): Vault issues short-lived credentials at runtime — no manual rotation
 - Rotation workflows live in `ansible-platform/roles/vault-rotate` (future) and are triggered by GitLab CI scheduled pipelines
 
+#### People reading in Vault
+
+Automation creates logins a person sometimes has to type: the local administrator of a service that single sign-on does not cover, an emergency account, a first password. They are machine secrets — roles read them at every run — so they stay in Vault, in one place. The person reads them there.
+
+1. **Sign-in through the identity provider only** (OIDC, same second factor as everywhere). Vault has no local user for a person.
+2. **By group.** The administrators' group of a service reads that service's login document — the path is declared per service in the catalog of `ansible-platform`. A document that mixes a person's login with machine-only values (a database password, an application key) is split first: the group is given a login, never a service's whole secret set.
+3. **Per person.** `secret/{env}/users/{username}/…` is readable by that person and nobody else. What automation generates for one person (a first sign-in password, a personal firewall password, personal key material) is handed over there; once the person has taken it into their own password manager it is removed from the area.
+4. **Read-only.** A person writes nothing into Vault; automation is the only writer.
+5. **Administrators of Vault** manage it and are denied the other people's areas by policy. An administrator can change a policy: this is **detected, not prevented**. Every read and every policy change is in the audit log, shipped to the log store, with an alert on a read in a person's area by anyone else, on a policy change outside an automation run, and on any use of a root token.
+6. **When the identity provider is down** people do not reach Vault. Getting back in is the emergency kit of `identity/0004-os-accounts`, not Vault's UI.
+
+Why not copy these logins into Vaultwarden: its items are encrypted by the client, its official tool cannot create its own account, so a bridge would need a master password set by hand at every installation — and the same secret would then live in both tools, to be rotated in both.
+
 ### Vaultwarden — human password manager
 
 Vaultwarden (Bitwarden-compatible, self-hosted, OSS) stores **human-facing credentials** that operators need to remember but shouldn't type into 15 different browser windows.
@@ -111,15 +126,15 @@ Vaultwarden (Bitwarden-compatible, self-hosted, OSS) stores **human-facing crede
 
 | In scope | Out of scope |
 |---|---|
-| Web app login passwords (Grafana, NetBox, Proxmox, etc. admin UIs) | Any machine-readable credential (goes to Vault) |
+| Logins a person created: outside portals, tools without single sign-on that automation does not manage | Any credential automation creates or reads (Vault) — a service's local administrator included |
 | Personal TOTP backup codes | Service account credentials (Vault) |
 | Operator's personal notes tied to a credential | SSH keys / passphrases for svc accounts (Vault) |
-| Shared org vault for break-glass UI access | Automation-consumed secrets (Vault) |
+| Shared collections for logins typed by people and used by several (a supplier portal) | The platform's emergency logins (Vault, read by group; the kit of `identity/0004-os-accounts`) |
 
 #### Organization
 
 - **Personal vaults** — one per human operator, encrypted with the operator's own master password
-- **Org shared vault** — `by-systems` org, members: all active engineers. Holds credentials that multiple humans may need in emergencies (e.g. break-glass admin UI passwords)
+- **Org shared collections** — `by-systems` org, members: all active engineers. Hold logins that people created and several of them use (a supplier portal). The platform's emergency logins are not here: they stay in Vault (§People reading in Vault)
 - **No env separation inside Vaultwarden** — humans think in terms of "the GitLab prod UI password", not `secret/prod/gitlab/admin-password`. The env is in the item name if needed.
 
 #### Rules
@@ -150,25 +165,26 @@ Any time a secret appears in committed text (docs, issues, PR descriptions, comm
 
 This ADR is **platform-scoped only**. How individual libraries (`lib-opnsense`, `lib-synology-dsm`) accept credentials at their API boundary is governed by each library's own ADRs (typically a `CredentialProvider` abstraction — see `lib/python/0001-design-standard` when refactored from flat 0029). This ADR tells you **where credentials live on the platform**, not how a library receives them.
 
-## Operating model — fabric working copy + Vault mirror (current), AppRole reads (target)
+## Operating model — Vault is the store; the controller keeps only what opens it
 
-HashiCorp Vault **is deployed** (raft storage, HTTPS, daily raft-snapshot DR). The operating model has two stages:
+HashiCorp Vault **is deployed** (raft storage, HTTPS, daily raft-snapshot DR).
 
-**Current (fabric + mirror):**
-
-- The controller holds per-credential JSON **fabric files** (`workspace/infra/secrets/fabric/`, mode 0600) — the **deploy-time working copy**: Ansible roles generate-if-absent and read these at provisioning time, so deployments work even while Vault is sealed or being restored.
-- `ansible-platform/playbooks/secrets-to-vault.yml` mirrors every fabric file into Vault KV v2 at the §path convention (write-if-absent, drift-reported); `secrets-validate.yml` authenticates each mirrored secret against its **live** service. **Vault is the authoritative mirror and the DR source** — the fabric copy is rebuildable from Vault, and vice versa.
+- **Roles create a credential in Vault and read it from Vault.** A role that needs a secret gets it or creates it there (`roles/vault_secret`); no role writes a credential file.
+- **The controller keeps only the files a play has to read before Vault can answer:** Vault's unseal material and logins, the automation account's password, what a firewall is built from, the emergency kit, Vault's snapshots — and, until they are moved, the few files that tools outside `ansible-platform` still read. Each is declared with its reader in `ansible-platform/inventories/prod/group_vars/all/controller_files.yml`; `playbooks/controller-files.yml` fails on any other file of the folder.
+- `secrets-validate.yml` authenticates Vault's values against the **live** services.
 - **Exception that must stay a file:** Vault's own bootstrap (unseal material) can never live only inside Vault; it is held off-platform per §Rules (cold storage), never in the running cluster.
 
-**Target (AppRole runtime reads):** services and rotation workflows read from Vault directly via AppRole + per-service policies (§Per-service access policies); fabric files then shrink to bootstrap-only. Moving a consumer from fabric-read to Vault-read is a per-service change tracked in the roadmap — until then the fabric copy is the contract for deploy-time reads.
+Until 2026-10-11 the controller held one JSON file per credential (the *fabric* files), mirrored into Vault by `secrets-to-vault.yml`. That stage is over: every file was compared with Vault, the files without a reader were removed, and that playbook no longer writes back a document that was archived.
+
+**Target (AppRole runtime reads):** services and rotation workflows read from Vault directly via AppRole + per-service policies (§Per-service access policies). Moving a consumer to a runtime read is a per-service change tracked in the roadmap.
 
 ## Consequences
 
-- **Two tools, clear boundary** — humans never read Vault, machines never read Vaultwarden. Mix-ups are violations, not accidents.
+- **Two tools, clear boundary** — machines never read Vaultwarden; people read in Vault only what their group or their own area gives them, read-only and logged, and write nothing there. Mix-ups are violations, not accidents.
 - **Env isolation is structural** — Vault paths encode env, per-service policies enforce it, and the same policy cannot span envs.
 - **Vault HA is non-optional** — if Vault is down, nothing can authenticate, nothing can rotate, nothing can be provisioned. 2-instance active/active deployment is required before production cut-over.
 - **Redaction is enforced by hook, not by convention** — `detect-secrets` blocks commits that leak.
-- **The transitional JSON state is explicitly non-architecture** — runbook territory, will be deleted after Vault deployment.
+- **The JSON files of the first months are gone** (2026-10-11) — what remains on the controller is declared and checked (§Operating model).
 - **Vaultwarden and HashiCorp Vault overlap zero** — no secret exists in both tools. If it's in one, it's not in the other.
 
 ## Revision triggers
@@ -184,6 +200,6 @@ Revise this ADR when:
 
 | Framework | Controls covered |
 |---|---|
-| ISO 27001:2022 | A.5.17 (authentication information), A.8.2 (privileged access rights), A.8.12 (prevention of data leakage), A.8.15 (logging — Vault audit), A.8.24 (use of cryptography — Vault KV v2 at rest) |
+| ISO 27001:2022 | A.5.17 (authentication information), A.5.18 (access rights — people's read rights by group and per person), A.8.2 (privileged access rights), A.8.12 (prevention of data leakage), A.8.15 (logging — Vault audit), A.8.24 (use of cryptography — Vault KV v2 at rest) |
 | NIS2 | Art. 21(2)(d) (supply chain security — env-isolated credentials), Art. 21(2)(e) (network and information systems security — detect-secrets + audit logs) |
 | GDPR | Art. 32(1)(a) (encryption — Vault KV v2 encrypted at rest) |
