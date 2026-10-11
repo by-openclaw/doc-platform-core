@@ -2,7 +2,7 @@
 
 **Status:** Draft
 **Date:** 2026-04-13 (supersedes flat ADR-0011, 2026-03-31 + flat ADR-0016, 2026-04-02)
-**Amended:** 2026-10-11 (proposal) — people read in Vault what is meant for them (§People reading in Vault); the controller keeps only what opens Vault (§Operating model)
+**Amended:** 2026-10-11 (approved by the owner) — people read in Vault what is meant for them (§People reading in Vault); the controller keeps only what opens Vault (§Operating model)
 **Scope:** Where platform secrets live, who reads them, and how they are organized. Covers two complementary tools: HashiCorp Vault (machine secrets) and Vaultwarden (human password manager).
 **Related:** `identity/0003-machine-credentials`, `identity/0004-os-accounts §11`, `naming/0001-infra`, `infra/0005-environment-tiers` (future)
 
