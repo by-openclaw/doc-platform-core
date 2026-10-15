@@ -28,13 +28,26 @@ There is also no list: nothing says which destinations a host may reach or a per
 
 ## Internet by request (the portal)
 
-The owner's model (2026-10-15): nobody gets standing internet; a person **requests a slot** — a destination (FQDN, IP or CIDR, with its ports), a purpose (a license update, a vendor download) and a duration — and the platform opens exactly that, for that time, for that requester, and logs it.
+The owner's reference (2026-10-15, a portal in use elsewhere): one page — **target** (IP or DNS name), **reason** (mandatory, free text), one fixed slot (one hour), a button; below it two tabs, **history** and **active/future** rules, each row = IP, hostname, start, end, user, created, reason; and the notice that regular or long-lived access goes through a ticket, not the portal. The platform's version keeps that shape and adds the group model below.
+
+The owner's model: nobody gets standing internet; a person **requests a slot** — a destination (FQDN, IP or CIDR, with its ports), a purpose (a license update, a vendor download) and a duration — and the platform opens exactly that, for that time, for that requester, and logs it.
 
 1. **The portal** is a module of the platform's admin portal, behind Authentik (the person is who signed in; no form field asks who they are). The form: destination, ports (80/443 default), purpose (free text, kept in the audit), duration from fixed slots (1 h, 4 h, 8 h; the maximum is a declared value), scope (my session only / the host I name).
 2. **Approval** is group-based: a `proxy-admins` member's request is active on submit; a `proxy-users` request waits for an admin's approval in the same portal (the admin sees who, what, why). Every state change notifies the platform's channel.
 3. **Enforcement without reloads:** Squid consults the slots through an external ACL helper (requester or source host, destination, port, now < expiry) on every request — a slot is live the second it is approved and dead the second it expires; nothing is rewritten, nothing restarts. The permanent allow-lists of §3 stay for the vendor sources; slots cover everything else.
 4. **Hosts that cannot speak to a proxy** (a licensing agent dialling out directly): a slot may ask for a **firewall slot** instead — the same request creates a time-boxed rule through the firewall catalog (`lib-opnsense`, the platform's firewall-as-code) and removes it at expiry. Firewall slots are v2: the catalog needs an expiry field first (its own change, same ADR family as `services/0008`).
 5. **Audit:** a slot is a record — requester, approver, destination, purpose, start, expiry, bytes used — written to Loki (`job=egress`, `kind=slot`) and visible in the portal's history; the register names the portal as the control for "internet access by exception".
+
+## Compliance (NIS2, GDPR)
+
+- **NIS2** — the service is a control: least privilege (deny by default, slots by exception), traceability (every request and slot carries the identity, purpose, approver and time; immutable in Loki), change management (lists by PR, slots by portal with approval), monitoring (the proxy's liveness and its deny rate are alerted), and the control is named in the compliance register against the "network security / access control" measures.
+- **GDPR** — the logs are personal data (who browsed what): purpose limitation (security and traceability only, stated in the register), data minimisation (hostname, not URL path; no content inspection), retention aligned with the platform's log retention (declared, not indefinite), access limited to `proxy-admins`, and the person's right of access served by the portal's history view of their own slots. The processing is listed in the register of processing activities.
+
+## Migration
+
+1. Today (2026-10-15): the Windows guests run with **open egress, declared** (`platform_windows_egress_open: true`, ansible-platform) — the same posture every other host has had since the beginning. The exception is explicit, dated and reversible by one flag.
+2. The service lands (LXC, Squid, lists, Loki); hosts and people are pointed at it; the flag flips back to deny for the Windows guests — then for the Linux hosts, zone by zone, through the firewall catalog.
+3. The portal module follows; firewall slots (v2) after the catalog carries expiry.
 
 ## Consequences
 
