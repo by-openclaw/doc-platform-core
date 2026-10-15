@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-10-15 (proposed)
-**Scope:** How anything inside the platform reaches the internet: hosts (updates, installers, agents) and people (an RDP or desktop session). Replaces the package cache standing in as a proxy for the Windows guests.
+**Scope:** How anything inside the platform reaches the internet: hosts (updates, installers, agents) and people (an RDP or desktop session) — standing allow-lists for vendors, and **time-boxed slots requested through a portal** for everything else. Replaces the package cache standing in as a proxy for the Windows guests.
 **Related:** `infra/0011-windows-authorized-applications` (the vendor sources it allows), `security/0001` (credentials in Vault), `identity/0004` (people and groups), `services/0006-firewall-services` (the catalog that makes it the only way out), `infra/0006-logging`.
 
 ---
@@ -25,6 +25,16 @@ There is also no list: nothing says which destinations a host may reach or a per
 6. **Windows guests**: WinHTTP (system) and WinINET (session) point at `svc-proxy`; system egress is host-identified, session egress authenticates. The Linux hosts keep `pkgcache` for packages and get `svc-proxy` for everything else (`http_proxy` in the declared place, not in task environments).
 7. **Availability:** one instance now; a second behind the services virtual IP when the cluster exists (`infra/0009`) — the proxy is a dependency of patching, so its liveness alert is critical.
 
+## Internet by request (the portal)
+
+The owner's model (2026-10-15): nobody gets standing internet; a person **requests a slot** — a destination (FQDN, IP or CIDR, with its ports), a purpose (a license update, a vendor download) and a duration — and the platform opens exactly that, for that time, for that requester, and logs it.
+
+1. **The portal** is a module of the platform's admin portal, behind Authentik (the person is who signed in; no form field asks who they are). The form: destination, ports (80/443 default), purpose (free text, kept in the audit), duration from fixed slots (1 h, 4 h, 8 h; the maximum is a declared value), scope (my session only / the host I name).
+2. **Approval** is group-based: a `proxy-admins` member's request is active on submit; a `proxy-users` request waits for an admin's approval in the same portal (the admin sees who, what, why). Every state change notifies the platform's channel.
+3. **Enforcement without reloads:** Squid consults the slots through an external ACL helper (requester or source host, destination, port, now < expiry) on every request — a slot is live the second it is approved and dead the second it expires; nothing is rewritten, nothing restarts. The permanent allow-lists of §3 stay for the vendor sources; slots cover everything else.
+4. **Hosts that cannot speak to a proxy** (a licensing agent dialling out directly): a slot may ask for a **firewall slot** instead — the same request creates a time-boxed rule through the firewall catalog (`lib-opnsense`, the platform's firewall-as-code) and removes it at expiry. Firewall slots are v2: the catalog needs an expiry field first (its own change, same ADR family as `services/0008`).
+5. **Audit:** a slot is a record — requester, approver, destination, purpose, start, expiry, bytes used — written to Loki (`job=egress`, `kind=slot`) and visible in the portal's history; the register names the portal as the control for "internet access by exception".
+
 ## Consequences
 
 - A download from a new portal is a one-line PR to `platform_egress_portals`, not a firewall exception.
@@ -33,7 +43,8 @@ There is also no list: nothing says which destinations a host may reach or a per
 
 ## Pending decisions (owner)
 
-1. Approve the service (one LXC, Squid, Authentik LDAP for people, IP identification for hosts).
-2. The browsing policy for `proxy-users`: allow-list of approved portals (recommended) or allow-all-with-logging for people.
-3. Ports beyond 80/443 anyone needs today (none known).
-4. Whether the first portal(s) you need now go into the list in the same PR that builds the service — name them and they do.
+1. Approve the service (one LXC, Squid, Authentik LDAP for people, IP identification for hosts) **with the request portal** as its front door.
+2. Approval model: `proxy-admins` self-approve, `proxy-users` need an admin (recommended) — or self-service for everyone with the audit as the control.
+3. Slot durations and the maximum (proposed 1 h / 4 h / 8 h, max 24 h).
+4. Portal placement: a module of the admin portal (recommended) or a standalone page.
+5. The portal(s) you need now — name them (FQDN, port) and they ship as the first standing entries with the service; until the service exists, a time-boxed catalog PR can open one destination for one guest.
