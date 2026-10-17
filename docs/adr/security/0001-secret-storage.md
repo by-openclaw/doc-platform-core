@@ -105,7 +105,7 @@ Rules that follow:
 5. **Mandatory custom metadata on every document** (KV v2 metadata, never in the data): `purpose` (one sentence), `class` (system | identity | break-glass | placeholder), `presenter`, `writer` (the role or play that creates and rotates it), `readers` (roles, plays, people groups), `rotation` (`<days>` or `on-incident` or `static`). The `note` / `_note` / `purpose` **data** fields migrate into metadata and disappear from the data.
 6. **The register is generated, never hand-written.** `playbooks/vault-register.yml` lists every document under the tiers, fails on a missing metadata field or on a document with no reader (unless class `break-glass` or `placeholder`), and writes `docs/vault-register.md` in ansible-platform (one row per document: path, class, purpose, presenter, writer, readers, rotation, created, last rotated). It is the asset inventory of secrets (ISO 27001 A.5.9) and runs in CI like `docs/register.md`.
 7. **An identity exists once; tiers do not copy it.** A person or a machine account is one identity, kept in the tier of the identity provider (`prod/users/<person>/…`, `prod/svc-<function>/…`): one key pair, one sign-in. What that identity presents to a system of another tier sits under that tier, under the identity (`dev/svc-rune/proxmox-terraform`, `test/users/<person>/firewall`). Reach is widened by **groups** (Authentik groups → Vault policies, service ACLs), never by a second copy of the identity's material in another tier — so a group grant is revoked in one place and a person's key is one key to rotate.
-8. **Retire what the rule exposes:** a relay the platform banned (`resend/by-research`), placeholders a product can scramble instead of store, one-off records nobody signs in with that are not break-glass.
+8. **Retire what the rule exposes:** placeholders a product can scramble instead of store, one-off records nobody signs in with that are not break-glass.
 
 **Migration (copy → switch the readers → retire, `roles/vault_tidy`, one PR per line, no secret regenerated):**
 
@@ -118,7 +118,7 @@ Rules that follow:
 | `dev/proxmox/tokens/{svc-rune-admin,svc-rune-terraform}` (the retired agent's token is removed) | `dev/svc-rune/proxmox-admin`, `dev/svc-rune/proxmox-terraform` | identity |
 | `prod/ci/github-rune`, `prod/ci/git-identity` (`ci/github-opus` is retired with its agent) | `prod/svc-rune/github-token`, `prod/svc-rune/git-identity` | identity |
 | `prod/{proxmox,windows,opnsense}/ssh-key` + `ssh-passphrase` | retired after the acceptors take `svc-ansible-prod`'s key | — |
-| `prod/resend/by-research` | retired | — |
+| `prod/resend/by-research` | **kept** — the owner decided on 2026-10-11 that the external relay must keep working though it is not used now (`platform_vault_restored_documents`); class `system`, metadata says so | system |
 | `prod/users/<person>/firewall` | scrambled on the firewall if the product allows; else kept as class `placeholder` | placeholder |
 
 Firewalls already fit (`prod/opnsense/*`, `test/opnsense/*`); a per-node segment appears only when a tier has two.
