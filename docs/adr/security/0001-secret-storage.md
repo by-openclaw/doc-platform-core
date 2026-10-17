@@ -92,7 +92,7 @@ register generated from Vault itself.
 | Class | Who presents it | Path | Examples |
 |---|---|---|---|
 | **system** | the service itself, to run or to authenticate as a client | `{tier}/{service}/{key}`; per node `{tier}/{service}/{hostname}/{key}` | `prod/proxmox/oidc` (Proxmox presents it to Authentik), `prod/proxmox/<node>/root`, `dev/windows/<host>/administrator`, `prod/gitlab/db-pgsql` |
-| **identity** | a person or a machine account, to a system | `{tier}/users/{person}/{key}`, `{tier}/svc-{function}/{key}` | `prod/users/adm_yboujraf/keys`, `prod/svc-ansible/gitlab-api`, `dev/svc-rune/proxmox-terraform`, `prod/svc-rune/github-token` |
+| **identity** | a person or a machine account, to a system | `{tier}/users/{person}/{key}`, `{tier}/svc-{function}/{key}` | `prod/users/adm_yboujraf/keys`, `prod/svc-ansible/gitlab-api`, `dev/svc-rune/proxmox-terraform`, `prod/svc-rune/github-token`. The platform has two machine identities, `svc-ansible` and `svc-rune`; the second agent identity (`svc-opus`) is retired (owner, 2026-10-17). |
 | **break-glass** | a human at a console when Authentik and Vault are down | `{tier}/break-glass/{key}` | `prod/break-glass/os`, `prod/break-glass/opnsense`, `prod/break-glass/ssh-key` |
 | **placeholder** | nobody — a value a product forces into a record whose authentication is elsewhere | avoided; when unavoidable, class `placeholder`, no reader | the local GUI password OPNsense requires on an LDAP-authenticated user |
 
@@ -100,11 +100,12 @@ Rules that follow:
 
 1. **Tier = the tier of the party.** A hypervisor's documents sit under the node's tier (`dev/proxmox/…` for the dev node, `prod/proxmox/…` for the live node — `poc` is not a tier, `naming/0001 §4.1`). Guests of another tier that use that node's token read it through policy (`platform_proxmox_env`), never through a path of their own tier.
 2. **A hostname appears only in the per-node segment** of a system document, never in the service slot (`pve.dev` was wrong). Service names are the service short codes (`proxmox`, `opnsense`, `windows`), one per product.
-3. **Tokens, passwords and keys an identity presents to a system live under the identity**, named after the system: `svc-rune/proxmox-admin`, `svc-opus/proxmox-audit`, `svc-ansible/jumpserver-api`. A system never holds another party's credential (the live node's `proxmox/admin` bundling three identities' tokens is the counter-example).
+3. **Tokens, passwords and keys an identity presents to a system live under the identity**, named after the system: `svc-rune/proxmox-admin`, `svc-rune/proxmox-terraform`, `svc-ansible/jumpserver-api`. A system never holds another party's credential (the live node's `proxmox/admin` bundling three identities' tokens is the counter-example).
 4. **A key belongs to whoever holds the private half.** People: `users/<person>/keys`. Machine accounts: `svc-<function>/ssh-key` + `ssh-passphrase`. There is no "key of a system": a system *accepts* identity keys. Transitional per-system key documents (`proxmox/ssh-key`, `windows/ssh-key`, `opnsense/ssh-key`, 2026-10-16) retire once the systems accept the identity key.
 5. **Mandatory custom metadata on every document** (KV v2 metadata, never in the data): `purpose` (one sentence), `class` (system | identity | break-glass | placeholder), `presenter`, `writer` (the role or play that creates and rotates it), `readers` (roles, plays, people groups), `rotation` (`<days>` or `on-incident` or `static`). The `note` / `_note` / `purpose` **data** fields migrate into metadata and disappear from the data.
 6. **The register is generated, never hand-written.** `playbooks/vault-register.yml` lists every document under the tiers, fails on a missing metadata field or on a document with no reader (unless class `break-glass` or `placeholder`), and writes `docs/vault-register.md` in ansible-platform (one row per document: path, class, purpose, presenter, writer, readers, rotation, created, last rotated). It is the asset inventory of secrets (ISO 27001 A.5.9) and runs in CI like `docs/register.md`.
-7. **Retire what the rule exposes:** a relay the platform banned (`resend/by-research`), placeholders a product can scramble instead of store, one-off records nobody signs in with that are not break-glass.
+7. **An identity exists once; tiers do not copy it.** A person or a machine account is one identity, kept in the tier of the identity provider (`prod/users/<person>/…`, `prod/svc-<function>/…`): one key pair, one sign-in. What that identity presents to a system of another tier sits under that tier, under the identity (`dev/svc-rune/proxmox-terraform`, `test/users/<person>/firewall`). Reach is widened by **groups** (Authentik groups → Vault policies, service ACLs), never by a second copy of the identity's material in another tier — so a group grant is revoked in one place and a person's key is one key to rotate.
+8. **Retire what the rule exposes:** a relay the platform banned (`resend/by-research`), placeholders a product can scramble instead of store, one-off records nobody signs in with that are not break-glass.
 
 **Migration (copy → switch the readers → retire, `roles/vault_tidy`, one PR per line, no secret regenerated):**
 
@@ -113,9 +114,9 @@ Rules that follow:
 | `prod/pve.dev/root` | `dev/proxmox/br-pmox-03/root` | system, per node |
 | `prod/pve/oidc` | `prod/proxmox/oidc` | system |
 | `prod/proxmox/root` | `prod/proxmox/srv-proxmox-poc-01/root` | system, per node |
-| `prod/proxmox/admin` (admin + audit + terraform token pairs) | `prod/svc-rune/proxmox-admin`, `prod/svc-opus/proxmox-audit`, `prod/svc-rune/proxmox-terraform` | identity |
-| `dev/proxmox/tokens/{svc-rune-admin,svc-opus-audit,svc-rune-terraform}` | `dev/svc-rune/proxmox-admin`, `dev/svc-opus/proxmox-audit`, `dev/svc-rune/proxmox-terraform` | identity |
-| `prod/ci/github-rune`, `prod/ci/git-identity`, `prod/ci/github-opus` | `prod/svc-rune/github-token`, `prod/svc-rune/git-identity`, `prod/svc-opus/github-token` | identity |
+| `prod/proxmox/admin` (admin + terraform token pairs; the audit pair of the retired agent is removed) | `prod/svc-rune/proxmox-admin`, `prod/svc-rune/proxmox-terraform` | identity |
+| `dev/proxmox/tokens/{svc-rune-admin,svc-rune-terraform}` (the retired agent's token is removed) | `dev/svc-rune/proxmox-admin`, `dev/svc-rune/proxmox-terraform` | identity |
+| `prod/ci/github-rune`, `prod/ci/git-identity` (`ci/github-opus` is retired with its agent) | `prod/svc-rune/github-token`, `prod/svc-rune/git-identity` | identity |
 | `prod/{proxmox,windows,opnsense}/ssh-key` + `ssh-passphrase` | retired after the acceptors take `svc-ansible-prod`'s key | — |
 | `prod/resend/by-research` | retired | — |
 | `prod/users/<person>/firewall` | scrambled on the firewall if the product allows; else kept as class `placeholder` | placeholder |
