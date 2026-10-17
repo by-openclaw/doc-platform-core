@@ -3,6 +3,7 @@
 **Status:** Draft
 **Date:** 2026-04-13 (supersedes flat ADR-0011, 2026-03-31 + flat ADR-0016, 2026-04-02)
 **Amended:** 2026-10-11 (approved by the owner) — people read in Vault what is meant for them (§People reading in Vault); the controller keeps only what opens Vault (§Operating model)
+**Amendment proposed:** 2026-10-17 — document classes, mandatory purpose metadata, the generated register (§Document classes, purpose and register). Not in force until the owner approves this PR.
 **Scope:** Where platform secrets live, who reads them, and how they are organized. Covers two complementary tools: HashiCorp Vault (machine secrets) and Vaultwarden (human password manager).
 **Related:** `identity/0003-machine-credentials`, `identity/0004-os-accounts §11`, `naming/0001-infra`, `infra/0005-environment-tiers` (future)
 
@@ -76,6 +77,53 @@ secret/prod/authentik/webhook-secret
 3. **Service short code matches NetBox service vocabulary** (see `naming/0001-infra §5` and `services/0003-netbox-cmdb` when deployed).
 4. **Keys are lowercase, hyphen-separated.** No underscores, no CamelCase.
 5. **Structured secrets (JSON blobs) are stored as single KV values** — individual fields accessible via `vault kv get -field=...`. Never split a single logical credential across multiple KV paths.
+
+#### Document classes, purpose and register (proposed 2026-10-17)
+
+The path convention above says where a document sits; it says nothing about what the document
+is **for**, who **presents** it, who **reads** it and how it **rotates**. On 2026-10-17 Vault held
+205 documents under the tiers; 7 carried purpose metadata, the rest an ad hoc `note`, `_note` or
+`purpose` field, or nothing — the owner could not tell what `users/<person>/firewall` or `pve/oidc`
+were for. This section closes that gap with one rule, four classes, mandatory metadata, and a
+register generated from Vault itself.
+
+**One rule: a credential lives under the party that presents it.**
+
+| Class | Who presents it | Path | Examples |
+|---|---|---|---|
+| **system** | the service itself, to run or to authenticate as a client | `{tier}/{service}/{key}`; per node `{tier}/{service}/{hostname}/{key}` | `prod/proxmox/oidc` (Proxmox presents it to Authentik), `prod/proxmox/<node>/root`, `dev/windows/<host>/administrator`, `prod/gitlab/db-pgsql` |
+| **identity** | a person or a machine account, to a system | `{tier}/users/{person}/{key}`, `{tier}/svc-{function}/{key}` | `prod/users/adm_yboujraf/keys`, `prod/svc-ansible/gitlab-api`, `dev/svc-rune/proxmox-terraform`, `prod/svc-rune/github-token`. The platform has two machine identities, `svc-ansible` and `svc-rune`; the second agent identity (`svc-opus`) is retired (owner, 2026-10-17). |
+| **break-glass** | a human at a console when Authentik and Vault are down | `{tier}/break-glass/{key}` | `prod/break-glass/os`, `prod/break-glass/opnsense`, `prod/break-glass/ssh-key` |
+| **placeholder** | nobody — a value a product forces into a record whose authentication is elsewhere | avoided; when unavoidable, class `placeholder`, no reader | the local GUI password OPNsense requires on an LDAP-authenticated user |
+
+Rules that follow:
+
+1. **Tier = the tier of the party.** A hypervisor's documents sit under the node's tier (`dev/proxmox/…` for the dev node, `prod/proxmox/…` for the live node — `poc` is not a tier, `naming/0001 §4.1`). Guests of another tier that use that node's token read it through policy (`platform_proxmox_env`), never through a path of their own tier.
+2. **A hostname appears only in the per-node segment** of a system document, never in the service slot (`pve.dev` was wrong). Service names are the service short codes (`proxmox`, `opnsense`, `windows`), one per product.
+3. **Tokens, passwords and keys an identity presents to a system live under the identity**, named after the system: `svc-rune/proxmox-admin`, `svc-rune/proxmox-terraform`, `svc-ansible/jumpserver-api`. A system never holds another party's credential (the live node's `proxmox/admin` bundling three identities' tokens is the counter-example).
+4. **A key belongs to whoever holds the private half.** People: `users/<person>/keys`. Machine accounts: `svc-<function>/ssh-key` + `ssh-passphrase`. There is no "key of a system": a system *accepts* identity keys. Transitional per-system key documents (`proxmox/ssh-key`, `windows/ssh-key`, `opnsense/ssh-key`, 2026-10-16) retire once the systems accept the identity key.
+5. **Mandatory custom metadata on every document** (KV v2 metadata, never in the data): `purpose` (one sentence), `class` (system | identity | break-glass | placeholder), `presenter`, `writer` (the role or play that creates and rotates it), `readers` (roles, plays, people groups), `rotation` (`<days>` or `on-incident` or `static`). The `note` / `_note` / `purpose` **data** fields migrate into metadata and disappear from the data.
+6. **The register is generated, never hand-written.** `playbooks/vault-register.yml` lists every document under the tiers, fails on a missing metadata field or on a document with no reader (unless class `break-glass` or `placeholder`), and writes `docs/vault-register.md` in ansible-platform (one row per document: path, class, purpose, presenter, writer, readers, rotation, created, last rotated). It is the asset inventory of secrets (ISO 27001 A.5.9) and runs in CI like `docs/register.md`.
+7. **An identity exists once; tiers do not copy it.** A person or a machine account is one identity, kept in the tier of the identity provider (`prod/users/<person>/…`, `prod/svc-<function>/…`): one key pair, one sign-in. What that identity presents to a system of another tier sits under that tier, under the identity (`dev/svc-rune/proxmox-terraform`, `test/users/<person>/firewall`). Reach is widened by **groups** (Authentik groups → Vault policies, service ACLs), never by a second copy of the identity's material in another tier — so a group grant is revoked in one place and a person's key is one key to rotate.
+8. **Retire what the rule exposes:** placeholders a product can scramble instead of store, one-off records nobody signs in with that are not break-glass.
+
+**Migration (copy → switch the readers → retire, `roles/vault_tidy`, one PR per line, no secret regenerated):**
+
+| Today | Target | Class |
+|---|---|---|
+| `prod/pve.dev/root` | `dev/proxmox/br-pmox-03/root` | system, per node |
+| `prod/pve/oidc` | `prod/proxmox/oidc` | system |
+| `prod/proxmox/root` | `prod/proxmox/srv-proxmox-poc-01/root` | system, per node |
+| `prod/proxmox/admin` (admin + terraform token pairs; the audit pair of the retired agent is removed) | `prod/svc-rune/proxmox-admin`, `prod/svc-rune/proxmox-terraform` | identity |
+| `dev/proxmox/tokens/{svc-rune-admin,svc-rune-terraform}` (the retired agent's token is removed) | `dev/svc-rune/proxmox-admin`, `dev/svc-rune/proxmox-terraform` | identity |
+| `prod/ci/github-rune`, `prod/ci/git-identity` (`ci/github-opus` is retired with its agent) | `prod/svc-rune/github-token`, `prod/svc-rune/git-identity` | identity |
+| `prod/{proxmox,windows,opnsense}/ssh-key` + `ssh-passphrase` | retired after the acceptors take `svc-ansible-prod`'s key | — |
+| `prod/resend/by-research` | **kept** — the owner decided on 2026-10-11 that the external relay must keep working though it is not used now (`platform_vault_restored_documents`); class `system`, metadata says so | system |
+| `prod/users/<person>/firewall` | scrambled on the firewall if the product allows; else kept as class `placeholder` | placeholder |
+
+Firewalls already fit (`prod/opnsense/*`, `test/opnsense/*`); a per-node segment appears only when a tier has two.
+
+**Compliance mapping of this section** — ISO 27001:2022 A.5.9 (inventory: the generated register), A.5.16 / A.5.17 (one credential per identity, no shared or unused authentication information, placeholders named), A.5.18 / A.8.2 (per-service policies, people's own area, break-glass apart), A.8.5 (people authenticate through Authentik only), A.8.24 (keys under their identity, escrowed, dated, 365-day rule, passphrase state recorded); NIS2 Art. 21(2)(h) cryptography, (i) access control and asset management, (j) MFA; ISO 27002 guidance on 5.17 for the lifecycle of authentication information.
 
 #### Per-service access policies
 
