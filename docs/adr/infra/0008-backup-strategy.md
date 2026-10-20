@@ -1,6 +1,7 @@
 # infra/0008 — Backup Strategy
 
 **Status:** Draft — several policy thresholds pending (`⚠ TBD` in §Pending decisions)
+**Amended:** 2026-10-20 (approved by the owner) — the PBS datastore lives off-site on Contabo S3 directly; the on-site S3 is not a backup destination; retention locked (§Backup destinations, decisions 1, 6, 7)
 **Date:** 2026-04-13 (supersedes flat ADR-0020, 2026-04-02)
 **Scope:** Platform-wide backup policy — what gets backed up, where to, how often, how long retained, how to restore. Does not define per-service backup mechanics beyond the class-level pattern.
 **Related:** `infra/0003-terraform-standard` (state backup), `security/0001-secret-storage` (Vault Raft snapshots), `infra/0005-environment-tiers §Tier-specific constraints`, `security/0003-hardening §8` (audit log retention)
@@ -40,8 +41,12 @@ Two-tier destination strategy:
 
 | Phase | Primary | Secondary / off-site |
 |---|---|---|
-| **Current** | Synology NAS (`br-syno-01`) | None — single point of failure, tracked as `security/0002-compliance-mapping` gap |
-| **Target** | Synology NAS (hot) | ⚠ **TBD** — see §Pending decisions |
+| **2026-04 → 2026-10** | Synology NAS (`br-syno-01`) | PBS datastore on the platform's own S3 (SeaweedFS, on the hypervisor's pool) mirrored to Contabo — the history sat twice on site and once off-site, and the copy on the hypervisor filled its pool (2026-10-18) |
+| **Decided 2026-10-20** | Synology NAS (hot): nightly full `vzdump` of every guest, **7 daily + 4 weekly** | **Contabo S3, as the PBS datastore itself** (PBS 4 S3 backend, local cache on the PBS guest, client-side encryption with the key in Vault): **14 daily + 8 weekly + 12 monthly**, deduplicated |
+
+The platform's own S3 (SeaweedFS) is **not a backup destination**: it holds application buckets (registries, artifacts, logs, session recordings) and mirrors those to Contabo. A backup of a guest never lands on the hypervisor that runs it.
+
+Consequences of the off-site datastore: the first fill uploads the deduplicated set once; afterwards only the daily deltas travel. A Contabo outage costs that night's PBS backup, never the NAS one. Restores of recent days come from the NAS (fast, full archives); older points come from Contabo.
 
 **Off-site backup is mandatory for `prod` and `drp` env tiers** (per `infra/0005-environment-tiers`). Non-prod tiers may rely on a single local target.
 
@@ -52,7 +57,7 @@ The platform targets the **3-2-1 backup rule** for prod / drp data:
 - **2** different storage media (disk + object store)
 - **1** off-site copy (not in the same physical location as production)
 
-Pre-off-site-deployment, the platform is at **2-1-0** — two copies on one medium, zero off-site. This is a known gap.
+Since 2026-10-20 the platform is at **3-2-1**: production, the NAS (disk, on site) and the PBS datastore on Contabo (object store, off site).
 
 ### Encryption
 
@@ -89,13 +94,13 @@ The following policy thresholds must be set by @yboujraf before this ADR moves f
 
 | # | Decision | Options / reference | Status |
 |---|---|---|---|
-| 1 | **Off-site backup target** | **LOCKED 2026-08-30: Contabo S3** (live: PBS S3 datastore + Vault snapshots + `infra-backup-s3-contabo`) | ✅ locked |
+| 1 | **Off-site backup target** | **LOCKED 2026-08-30: Contabo S3**; **clarified 2026-10-20:** the PBS datastore is on Contabo directly (not on the on-site S3 with a mirror); Vault snapshots and the application buckets' mirror also go there | ✅ locked |
 | 2 | **PostgreSQL backup schedule** | Daily `pg_dump` + continuous WAL archiving? PITR window length? | ⚠ TBD |
 | 3 | **Redis backup schedule** | `BGSAVE` hourly / daily? RDB + AOF hybrid? | ⚠ TBD |
 | 4 | **Vault Raft snapshot schedule** | **LOCKED 2026-08-30: daily** raft snapshot → NFS + S3 + controller (`roles/vault_backup`) | ✅ locked |
 | 5 | **GitLab application backup schedule** | Daily? Delta or full? | ⚠ TBD |
-| 6 | **Retention — hot (NAS)** | Typical: 7–14 days | ⚠ TBD |
-| 7 | **Retention — cold (off-site)** | Typical: 30 days to 1 year depending on tier | ⚠ TBD |
+| 6 | **Retention — hot (NAS)** | **LOCKED 2026-10-20: 7 daily + 4 weekly** (full archives, on site) | ✅ locked |
+| 7 | **Retention — cold (off-site)** | **LOCKED 2026-10-20: 14 daily + 8 weekly + 12 monthly** on the Contabo PBS datastore (deduplicated, encrypted client-side) | ✅ locked |
 | 8 | **Restore SLA (RTO) — prod** | Typical: ≤ 4 hours for critical services, ≤ 24 hours for non-critical | ⚠ TBD |
 | 9 | **Restore SLA (RTO) — non-prod** | Typical: best-effort, no SLA | ⚠ TBD |
 | 10 | **Restore drill cadence** | Quarterly (ISO 27001 minimum) or monthly? | ⚠ TBD |
