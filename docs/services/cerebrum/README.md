@@ -43,16 +43,16 @@ Every role: pinned installer with checksum from the platform object store, setti
 | Component | Port | Protocol | Purpose |
 |---|---|---|---|
 | server | 40001, 40002 | TCP + UDP | server protocol: clients, panels |
-| server | 40009 | TCP | link to the Device Service |
+| server | 40009 | TCP | **Northbound API**, XML over WebSocket (the vendor's API document defaults to 40007; the lab answers on 40009). Licensed per open session: 10 on the lab ("XML licenses" on the License tab). The Service Manager's `MGMT_PORT=40009` names this same port. Verified 2026-10-21 from the platform controller: the port completes the WebSocket handshake and refuses reads with `NACK 6 NOT_LOGGED_IN` until a Cerebrum user logs in |
 | server | 9081 / 9080 | TCP | web client, RCP over HTTP |
 | server | 162 | UDP | SNMP trap receiver |
 | server | 1161 | UDP | Cerebrum's SNMP agent |
 | server | 2071, 2072 | UDP | ACP1, ACP2 (Axon Control Protocol) |
 | server | 2000 | UDP | listening on the lab, *to confirm* |
 | server | 40003, 40030 | TCP | Federation (from the repository) |
-| server | 40007, 40051 | TCP | Mediaconf and Exchanger XML APIs (from the repository) |
+| server | 40051 | TCP | Exchanger XML API (from the repository); the repository's 40007 is the Northbound API at its default port |
 | server | 8080–8085, 8090–8095 | TCP | FCR and SAMIX APIs (from the repository) |
-| Device Service | 40009, 31150–31155, 62010 | TCP | management port, XS via Linx, video mixer (from the repository) |
+| Device Service | 31150–31155, 62010 | TCP | XS via Linx, video mixer (from the repository); its `MGMT_PORT=40009` points at the server's Northbound port above, it is not a listener of its own (*to confirm*) |
 | NMOS registry | 8080 | TCP | `x-nmos/registration`, `x-nmos/query`; mDNS 5353 UDP |
 | licence manager | 8558 | TCP | API and UI, TLS 1.2 |
 | database | static port to set | TCP | from the server host only |
@@ -98,7 +98,8 @@ A cluster does not make the application highly available; it makes the host disp
 | audit trail `ErrorLogs\AuditTrail\*.log` (TSV, severity column, 10 MB rotation) | file only | Alloy tails it → Loki as the second source until the syslog parser is proven; alerts on crash dumps |
 | SNMP | Cerebrum's agent on 1161 and traps out | Prometheus `snmp_exporter` with the shipped `AppMIBs` for health; a trap receiver later if the comparison shows events the audit trail lacks |
 | SQL Server errorlog, licence manager, Windows events | event log | Alloy channels already in place |
-| liveness | — | TCP probe on 40001, the web client on 9081, the licence manager on 8558 |
+| server counters and health (the Object Browser tree of device `0.0.0.0`, sub-device `00: System`: CPU, memory, handles, internal queues, C-Link queues, thread responsiveness, redundancy, federation, licence) | Performance and License tabs, read by eye | subscribed live over the **Northbound API** by the `cerebrum-nb` connector of `by-openclaw/go-acp` (`dhs consumer cerebrum-nb watch --metrics-addr`), scraped by Prometheus; the vendor's thresholds (§13 row 12) become alert rules. Semantics, paths and the blocker in §14 |
+| liveness | — | TCP probe on 40001, the web client on 9081, the licence manager on 8558; `Redundancy_Status.Overall` and `02: Services` → `ALL_RESPONSIVE` over the Northbound API |
 
 ## 10. Runbook (to grow)
 
@@ -186,7 +187,7 @@ Source: the vendor's ten-page checklist the owner shared on 2026-10-22. One row 
 
 | # | Vendor check | Platform |
 |---|---|---|
-| 1 | Version, licences and SLA in Help/About; same licences on both servers; SLA valid | `cerebrum-ops` version report feeds the register; licence and SLA expiry become a row with an alert 30 days ahead (VIA License Manager API: *to confirm*) |
+| 1 | Version, licences and SLA in Help/About; same licences on both servers; SLA valid | `cerebrum-ops` version report feeds the register; licence and SLA expiry become a row with an alert 30 days ahead; the licence state is also readable over the Northbound API as `License.License_Type`, `License.Demo_License_Enabled`, `License.Demo_License_Remaining`, `License.Sentinel_Key_Serial_Number` and the `License.Supported_Options.*` limits with their `*_In_Use` counters (read live 2026-09-25) |
 | 2 | Auto-backup files produced as configured | the nightly `Auto Backup` folder is watched: a missing file for 2 days alerts; the folder is in the guest backup |
 | 3 | Server has control / navigation / tally / router views disabled; clients use them | `_Config` row `CORTEX / DISABLE_CTL_NAV_TALLY_ON_SERVER` (0 on the broadcaster's test system; 1 is the vendor's recommendation for a server) — inventory data |
 | 4 | Control actions responsive; UI and events responsive | runbook step, after every change |
@@ -197,19 +198,66 @@ Source: the vendor's ten-page checklist the owner shared on 2026-10-22. One row 
 | 9 | Audit trail: today's logs exported, repeating errors checked; **memory stable, no single core at 100 %**; no raw protocol logging left on | the process collector (working set, private bytes, handles, threads, per-core CPU) with alerts; `AUDIT` levels as data with the vendor's defaults |
 | 10 | Restart: no duplicate CGD files, no Global Datastores on disk when redundant | runbook, checked in the audit trail after a restart |
 | 11 | SQL: alarm log and audit trail sizes give 48 hours of history, or archiving enabled to a directory **outside** the Cerebrum folder | `SQL / LOG_ARCHIVING`, `MAX_*` and `Admin / File Paths` rows as data; the archive on a separate, backed-up volume |
-| 12 | Performance tab: internal queues at 0, message backlog age 0 ms, message queue run rate below 2000; **CPU below 15 %, ideally below 5 %** in normal operation | thresholds for the alerts; how the queue counters are read from outside (SNMP agent, MIB OIDs) is *a vendor question* |
+| 12 | Performance tab: internal queues at 0, message backlog age 0 ms, message queue run rate below 2000; **CPU below 15 %, ideally below 5 %** in normal operation | thresholds for the alerts. The counters are the `00: System` objects `ApplicationOverview.ProcessorTime`, `InternalQueues.MessageQueueLength`, `InternalQueues.TotalMessageQueueLength` (run rate = its delta per second) and `InternalQueues.LastEventLogCommitDuration`, read and subscribed over the Northbound API (§14) — no SNMP needed; the backlog *age* (ms) is on the Performance tab only, *vendor question* whether it has an object |
 | 13 | Macro/GUI statistics in verbose mode for 1–5 minutes; chatty devices inhibited rather than custom CGD | runbook for tuning; inhibits as data |
 | 14 | Host: **reserve the CPU cores and memory for Cerebrum alone, as if physical**; memory stable; no other application dominating CPU (antivirus); at least 20 GB free; OS licensed; **application and Watchdog auto-start**; all servers time-synced, same time zone | done by design: NUMA-pinned cores, memory bound, ballooning off; Defender exclusions; disk alert; Windows licence parked; the session account with both start tasks; NTP from the firewall, one time zone |
 | 15 | Device Services: manual and automatic failover; time for devices to become controllable (NMOS registry devices especially); redundant path per device | runbook when a second Device Service exists |
 | 16 | SQL: partnership stable after repowering all three machines; mirrored database principal and synchronized partner, witness available; Always On: cluster status; mdf/ldf below 20 GB; SQL licence | the HA decision (§8); database size alert at 15 GB on Express (10 GB per database cap) |
 | 17 | Redundancy tab: partner and witness OK, no unexplained failovers | when HA exists |
-| 18 | Clients tab: all logged in, no disconnections, client versions match the servers; C-Link resends and timeouts not increasing | version report compares client and server versions; C-Link counters: *vendor question* for an external read |
+| 18 | Clients tab: all logged in, no disconnections, client versions match the servers; C-Link resends and timeouts not increasing | version report compares client and server versions; C-Link counters: `InternalQueues.CorLinkSendQueue`, `CorLinkReceiveQueue`, their `Peak*`/`Total*` siblings and `CorLinkRate` over the Northbound API (§14); the per-client resend and timeout columns of the Clients tab were not seen in the `00: System` tree — checked in the full walk |
 | 19 | Devices online for 30–60 minutes; UIs without errors from a client; macros loaded; safe routes; IP routing endpoints OK; tallies follow | commissioning runbook, executed from a client, never from the server |
 | 20 | UI Framework: file sync server→client works; UI version incremented and clients updated | runbook; client versions in the report |
-| 21 | Event log reasonable with all filters; alarms acknowledged; system GOOD; new alarms investigated | alarms to Loki; the GOOD state as a probe (*how to read it: vendor question*) |
+| 21 | Event log reasonable with all filters; alarms acknowledged; system GOOD; new alarms investigated | alarms to Loki; the GOOD state is `Redundancy_Status.Overall` (enum `Error|OK`, read live on the lab on 2026-09-25 by the connector's alarm template) together with `02: Services` → `ALL_RESPONSIVE` (same enum) over the Northbound API (§14) |
 | 22 | Clients TX: continuously increasing timeouts/resends = network or an under-provisioned client | client sizing in the Win11 Pro template; counters *vendor question* |
 | 23 | **Export Today's Logs** works and is known by the customer — the capture for a support ticket | the support-capture runbook: one play that runs the export and ships the archive to the object store |
 | 24 | Audit trail since installation checked; cleared; backup of the system and files; project folder or Cerebrum directory; stored safely | the guest backup plus the `.ccf` auto-backups, off-site |
 | 25 | Server monitoring: SNMP to the server's IPMI (BMC, iDRAC, iLO) for power supplies with severities | the hypervisor's iLO is monitored by the platform, not by Cerebrum; the guest sees no hardware |
 
 **What the list changes in our plan:** the Watchdog is part of the design (not optional); every unused device-definition file costs memory because all of them load; log archiving goes outside the Cerebrum folder; the vendor's own thresholds (CPU under 15 %, queue backlog 0 ms, run rate under 2000, database under 20 GB, 20 GB disk free) become the alert thresholds; the "Export Today's Logs" procedure becomes a play. The C-Link itself is configured in `_Config` (`COR_LINK`: `MULTICAST_ADDRESS`, `MULTICAST_PORT 40001`, `FILETRANS_PORT 40006`, `MAX_RESENDS`, `HEALTH_FAILOVER_GRACE_PERIOD`, `SERVER_NAME`), the auto-backup in `TALLY_ROUTER` (`AUTO_BACKUP`, `BACKUP_DIRECTORY`, `BACKUP_PERIOD`, `BACKUP_LIMIT`, `BACKUP_SIZE`), the web client in `WEB_CLIENT` (`ENABLED`, `ENABLE_IDLE_TIMEOUT`). The **live counters** (queue backlog and run rate, C-Link resends and timeouts, the GOOD state) are not settings anywhere: the `AppMIBs` folder on the lab holds only standard MIBs (HOST-RESOURCES, IF, IP, SNMPv2, …), so Cerebrum's SNMP agent exposes host-level objects (per-process CPU and memory through `hrSWRunPerf`) and no application counters. Reading those from outside is the one vendor question left.
+
+## 14. Metrics over the Northbound API — checked 2026-10-21/22
+
+The owner asked whether the object tree of device `0.0.0.0` can be browsed recursively and watched for metrics. Checked against the vendor's *Cerebrum Northbound API 0v16* document and the connector that already speaks it, `cerebrum-nb` in `by-openclaw/go-acp` (the `dhs` binary; release v0.46.0 verified by checksum), which logged into the lab and ran its read and write verbs on 2026-09-25/27.
+
+### 14.1 What the API allows (0v16 §1.6, §5.4.3)
+
+| Question | Answer from the document | Consequence |
+|---|---|---|
+| Read one object | `OBTAIN` → `DEVICE_CHANGE TYPE="VALUE"` with `IP_ADDRESS` or `DEVICE_NAME`, `SUB_DEVICE` (0-based) and `OBJECT` = the dotted path | the Object Browser path is the wire path; `0.0.0.0`, sub-device `0` = `00: System` |
+| Browse a group | obtaining a **group** returns the values of its **direct children** only; a child that has children of its own is listed but not expanded | **no recursion on the wire** — the client walks group by group (one obtain per group) |
+| Wildcards | only on **table indexes** (`Devices.[*]`, several per path such as `Devices.[*].Senders.[*].Connected`); nothing else wildcards; a response above 20 MB is refused with `NACK RESPONSE_TOO_LARGE` | there is no "give me the whole tree" request, as the owner remembered; scope every read |
+| Subscribe | `SUBSCRIBE` on an object pushes its value now and on every change; on a group it follows the **direct children** only (grandchildren never notify); a wildcard snapshot ends with `WILDCARD_COMPLETE` | metrics = one subscription per leaf, or per parent group for its leaves; push-based, no polling |
+| Root of a sub-device | the document gives no root spelling; the connector probes `OBJECT=""`, `ROOT-NODE-V2`, `*`, then no attribute (the last one was refused live with `NACK 10`) and seeds the walk from whatever the server enumerates | the walk starts from a named group when the root probe fails (`--path "ComputerOverview;InternalQueues;…"`) |
+| Access | every read needs a logged-in Cerebrum user (`NACK 6 NOT_LOGGED_IN` otherwise); one licence per open WebSocket session | a dedicated read-only Cerebrum user for monitoring, one session, one licence of the 10 |
+
+So the recursion the owner remembers is real but **client-side**: the connector's `tree --device` and `extract` verbs descend group by group, and `watch --object "GROUP.**"` expands a subtree into leaf subscriptions by obtains before subscribing; the server itself never recurses.
+
+### 14.2 The server's own tree (device `0.0.0.0 [Cerebrum]`, Object Browser 2.9.3, 2026-10-22)
+
+Sub-devices: `00: System`, `01: IP Router`, `02: Services`, `03: Resource Manager`, `04: Assignment Engine`. Under `00: System` › Objects:
+
+| Group | Leaves (value type) | Use |
+|---|---|---|
+| `ComputerOverview` | `ProcessorTime`, `ProcessCount`, `ThreadCount`, `HandleCount`; `Memory.PhysicalInUse/PhysicalAvailable/CommittedTotal/CommittedPeak/CommittedLimit` (MB); `Network.Transmit.BytesPerSec/BytesPerSecMax/PacketsPerSec/PacketsPerSecMax`, `Network.Receive.*`; `ResetPeakValues` (action) | host view, same numbers as the Performance tab "PC System Performance" |
+| `ApplicationOverview` | `ProcessorTime` (%), `HandleCount`, `PeakHandleCount`, `GDIObjects`, `PeakGDIObjects`, `UserObjects`, `PeakUserObjects`, `DeviceDeactivations`; `Memory.*` | the process: CPU under 15 % (vendor), handles and GDI objects stable = no leak |
+| `InternalMemoryManagement` | (not expanded in the screenshot) | heap of the application — to walk |
+| `InternalQueues` | `MessageQueueLength`, `PeakMessageQueueLength`, `MessageQueue.*`, `TotalMessageQueueLength`, `EventLogQueueLength`, `PeakEventLogQueueLength`, `TotalEventLogQueueLength`, `LastEventLogCommitDuration` (µs), `AuditTrailQueueLength`, `Peak…`, `Total…`, `CorLinkSendQueue`, `PeakCorLinkSendQueue`, `TotalCorLinkSendQueue`, `CorLinkReceiveQueue`, `Peak…`, `Total…`, `CorLinkRate`, `ResetPeakQueueLengths` (action), `WriteCount` | the vendor's checklist rows 12 and 18: queues at 0, run rate = Δ`TotalMessageQueueLength`/s under 2000 |
+| `ThreadResponsiveness` | GUI and macro thread current/peak (Performance tab) | stalls |
+| `Redundancy_Status` | `Overall`, `SQL_Log_Maintenance` (enum `Error|OK`), `Watchdog_Health` (0–100) — read live 2026-09-25 | the GOOD state of row 21; partner objects are `available=0` on a standalone |
+| `Federation` | `Is_Using_Federation_Service`, `Overall`, `Failover`, `Primary.*` | only with a federation |
+| `License` | `License_Type`, `Demo_License_Enabled`, `Demo_License_Remaining`, `Sentinel_Key_Serial_Number`, `Supported_Options.<option>` with `_In_Use` — read live 2026-09-25 | licence rows of §13 (1) |
+| `02: Services` | `ALL_RESPONSIVE` (enum `Error|OK`) — read live 2026-09-25 | the liveness of the service threads |
+
+The License tab (2026-10-22) adds: licence type Demo, Sentinel key missing, client licences 10, web clients 10, **XML (Northbound) licences 10**, SNMP enabled, **External Logging disabled**, federation 1, redundant server allowed, IP NMS disabled. "External Logging" is a licensed option — to confirm with the vendor whether the syslog output of §9 depends on it.
+
+### 14.3 Design: the exporter
+
+- **Collector:** the `dhs` Linux binary on the monitoring host, one `watch` session per Cerebrum server, as a systemd unit installed by Ansible (the binary pinned by release checksum from the object store). It logs in with a read-only Cerebrum user from Vault, subscribes to the leaves of `ComputerOverview`, `ApplicationOverview`, `InternalQueues`, `ThreadResponsiveness`, `Redundancy_Status`, `License` and `02: Services`, and serves Prometheus `/metrics` on its `--metrics-addr`. Every change also goes to its log sink in RFC 5424 or JSON — Alloy ships that to Loki as the event trail.
+- **Footprint on Cerebrum:** push-based after the initial obtains (one obtain per group to expand the subtree, then one subscription per leaf); the server emits on change and re-asserts unchanged values, nothing polls it. One WebSocket, one licence, a few dozen leaves — no table wildcards and no walk of the device trees of the controlled devices from this session. The walk of the full tree is a one-off (`tree --device`, capped by `--max-requests`) run by hand to produce the reference, never on a schedule.
+- **Alerts:** the vendor's numbers from §13 (CPU under 15 %, queues at 0, run rate under 2000, memory stable, handles stable) as Prometheus rules on the scraped gauges; `Redundancy_Status.Overall` and `ALL_RESPONSIVE` not `OK` for 30 s = major (the connector ships the same rules as its alarm template `Cerebrum@unknown.json`).
+- **Secrets:** the connector keeps the lab login in its own `.secrets/staging-cerebrum.json` on the desk and on its control node; the platform's Vault holds no Cerebrum credential. For the platform the login goes to Vault under the service's tier and host (`<tier>/cerebrum/<host>/nb-api`, fields `user`, `pass`), read by the role, never on a command line.
+
+### 14.4 What is not done yet, and why
+
+- The live walk of the five sub-devices from the platform controller is blocked on the login: the lab's Cerebrum user is not in the platform Vault, and the connector's control node (`dhs-debian`) does not accept the platform's keys. Once the credential is in Vault at the path above, the walk runs from the controller (the port is reachable from it, verified) and the resulting tree lands here as the object-path reference, with the root spelling that the server accepts.
+- Where the Northbound port (40009) and its enablement are configured was not found in `Cerebrum.ini` nor in the exported data files; the server device's **Control Interfaces** tab is the likely place — to record in §12 after the next lab session.

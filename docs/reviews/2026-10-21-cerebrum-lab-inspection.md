@@ -28,7 +28,7 @@
 |---|---|---|---|
 | 9081 | TCP | Cerebrum.exe | web client / RCP (rule "Cerebrum RCP HTTP" is on 9080 via http.sys) |
 | 40001, 40002 | TCP + UDP | Cerebrum.exe | server protocol (clients, panels) |
-| 40009 | TCP | Cerebrum.exe | Service Manager link |
+| 40009 | TCP | Cerebrum.exe | Northbound API, XML over WebSocket (the vendor's default is 40007). Verified 2026-10-21 from the platform controller with the `go-acp` connector: WebSocket handshake completes, reads answer `NACK 6 NOT_LOGGED_IN` without a Cerebrum login. The Service Manager's `MGMT_PORT=40009` names this port |
 | 162 | UDP | Cerebrum.exe | SNMP trap receiver |
 | 1161 | UDP | Cerebrum.exe | SNMP agent of Cerebrum |
 | 2000, 2072 | UDP | Cerebrum.exe | device protocols (to identify with the vendor) |
