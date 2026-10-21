@@ -87,3 +87,7 @@ No Windows event-log provider exists for Cerebrum (only the licence manager and 
 | 10 | Upgrade path and installer switches (the repo's `/COMPONENTS`, `/InstallSQL`, `/InstallSentinel` flags; 2.9.2 → 2.9.3 was done in place on the lab) | vendor documentation |
 | 11 | Windows Server licence for the platform hosts (the lab runs an evaluation) | owner |
 | 12 | Installer files and checksums for 2.9.3, WebView2, ODBC/OLE DB, SQL Express 2019, VIA License Manager, SDN | owner (vendor download area) |
+
+## 7. Owner's answers (2026-10-21)
+
+Recorded in `docs/services/cerebrum/README.md` §3: ACP2 on 2072 (2000 to confirm), VIA License Manager licenses EVS products, unattended run needed, SQL enhanced but vendor specification kept, desktop client + web client + one panel later, syslog and SNMP both (compare), SDN probably not, discovery by DNS-SD + mDNS + manual, HA in two layers, upgrades after the export (22 configuration files exported the same day), Windows licence parked while the guests stay pinned, all tooling by Ansible.
