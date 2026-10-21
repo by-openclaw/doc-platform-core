@@ -179,3 +179,37 @@ Cerebrum keeps four layers of configuration. The table carries one row per item,
 | 38 | Firewall | "any port for Cerebrum.exe" | the explicit list of 12.1/§4 per program |
 
 **Tracking and audit, the one question that matters for the vendor discussion:** every change an operator makes (crosspoint, salvo, macro, configuration) must land with the user's identity in a log the operator cannot edit. On the lab that is the audit-trail file on the host, writable by the same local Administrator who runs the application. The platform answer is syslog to Loki in real time plus per-user accounts in Cerebrum; the questions are rows 16, 19, 21 and 28.
+
+## 13. The vendor's commissioning check and health list (v2.01, 2026-09-01) mapped to the platform
+
+Source: the vendor's ten-page checklist the owner shared on 2026-10-22. One row per check; "platform" says where it lands here.
+
+| # | Vendor check | Platform |
+|---|---|---|
+| 1 | Version, licences and SLA in Help/About; same licences on both servers; SLA valid | `cerebrum-ops` version report feeds the register; licence and SLA expiry become a row with an alert 30 days ahead (VIA License Manager API: *to confirm*) |
+| 2 | Auto-backup files produced as configured | the nightly `Auto Backup` folder is watched: a missing file for 2 days alerts; the folder is in the guest backup |
+| 3 | Server has control / navigation / tally / router views disabled; clients use them | an `_Config` row in the inventory data (category *to identify*) |
+| 4 | Control actions responsive; UI and events responsive | runbook step, after every change |
+| 5 | Export of system tables and archive; macros loaded; UIs work | `cerebrum-db-config` export; runbook |
+| 6 | Device protection enabled; internal watchdog enabled | `_Config` rows (*to identify*); **the Watchdog is in use** — the role creates its start task beside the server's |
+| 7 | Unused CGD files deleted (Cerebrum loads **every** CGD file in `GenericDevices`, even unused); the Cerebrum folder clean of large or compressed files | the role keeps `GenericDevices` to the declared device families and nothing else lands in the folder; the footprint measured before and after |
+| 8 | Event log: devices online, no alarms, no excessive logging | event log levels as data; alarms through syslog to Loki |
+| 9 | Audit trail: today's logs exported, repeating errors checked; **memory stable, no single core at 100 %**; no raw protocol logging left on | the process collector (working set, private bytes, handles, threads, per-core CPU) with alerts; `AUDIT` levels as data with the vendor's defaults |
+| 10 | Restart: no duplicate CGD files, no Global Datastores on disk when redundant | runbook, checked in the audit trail after a restart |
+| 11 | SQL: alarm log and audit trail sizes give 48 hours of history, or archiving enabled to a directory **outside** the Cerebrum folder | `SQL / LOG_ARCHIVING`, `MAX_*` and `Admin / File Paths` rows as data; the archive on a separate, backed-up volume |
+| 12 | Performance tab: internal queues at 0, message backlog age 0 ms, message queue run rate below 2000; **CPU below 15 %, ideally below 5 %** in normal operation | thresholds for the alerts; how the queue counters are read from outside (SNMP agent, MIB OIDs) is *a vendor question* |
+| 13 | Macro/GUI statistics in verbose mode for 1–5 minutes; chatty devices inhibited rather than custom CGD | runbook for tuning; inhibits as data |
+| 14 | Host: **reserve the CPU cores and memory for Cerebrum alone, as if physical**; memory stable; no other application dominating CPU (antivirus); at least 20 GB free; OS licensed; **application and Watchdog auto-start**; all servers time-synced, same time zone | done by design: NUMA-pinned cores, memory bound, ballooning off; Defender exclusions; disk alert; Windows licence parked; the session account with both start tasks; NTP from the firewall, one time zone |
+| 15 | Device Services: manual and automatic failover; time for devices to become controllable (NMOS registry devices especially); redundant path per device | runbook when a second Device Service exists |
+| 16 | SQL: partnership stable after repowering all three machines; mirrored database principal and synchronized partner, witness available; Always On: cluster status; mdf/ldf below 20 GB; SQL licence | the HA decision (§8); database size alert at 15 GB on Express (10 GB per database cap) |
+| 17 | Redundancy tab: partner and witness OK, no unexplained failovers | when HA exists |
+| 18 | Clients tab: all logged in, no disconnections, client versions match the servers; C-Link resends and timeouts not increasing | version report compares client and server versions; C-Link counters: *vendor question* for an external read |
+| 19 | Devices online for 30–60 minutes; UIs without errors from a client; macros loaded; safe routes; IP routing endpoints OK; tallies follow | commissioning runbook, executed from a client, never from the server |
+| 20 | UI Framework: file sync server→client works; UI version incremented and clients updated | runbook; client versions in the report |
+| 21 | Event log reasonable with all filters; alarms acknowledged; system GOOD; new alarms investigated | alarms to Loki; the GOOD state as a probe (*how to read it: vendor question*) |
+| 22 | Clients TX: continuously increasing timeouts/resends = network or an under-provisioned client | client sizing in the Win11 Pro template; counters *vendor question* |
+| 23 | **Export Today's Logs** works and is known by the customer — the capture for a support ticket | the support-capture runbook: one play that runs the export and ships the archive to the object store |
+| 24 | Audit trail since installation checked; cleared; backup of the system and files; project folder or Cerebrum directory; stored safely | the guest backup plus the `.ccf` auto-backups, off-site |
+| 25 | Server monitoring: SNMP to the server's IPMI (BMC, iDRAC, iLO) for power supplies with severities | the hypervisor's iLO is monitored by the platform, not by Cerebrum; the guest sees no hardware |
+
+**What the list changes in our plan:** the Watchdog is part of the design (not optional); every unused device-definition file costs memory because all of them load; log archiving goes outside the Cerebrum folder; the vendor's own thresholds (CPU under 15 %, queue backlog 0 ms, run rate under 2000, database under 20 GB, 20 GB disk free) become the alert thresholds; the "Export Today's Logs" procedure becomes a play. Three readings need a vendor answer: queue counters, C-Link counters and the system GOOD state from outside the application.
