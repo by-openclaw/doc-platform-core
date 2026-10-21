@@ -25,15 +25,15 @@ Every role: pinned installer with checksum from the platform object store, setti
 
 | # | Topic | Decision |
 |---|---|---|
-| 1 | UDP 2072 | ACP2 (Axon Control Protocol 2). UDP 2000: *to confirm with the vendor* (expected: ACP v1 / legacy Synapse discovery) |
+| 1 | UDP 2071 / 2072 | ACP1 on 2071, ACP2 on 2072 (Axon Control Protocol). UDP 2000 seen listening on the lab: *still to confirm with the vendor* |
 | 2 | Licensing | VIA License Manager is the licensing service for EVS products (Cerebrum, Neuron, …): one instance on the platform |
 | 3 | Unattended run | needed: service session account, auto-logon, Watchdog, start-at-logon tasks; CIS exception on that host |
 | 4 | Database | SQL Server with an enhanced install (static port, no Browser, no telemetry, backups) **but the vendor's specification for the Cortex database, mirroring and backup is kept** |
 | 5 | Clients | desktop client on the workstations; web client available; one hardware panel to install later |
-| 6 | Logging | both syslog-style (audit trail to Loki) and SNMP; compare what each carries before choosing the alerting source |
+| 6 | Logging | Cerebrum supports **syslog and SNMP, syslog by default**. The syslog **format is not standard** (fields in the wrong columns): capture a sample from the lab, write the parser for it, then compare with SNMP before choosing the alerting source |
 | 7 | SDN | probably not needed; not deployed unless a device requires it |
-| 8 | NMOS discovery | all three: unicast DNS-SD, mDNS, manual (see §7) |
-| 9 | HA | see §8: platform resilience first (hypervisor cluster), application HA when licensed |
+| 8 | NMOS discovery | all three: mDNS works on the local test platform without a reflector; every device that offers this connection is tested with it; unicast DNS-SD and manual as the other paths (see §7) |
+| 9 | HA | the vendor's A/B pairing is Cerebrum's own mechanism, not hypervisor clustering; the Watchdog / Witness services may no longer be used in 2.9 — *to check in the technical documentation*; see §8 |
 | 10 | Upgrades | yes, after the configuration files are exported and templated (done 2026-10-21: 22 files in the quarantine export) |
 | 11 | Windows Server licence | parked until the WS2025 template is tuned and the hypervisor cluster exists; the three guests stay pinned |
 | 12 | Tooling | everything by Ansible: installers, browser, Wireshark, tools, VS Code with extensions (Python, XML, JSON, YAML, Ansible, SSH keys, Vault) — the `infra/0011` profiles |
@@ -47,8 +47,8 @@ Every role: pinned installer with checksum from the platform object store, setti
 | server | 9081 / 9080 | TCP | web client, RCP over HTTP |
 | server | 162 | UDP | SNMP trap receiver |
 | server | 1161 | UDP | Cerebrum's SNMP agent |
-| server | 2072 | UDP | ACP2 |
-| server | 2000 | UDP | *to confirm* |
+| server | 2071, 2072 | UDP | ACP1, ACP2 (Axon Control Protocol) |
+| server | 2000 | UDP | listening on the lab, *to confirm* |
 | server | 40003, 40030 | TCP | Federation (from the repository) |
 | server | 40007, 40051 | TCP | Mediaconf and Exchanger XML APIs (from the repository) |
 | server | 8080–8085, 8090–8095 | TCP | FCR and SAMIX APIs (from the repository) |
@@ -77,7 +77,7 @@ AMU, Antenna Controller, Assignment Engine, Audio Console, Audio Processor, Auto
 
 ## 7. Discovery (NMOS, mDNS, DNS-SD)
 
-- **mDNS** is link-local multicast: it reaches only the VLAN it is sent on. Across VLANs it needs a reflector on the firewall (one more thing to secure), so mDNS stays for devices that cannot do better and only inside their VLAN.
+- **mDNS** is link-local multicast: it reaches the VLAN it is sent on. On the local test platform it works without any reflector (owner, 2026-10-21); every device that offers this connection is tested with it. Across VLANs it would need a reflector on the firewall, which is a decision per device, not a default.
 - **Unicast DNS-SD** is ordinary DNS (`_nmos-register._tcp`, `_nmos-query._tcp` SRV/TXT/PTR records) served by the platform resolver: it works across VLANs and is the preferred path. *To confirm:* which EVS devices and Cerebrum 2.9.3 support unicast DNS-SD.
 - **Manual** registry address on the device is the fallback.
 
@@ -86,7 +86,7 @@ AMU, Antenna Controller, Assignment Engine, Audio Console, Audio Processor, Auto
 | Layer | What it protects against | How | When |
 |---|---|---|---|
 | hypervisor cluster (the DL380 plan, Ceph, live migration) | a host failure, maintenance without downtime | the guest moves or restarts on another node; the application restarts | the cluster program; the guests stay pinned until then |
-| application HA (vendor design) | an application or OS failure | two servers A/B, Witness, SQL mirroring (SQL Standard), Device Service pairs | when licensed and after the first site runs |
+| application HA (the vendor's A/B pairing — Cerebrum's own mechanism, not hypervisor clustering) | an application or OS failure | two servers A/B with SQL mirroring (SQL Standard); the Watchdog / Witness services of older releases may no longer apply in 2.9 — *to check in the technical documentation* | when licensed and after the first site runs |
 
 A cluster does not make the application highly available; it makes the host disposable. Both are wanted eventually; the cluster comes first because it serves every service.
 
@@ -94,7 +94,8 @@ A cluster does not make the application highly available; it makes the host disp
 
 | Source | Today | On the platform |
 |---|---|---|
-| audit trail `ErrorLogs\AuditTrail\*.log` (TSV, severity column, 10 MB rotation) | file only | Alloy tails it → Loki, labelled by severity; alerts on severity and on crash dumps |
+| syslog from Cerebrum (default output; **non-standard format**, fields in the wrong columns) | not configured on the lab | Alloy's syslog listener receives it; a parser written from a captured sample (the lab points its syslog at the platform's listener for the capture); labels by severity → Loki |
+| audit trail `ErrorLogs\AuditTrail\*.log` (TSV, severity column, 10 MB rotation) | file only | Alloy tails it → Loki as the second source until the syslog parser is proven; alerts on crash dumps |
 | SNMP | Cerebrum's agent on 1161 and traps out | Prometheus `snmp_exporter` with the shipped `AppMIBs` for health; a trap receiver later if the comparison shows events the audit trail lacks |
 | SQL Server errorlog, licence manager, Windows events | event log | Alloy channels already in place |
 | liveness | — | TCP probe on 40001, the web client on 9081, the licence manager on 8558 |
