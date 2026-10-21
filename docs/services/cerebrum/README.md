@@ -115,3 +115,67 @@ A cluster does not make the application highly available; it makes the host disp
 ## 11. CISO map per service (to complete in the service ADR)
 
 Each Windows service gets its own row: account it runs as, ports, firewall rule, TLS, logging, backup, update path, NIS2 and ISO 27001 controls — server session, Device Service, Federation, licence manager, NMOS registry, SQL instance, SDN if any.
+
+## 12. Configuration reference for the vendor discussion (lab 2.9.3, 2026-10-21)
+
+Cerebrum keeps four layers of configuration. The table carries one row per item, what the lab holds, and the question or the control it needs.
+
+### 12.1 `Cerebrum.ini` — the bootstrap file (one file, written at install, read at start)
+
+| # | Key | Lab value | Meaning | Control / question for the vendor |
+|---|---|---|---|---|
+| 1 | `CORTEX:DISABLE_CRASH_DUMP` | 0 | crash dumps written to `ErrorLogs\*.dmp` | a dump is a memory image: may hold credentials; retention and access to that folder; ship to the platform, not kept on the host |
+| 2 | `IP:PRIMARY` | 0 | the server's role in an A/B pair | semantics of 0/1, what changes on failover |
+| 3 | `License:Demonstration_Key` | set | a demo licence key in clear text | still used with VIA License Manager? remove in production |
+| 4 | `License:SLA` | absent (template only) | ? | meaning |
+| 5 | `VIRTUAL:BIND_ADDRESS` … `FOURTH_BIND_ADDRESS` | 0.0.0.0 ×4 | the interfaces the server listens on | bind to the control VLAN only, never all interfaces; what each of the four binds serves |
+| 6 | `VIRTUAL:CURRENT_VIRTUAL_ADDRESS` ×3 | absent (template only) | the virtual IP of the A/B pair | how the VIP moves (gratuitous ARP?), what the network must allow |
+| 7 | `SQL:USE_DEFAULT` | 1 | use the local default instance | 0 when the database is on its own host |
+| 8 | `SQL:LOGIN_CREDENTIALS` | 0 (template: 2) | 0 = Windows authentication, 2 = SQL login | the exact list of modes; Windows authentication with a managed account avoids any password in the file |
+| 9 | `SQL:LOGIN_USERNAME`, `SQL:LOGIN_PASSWORD` | empty | the SQL login when mode 2 | **password in clear text in the file**: is there an encrypted form; otherwise file ACL to the session account only and the value from Vault |
+| 10 | `SQL:PRIMARY_CONNECTION`, `SQL:SECONDARY_CONNECTION` | `localhost\CEREBRUMSQL` ×2 | the instance and its mirror partner | TLS on the SQL connection (encrypt=yes, trust server certificate no) |
+| 11 | `SQL:REDUNDANT` | 0 | mirroring on/off | requirements (SQL Standard, Witness) |
+| 12 | `SQL:DATABASE`, `SQL:SECONDARY_DATABASE` | `Cortex` ×2 | the database names | — |
+| 13 | `SQL:USE_MULTI_SUBNET_CLUSTERING` | 0 | multi-subnet failover | supported SQL high-availability (mirroring vs Always On) |
+| 14 | `COR_LINK:BIND_ADDRESS` | 0.0.0.0 | the Cortex link bind (server-to-server) | restrict; which port and peers |
+| 15 | `CORTEX:RUNNING` | 1 | runtime state written by the application | not a setting: the role ignores drift on it |
+
+### 12.2 The database table `dbo._Config` — everything else (33 categories, rows of user / category / property / value)
+
+| # | Category | What it holds | Control / question |
+|---|---|---|---|
+| 16 | `LOGGING` | `USE_LOGGING_SERVER`, `SERVER_1_ADDRESS/PORT`, `SERVER_2_*`, `TRANSPORT_TYPE`, `USE_SSL`, `MESSAGES_TO_LOG` | the syslog target: TLS (`USE_SSL`) to the platform listener, both servers set; the format (non-standard columns) documented by the vendor |
+| 17 | `SNMP` | agent port 1161, default version and communities, v3 auth/priv passwords, trap receiver port 162, poll time | communities and v3 passwords sit in the database in clear text: v3 with auth+priv only, no default community, the values from Vault |
+| 18 | `TRAP` | trap servers 1 and 2, ports, communities, notify on startup | traps to the platform receiver; same community rule |
+| 19 | `AUDIT` | per-area levels (application, protocol, SQL, UDP, services, web client, macros, scheduler, IP router, ACP) | the levels that give user attribution of every change; what each level writes |
+| 20 | `ALARM`, `EVENT_LOG` | what is logged as events (clients, GPI/GPO, UMD, salvos, scheduler, traps) | the set the operations need in Loki |
+| 21 | `SECURITY` | ? (not in the broadcaster's export) | what it governs: client authentication, password policy, session timeout, LDAP |
+| 22 | `WEB_CLIENT` | web client settings | TLS and authentication of the web client (ports 9080/9081) |
+| 23 | `EMAIL` | SMTP for notifications | the platform mailbox, TLS, credentials from Vault |
+| 24 | `SQL` | log archiving, sizes | retention of the database's own log tables |
+| 25 | `CRASH_DUMP` | thread ids to the audit trail | — |
+| 26 | `SERVICES`, `CLIENTS`, `GUI`, `SOUND`, `SCHEDULER`, `TALLY_ROUTER`, `IP`, `IP_RTR`, `VIRTUAL`, `COR_LINK`, `CORTEX`, `ACP`, `GENERIC_DEV`, `PROJECT`, `RC`, `MacroFile`, `STARTUP_UPDATE_AUTO_ACK`, `TABLE_RESTORE`, `IMPORT_ENABLE` | operational settings | exported as a whole from the lab once a read-only login exists; the role keeps them as inventory data |
+| 27 | `Admin / File Paths` | backup path and other paths | the backup folder on a monitored volume |
+
+### 12.3 Data files beside the application (XML, UTF-16)
+
+| # | File | Lab content | Control / question |
+|---|---|---|---|
+| 28 | `Global Data Files\USERS.XML` | groups and users of the application: one group `Admin`, one user `Admin` of type Cerebrum | where passwords are kept (not in this file); LDAP/Authentik for people; per-user accounts for attribution, never a shared `Admin` |
+| 29 | `Global Data Files\CLIENTS.XML` | known clients: name, address, type, last seen, MAC | an inventory the register can read |
+| 30 | `Global Data Files\INDEX.XML`, `MENUS.XML` | the index of these files, navigation | — |
+| 31 | `LOCAL DATA FILES\LOCAL SETTINGS.XML` | the local UI state | — |
+| 32 | `Data Files\User Configuration.xml` | roles `Admin`, `Operator`, `Engineer` with their monitors | the role model to map on Authentik groups |
+| 33 | `Data Files\…`, `Variables\*.cvf`, `Configurations\*.ccf`, `Projects`, `Forms` | routers, assignment engine, variables, the site design, panels | versioned in git as the owner's design, backed up nightly by the application (`Auto Backup`) and by the guest backup |
+
+### 12.4 Beside Cerebrum, on the same host
+
+| # | Item | Lab | Control / question |
+|---|---|---|---|
+| 34 | Cerebrum SDN `etc\default_config.json` | `disableLicenseCheck`, bind option, API ports 5000/5002, HTTP API off | TLS floor 1.0 on the service (`--tls-min-v1.0`): raise; needed at all? |
+| 35 | VIA License Manager `Config\ssl.conf`, `ldap.conf` | own certificate, key-store password in clear in the file, TLS 1.2 ciphers, LDAP off | LDAP against Authentik; the key-store password from Vault; a platform certificate |
+| 36 | SQL Server instance | mixed authentication, dynamic port, Browser on, telemetry on, no backups | static port, Browser off, telemetry off, SQL login for the server only, backups to the NAS |
+| 37 | The session | the server runs in the Administrator's RDP session | the service session account, auto-logon, Watchdog; RDP only through JumpServer |
+| 38 | Firewall | "any port for Cerebrum.exe" | the explicit list of 12.1/§4 per program |
+
+**Tracking and audit, the one question that matters for the vendor discussion:** every change an operator makes (crosspoint, salvo, macro, configuration) must land with the user's identity in a log the operator cannot edit. On the lab that is the audit-trail file on the host, writable by the same local Administrator who runs the application. The platform answer is syslog to Loki in real time plus per-user accounts in Cerebrum; the questions are rows 16, 19, 21 and 28.
