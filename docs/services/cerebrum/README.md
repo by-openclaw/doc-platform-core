@@ -286,11 +286,32 @@ Yes: a subscription **is** the metrics collection. The server sends the value at
 
 - **One `watch` session per server and sub-device.** `dhs consumer cerebrum-nb watch --device 0.0.0.0 --sub-device 0 --object "<the §14.3 leaves of 00: System>"`, a second session on `--sub-device 2` for the Services tables (`SERVERS.[*].SERVICES.[*].STATE` and the device rows: table wildcards are allowed on the wire), a third on `--sub-device 1` when IP routing is in use. Each session is one licence; three of the ten.
 - **Syslog.** Every change leaves the watch as one RFC 5424 line (`--syslog-addr <alloy>:1514`, app-name `dhs`, `cerebrum_value_change device=0.0.0.0 sub_device=0 object=… value=… type=… available=…`) into Alloy's syslog listener → Loki. That is the "syslog watch": a change-only event trail beside Cerebrum's own syslog and audit trail (§9). Unchanged re-assertions are suppressed by the connector, so the volume is the change rate.
-- **Metrics.** The same session serves the current values as Prometheus gauges on `--metrics-addr` (labels `proto`, `device`, `role`); Prometheus scrapes them and the §14.3 columns become alert rules; the vendor severities ship as the connector's alarm template (`--alarm`).
+- **Metrics.** The same session serves Prometheus on `--metrics-addr`: the connector's own health (frames, bytes, reconnects, NAKs, latency, uptime) and the alarm state per severity (`dhs_alarm_active{severity}`), evaluated by the alarm template (`--alarm`) from the vendor severities of §14.3. Checked on v0.46.0: it does **not** expose each subscribed value as a gauge, so the raw numbers reach Loki (syslog) but not Prometheus. Two ways to close that: a per-object gauge in the connector's watch verb (small change in `go-acp`, the proposal), or Grafana alerting from Loki with a LogQL `unwrap value` over the syslog lines. Until then the §14.3 thresholds live in the alarm template and `dhs_alarm_active` is the scraped signal.
 - **"Any other object used every day."** Each controlled device (Neuron, panels, routers, the NMOS registry) gets its own watch session with its own object list, chosen from that device's definition file or from a one-off `extract` walk (the connector's DM cache), kept as data in the inventory per device family. Same syslog and metrics path.
 - **Footprint on Cerebrum:** initial obtains (one per group, one per table wildcard, answers under 20 MB), then push only; no walks on a schedule; the full-tree walk is a one-off by hand to refresh the reference.
 
-### 14.5 Not done, and the one blocker
+### 14.5 Proven live from the platform controller (2026-10-22)
 
-- The live walk and the subscribe test from the platform controller need the lab's Cerebrum login in Vault at `dev/cerebrum/vm-cerebrum-stg-01/nb-api` (fields `user`, `pass`): the lab refuses every read without it (`NACK 6`), the platform Vault holds no Cerebrum credential, and the connector's own copy stays in its environment. Once it is there, the §14.3 list is proven live (state names of the `UINT8` enums, the root spelling, the table wildcard sizes) and the reference gains the live values.
-- The Northbound port (40009) and its enablement: `ControlInterfaces` reports the state of each interface, not its settings; the setting itself (server device › Control Interfaces tab) is still to record in §12.
+The lab login is in Vault at `dev/cerebrum/vm-cerebrum-stg-01/nb-api` (fields `user`, `pass`, `host`, `port` plus the register metadata; the connector's own copy named it `staging/cerebrum/nb-dhs`, a tier the platform does not have). With it, from the controller:
+
+| Step | Result |
+|---|---|
+| LOGIN + POLL | logged in as the lab's API user (group Admin); `api_ver 0.1`, primary active, no secondary |
+| walk `00: System` (18 start groups) | 62 obtains, 173 objects, 145 available; enum names confirmed (`Redundancy_Status.Overall` = `Error|OK`, `SQL_State` adds `Suspect`, `License.Supported_Options.External_Logging` = `Disabled|Enabled`) → [`reference/server-object-tree-2.9.3-live-lab.md`](reference/server-object-tree-2.9.3-live-lab.md) |
+| walk `02: Services` | 7 objects: `ALL_RESPONSIVE` = OK; the `SERVERS` table is empty because no Service Manager is registered on the lab, so the service and device rows of §14.2 are proven only when a Device Service exists |
+| walk `03: Resource Manager` | 35 objects, all `available=0` (option not in use) |
+| walk `04: Assignment Engine` | `EngineCount` 5, five `RoutingMode` rows = 1-N |
+| walk `01: IP Router` | stopped at the 3 000-obtain cap after 600 sender rows (8 999 objects), `Receivers` not reached: the walk obtains every table row, one request each. Never on a schedule; monitor the tables through the wire wildcard (`Senders.[*].Available`) |
+| subscribe (6–13 leaves, 40 s) | the current value of every leaf at once, then only changes (handles, total queue length, CPU, commit duration); Prometheus `/metrics` served |
+| syslog | 19 RFC 5424 datagrams in 22 s to a local listener: `<134>1 … dhs … cerebrum_value_change device=0.0.0.0 sub_device=0 object=ApplicationOverview.HandleCount label=HandleCount value=2983 type=integer access=R-- units= available=true` — the line Alloy will receive |
+| session life | the server closed the WebSocket once after about 30 s in the first run; the connector reconnected and re-subscribed by itself. To characterise with `keepalive-probe` before the service unit is written |
+
+Facts the walk added: `License.Supported_Options.External_Logging` is an object and reads **Disabled** on the lab, so per-service syslog (`EXTERNAL_LOGGING_SERVERS`) is a licensed option, as the License tab suggested; `ControlInterfaces.Name.[DHS].Connection` shows the controller's own session, so an open API session is visible to the operator; `InternalQueues.MessageQueue.PeakBacklogUser` = `IP Rtr (0x0080)` with a 17.7 s peak backlog, the trace of the NMOS shuffler registration; `Users.User[*]` lists the Cerebrum users and their group; `Foundation.Enabled` = 0 (the vendor's web and identity layer, off).
+
+### 14.6 Still open
+
+- A **read-only Cerebrum user** for monitoring: the lab's API user sits in the Admin group; the roles create a monitoring user in a group without control rights, and keep the write-capable one for `cerebrum-ops`.
+- **Per-object gauges** in the connector (or the Loki-side alerting), see §14.4.
+- The **Northbound port and enablement setting** (server device › Control Interfaces tab) for §12.
+- The Services and Device Service rows (§14.2) proven when a Device Service is registered.
+- The Vault entry added to the platform's generated vault register when the `cerebrum_*` roles land (`playbooks/vars/vault_kv_map.yml`).
