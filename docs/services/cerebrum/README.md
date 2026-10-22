@@ -334,6 +334,20 @@ So "the .ccf holds all details" is true for the configuration, not for the setti
 2. **IP-Core connects as `sa`** (`credentialMode 2`). The role gives it a dedicated SQL login with the rights it needs, never the server administrator.
 3. **No rotation on `ipcore.log`**: 328 MB in eight weeks, growing; nssm's `AppRotateFiles` / `AppRotateBytes` are unset and `default_logging_config.json` only sets the level. The role sets the rotation parameters of the service.
 4. **Cerebrum itself rotates** its audit trail and error logs (10 MB); the nightly `.ccf` auto-backup works (02:30, 627 KB, 14 days present).
+5. **The SQL `sa` password of the lab is the vendor's documented default.** The help file's topic *SQL Server Manual Installation* prints the `sa` password to enter during the SQL Express set-up, and the lab's IP-Core log shows the application connecting with exactly that value. Every Cerebrum installation that kept the installer's default therefore has a publicly documented database administrator password. For the platform: the SQL instance is provisioned by the `cerebrum_db` role with its own `sa` password from Vault before Cerebrum is installed, the application gets a dedicated login, and the lab is rotated now.
+
+### 15.2 Is the database provisioned, or are the ini and the files enough?
+
+The database is the store. The vendor's own description: Cerebrum "uses an SQL database for storing the network/application events and the configuration data for the application and system", needs it "continuously available", and the default installation creates the instance (`AXONSQL`; `CEREBRUMSQL` on the lab) with the `Cerebrum.mdf` / `Cerebrum_log.ldf` files and the tables `_Config`, `_Users`, `_Groups`, `_DeviceDetails`, `_ControlPermissions`, `_AlarmActive`, `_AlarmLog`, `_AuditTrail`, `_CableMap`, `_LogicGates`, `_LogicLinks`, `_ObjectParams`, `_SNMP_*`, `_StatusPriority`. A remote instance (a managed cluster) is supported and needs read access to a list of `sys.*` views. So:
+
+| Layer | Who creates it | What the platform does |
+|---|---|---|
+| the SQL instance, its `sa` password, the TCP port, the logins (application, IP-Core, read-only audit), maintenance and backups, mirroring or Always On for a redundant pair | the platform, before Cerebrum | `cerebrum_db` role on the SQL host |
+| the `Cerebrum` database and its tables | Cerebrum itself at first start, through the login the ini names (the login needs the right to create it) | nothing, except verifying it exists |
+| the settings rows of `_Config` (§15 row 12 to 28) | Cerebrum writes defaults at first start | the site values written as data after the first start (`cerebrum-db-config.yml`), then Cerebrum restarted |
+| the configuration tables (devices, routing, users …) | empty at first start | the site's `.ccf` imported through Cerebrum (the vendor's path), `IMPORT_ENABLE` deciding what it may overwrite |
+
+The ini only says where the database is and how to log in; the data files cover the clients' local settings and the projects. Without the database part a new server starts with the vendor's defaults and no devices.
 
 ### 15.1 The vendor file formats, read on 2026-10-22
 
