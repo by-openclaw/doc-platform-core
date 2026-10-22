@@ -1,22 +1,22 @@
 # Cerebrum — the playbooks, one per scope
 
-One playbook per concern, each the full lifecycle of its scope (install, settings as data, secrets from Vault, firewall, logging, liveness, backup line, verification), run in the order below. Every task is an Ansible module call; the broadcaster's 46 inline PowerShell scripts are not carried over. Hosts and tiers are inventory data; nothing below names an address. Secrets live in Vault under `<tier>/cerebrum/<host>/<key>` and reach the host as module arguments, never on a command line. "Setting" numbers refer to the list in [README §15](README.md#15-where-the-three-kinds-of-cerebrum-state-live-and-the-findings-of-2026-10-22).
+Seven playbooks are needed now; two are kept for later; one is not needed. Each is the full lifecycle of its scope (install, settings as data, secrets from Vault, firewall, logging, liveness, backup line, verification), every task an Ansible module call, hosts and tiers inventory data, secrets as module arguments only. "Setting n" refers to the numbered list in [README §15](README.md#15-where-the-three-kinds-of-cerebrum-state-live-and-the-findings-of-2026-10-22). Decisions by the owner on 2026-10-22: IP-Core/SDN is not used; the VIA License Manager licenses Neuron, not Cerebrum; the NMOS registry is Bonjour, firewall and DNS as the vendor's IS-04/05 help describes.
 
-| Seq | Playbook | Hosts (group) | Role | Scope in one line |
+| Seq | Playbook | Hosts (group) | Needed | Scope in one line |
 |---|---|---|---|---|
-| 1 | `cerebrum-db.yml` | `cerebrum_db` (vm-winsql-01) | `cerebrum_db` | the SQL instance Cerebrum will create its database in |
-| 2 | `cerebrum-license.yml` | `cerebrum_license` (vm-winapp-02) | `cerebrum_license` | VIA License Manager, certificate, licence |
-| 3 | `cerebrum-server.yml` | `cerebrum_server` (vm-winapp-01) | `cerebrum_server` | the server application, its ini, data files, auto-start, Watchdog |
-| 4 | `cerebrum-db-config.yml` | `cerebrum_db` | — (tasks) | the settings rows of `_Config` as data, export and converge |
-| 5 | `cerebrum-device-service.yml` | `cerebrum_device_service` (vm-winapp-02) | `cerebrum_device_service` | the Device Service (Service Manager) |
-| 6 | `cerebrum-nmos.yml` | `cerebrum_nmos` (vm-winapp-02) | `cerebrum_nmos` | the NMOS registry and discovery |
-| 7 | `cerebrum-web.yml` | `cerebrum_server` | `cerebrum_web` | the web client, RCP and hardware panels |
-| 8 | `cerebrum-client.yml` | `cerebrum_clients` (Win11 Pro seats) | `cerebrum_client` | the desktop client and Designer seats |
-| 9 | `cerebrum-sdn.yml` | `cerebrum_server` | `cerebrum_sdn` | IP-Core, only when IP routing is used |
-| 10 | `cerebrum-watch.yml` | `monitoring` (Linux) | `cerebrum_watch` | the Northbound subscription to syslog and Prometheus |
-| 11 | `cerebrum-ops.yml` | all of the above | — (tasks, `-e op=`) | start, stop, version report, export, import, failover, support capture |
+| 1 | `cerebrum-db.yml` | `cerebrum_db` | now | the SQL instance Cerebrum creates its database in |
+| 2 | `cerebrum-server.yml` | `cerebrum_server` | now | the server application, its licence, ini, data files, auto-start, Watchdog |
+| 3 | `cerebrum-db-config.yml` | `cerebrum_db` | now | the settings rows of `_Config` as data |
+| 4 | `cerebrum-nmos.yml` | `cerebrum_server` | now | the NMOS registry: Bonjour, URL reservations, firewall, DNS-SD |
+| 5 | `cerebrum-web.yml` | `cerebrum_server` | now | the web client and RCP over TLS, hardware panels |
+| 6 | `cerebrum-client.yml` | `cerebrum_clients` | now | the desktop and Designer seats |
+| 7 | `cerebrum-ops.yml` | all | now | start, stop, version, export, import, support capture |
+| 8 | `cerebrum-watch.yml` | `monitoring` | with 7 | the Northbound subscription to syslog and Prometheus |
+| 9 | `cerebrum-device-service.yml` | `cerebrum_device_service` | later | the Device Service, when a second control point or a remote registry is wanted |
+| — | IP-Core / SDN | — | **not used** | the lab's `cerebrumipcore` service is a vendor leftover; the roles do not install it |
+| — | VIA License Manager | — | **not Cerebrum** | licenses Neuron; it belongs to the Neuron scope, not to these playbooks |
 
-Prerequisites on every Windows host, applied by `windows-guests.yml` before any of these: `windows_guest`, `windows_hardening`, `windows_firewall`, `windows_logging`. The platform firewall rules (OPNsense catalog) are a separate PR per zone, before seq 1.
+Before seq 1: the platform baseline on every Windows host (`windows-guests.yml`: `windows_guest`, `windows_hardening`, `windows_firewall`, `windows_logging`) and the OPNsense catalog rules for the Cerebrum ports (one PR per zone).
 
 ---
 
@@ -24,130 +24,125 @@ Prerequisites on every Windows host, applied by `windows-guests.yml` before any 
 
 | # | Step | How | Value from | Check |
 |---|---|---|---|---|
-| 1.1 | SQL Server 2019 Express (or Standard for a redundant pair) from the object store, checksum pinned | `win_package` with the vendor's unattended options (named instance `CEREBRUMSQL`, mixed mode) | `cerebrum_db_version`, `cerebrum_db_instance` | `win_service_info` MSSQL$CEREBRUMSQL running |
-| 1.2 | `sa` password set at install, never the vendor's default (README §15 finding 5) | installer argument from Vault, `no_log` | `<tier>/cerebrum/<host>/sa` | login test with `mssql_script` (`SELECT 1`) |
-| 1.3 | TCP enabled on a **static** port; dynamic ports off; SQL Browser disabled | `win_regedit` on the instance's `SuperSocketNetLib\Tcp` keys, `win_service` | `cerebrum_db_port` | `win_powershell`-free: `win_wait_for` on the port |
-| 1.4 | Logins: application (dbcreator until the database exists, then db_owner of `Cerebrum`), IP-Core (read/write on the tables the help lists), audit read-only (`db_datareader`) | `mssql_script`, passwords from Vault as module arguments | `<tier>/cerebrum/<host>/app-login`, `/ipcore-login`, `/audit-ro` | `mssql_script` `SELECT name FROM sys.sql_logins` |
-| 1.5 | Services: Agent off, CEIP/telemetry service off, VSS writer on | `win_service` | standard | service states |
-| 1.6 | Maintenance: recovery model, max sizes (settings 22), nightly native backup to the platform share, verify | SQL Agent is absent on Express: `win_scheduled_task` running `sqlcmd` with a maintenance script **from the role's files**, or the platform backup of the guest plus the application's own archiving | `cerebrum_db_backup_*` | a backup file younger than 24 h |
-| 1.7 | Firewall: the SQL port from the server host only; nothing else | `win_firewall_rule` with `remoteip` | inventory | rule listing |
-| 1.8 | Redundant pair: mirroring in high-safety mode with a witness, or Always On, per README §8 | later, its own tasks file | HA decision | `Redundancy_Status.SQL_*` over the API |
-| 1.9 | Liveness: TCP probe of the port; logs: SQL errorlog to Loki | `windows_logging` channel | — | Loki query |
+| 1.1 | SQL Server 2019 (Express, or Standard for a redundant pair) from the object store, checksum pinned, named instance, mixed mode | `win_package` with the unattended options | `cerebrum_db_version`, `cerebrum_db_instance` | the instance service running |
+| 1.2 | `sa` password set at install from Vault, never the vendor's documented default (README §15 finding 5) | installer argument, `no_log` | `<tier>/cerebrum/<host>/sa` | `mssql_script` `SELECT 1` |
+| 1.3 | TCP on a **static** port, dynamic ports off, SQL Browser off | `win_regedit` on the instance's network keys, `win_service` | `cerebrum_db_port` | `win_wait_for` on the port |
+| 1.4 | TLS on the instance: a server certificate from the platform CA in the machine store, `ForceEncryption=1`; the lab has neither | certificate role + `win_regedit` (`SuperSocketNetLib`) | Step-CA | an encrypted login from the server host |
+| 1.5 | Logins: the application (database creator until the database exists, then owner of it), the audit read-only (`db_datareader`) | `mssql_script`, passwords as module arguments | `<tier>/cerebrum/<host>/app-login`, `/audit-ro` | `sys.sql_logins` |
+| 1.6 | Services: Agent off, telemetry off, VSS writer on | `win_service` | standard | service states |
+| 1.7 | Sizes and archiving (setting 22), nightly native backup to the platform share | rows of seq 3 + `win_scheduled_task` running a maintenance file from the role | `cerebrum_db_backup_*` | a backup younger than 24 h |
+| 1.8 | Firewall: the SQL port from the server host only | `win_firewall_rule` with `remoteip` | inventory | rule listing |
+| 1.9 | Redundant pair later: mirroring in high-safety mode with a witness, or Always On (README §8) | its own tasks file | HA decision | `Redundancy_Status.SQL_*` over the API |
 
-## 2. `cerebrum-license.yml` — VIA License Manager
-
-| # | Step | How | Value from | Check |
-|---|---|---|---|---|
-| 2.1 | VIA License Manager 3.0.4 from the object store | `win_package` | `cerebrum_license_version` | service running on 8558 |
-| 2.2 | TLS 1.2 only, certificate from the platform CA instead of the self-signed one (`ssl.conf`) | `win_template` of `Config\ssl.conf`, certificate via the certificate role | Step-CA | `openssl s_client` from the controller (`uri` with `validate_certs: true`) |
-| 2.3 | `ldap.conf` stays off (identity through the platform, not the licence manager) | `win_template` | standard | file content |
-| 2.4 | The licence: file or key activation as the vendor delivers it; Sentinel driver only for a hardware key | `win_copy` from Vault for a file, `win_package` for the driver | `<tier>/cerebrum/license` | License tab objects over the API: `License.License_Type` not Demo, `Supported_Options.*` |
-| 2.5 | Firewall: 8558 from the server hosts and the admin jump only | `win_firewall_rule` | inventory | rule listing |
-| 2.6 | Backup line: the SQLite store of the licence manager in the guest backup | documented | — | — |
-
-## 3. `cerebrum-server.yml` — the server application
+## 2. `cerebrum-server.yml` — the server application
 
 | # | Step | How | Value from | Check |
 |---|---|---|---|---|
-| 3.1 | `Cerebrum_<version>_Installer.exe` from the object store, checksum pinned, product id known, components declared (`/COMPONENTS=…`), no `/InstallSQL`, no `/InstallSentinel` | `win_package` | `cerebrum_version`, `cerebrum_components` | registry product present, version |
-| 3.2 | `Cerebrum.ini`: the 15 keys (settings 8 to 11): remote database, dedicated login, bind addresses, crash dump, no demo key | `win_template`, password from Vault inside the template variables, `no_log` | inventory + `<tier>/cerebrum/<host>/app-login` | file diff |
-| 3.3 | Data files (setting 31): `Global Data Files\*.XML`, `Data Files\*.xml`, `LOCAL DATA FILES\LOCAL_SETTINGS.XML`, `Variables\*.cvf` | `win_template` (UTF-16 where the vendor's files are) | role templates + inventory | file diff |
-| 3.4 | Accounts in `Global Data Files\USERS.XML`: Admin (password from Vault), the API monitoring user (read-only), the ops user (write) | `win_template` | `<tier>/cerebrum/<host>/admin`, `/nb-api-monitor`, `/nb-api-ops` | login over the API with each |
-| 3.5 | `GenericDevices`: the declared family set only, every other file removed (every file loads, vendor checklist row 7) | `win_copy` from the role's files + `win_find`/`win_file` for the rest | `cerebrum_device_families` | folder listing equals the declaration |
-| 3.6 | Projects and forms: the site's `.cjf` and `Forms` from the object store | `win_get_url` + `win_unzip`-free copy (`.cjf` is one file) | `cerebrum_project` | file present, hash |
-| 3.7 | `GlobalMacros`: the vendor's `WatchdogHealthCheck.cmf` and the site's macros | `win_copy` | role files | — |
-| 3.8 | Auto-start: Cerebrum and the Watchdog application at logon of the service session, RDP session settings (vendor checklist row 14) | `win_scheduled_task`, `win_regedit` | standard | tasks listed, process present after a reboot |
-| 3.9 | Services the installer registers (Service Manager link) with restart-on-failure | `win_service` | standard | service states |
-| 3.10 | Firewall per port: 40001/40002 tcp+udp, 40009 tcp, 2071/2072 udp, 162/1161 udp; program-wide "any" rules removed | `win_firewall_rule` | README §4 | rule listing |
-| 3.11 | Logs: `ErrorLogs\AuditTrail\*.log` tailed, `ErrorLogs\*.dmp` alerted; `Export Today's Logs` path (setting 22) | `windows_logging` extra jobs | — | Loki query |
-| 3.12 | First start: the application creates the database and the default `_Config` rows; then seq 4 | `win_scheduled_task` run once, `win_wait_for` on 40001 | — | `_Config` row count over the audit login |
-| 3.13 | Backup line: nightly `Auto Backup` (setting 23) to a path outside the Cerebrum folder, copied to the object store by seq 11 | settings + ops | — | a `.ccf` younger than 24 h in the store |
+| 2.1 | `Cerebrum_<version>_Installer.exe` from the object store, checksum pinned, components declared, no bundled SQL | `win_package` | `cerebrum_version`, `cerebrum_components` | product and version in the registry |
+| 2.2 | The licence: Cerebrum is licensed through a Sentinel key (the License tab reads the key serial; the lab runs the demo key with none). Hardware key: the Sentinel driver from the installer. Software licence: the vendor's licence file applied as the help's *licence upgrade procedure* describes (*to confirm on the help topic*) | `win_package` for the driver, `win_copy` from Vault for a file | `<tier>/cerebrum/license` | `License.License_Type` not Demo, `Supported_Options.*` over the API |
+| 2.3 | `Cerebrum.ini`: settings 8 to 11: remote database, dedicated login, bind addresses, crash dump, no demo key | `win_template`, `no_log` | inventory + `<tier>/cerebrum/<host>/app-login` | file diff |
+| 2.4 | Data files (setting 31): `Global Data Files`, `Data Files`, `LOCAL DATA FILES`, `Variables` | `win_template` (UTF-16 where the vendor's files are) | role templates + inventory | file diff |
+| 2.5 | Accounts (setting 30): Admin, the API monitoring user (read-only), the ops user (write) | `win_template` of `USERS.XML` | `<tier>/cerebrum/<host>/admin`, `/nb-api-monitor`, `/nb-api-ops` | an API login with each |
+| 2.6 | `GenericDevices`: the declared family set only (every file loads, vendor checklist row 7) | `win_copy` + removal of the rest | `cerebrum_device_families` | folder equals the declaration |
+| 2.7 | The site's project (`.cjf`) and `GlobalMacros` (`WatchdogHealthCheck.cmf`) | `win_copy` from the object store | `cerebrum_project` | hash |
+| 2.8 | Auto-start of Cerebrum and the Watchdog at logon of the service session, **with highest privileges** (TLS binding needs it, see Certificates), RDP session settings | `win_scheduled_task`, `win_regedit` | standard | process present after a reboot |
+| 2.9 | Firewall per port: 40001/40002 tcp+udp, 40009 tcp, 2071/2072 udp, 162/1161 udp; no program-wide "any" rule | `win_firewall_rule` | README §4 | rule listing |
+| 2.10 | Logs: audit trail tailed, crash dumps alerted (setting 22 paths outside the Cerebrum folder) | `windows_logging` extra jobs | — | Loki query |
+| 2.11 | First start: Cerebrum creates the database and the default `_Config` rows; then seq 3 | run-once task + `win_wait_for` on 40001 | — | row count over the audit login |
+| 2.12 | Backup line: the nightly `Auto Backup` (setting 23) outside the Cerebrum folder, copied to the object store by seq 7 | settings + ops | — | a `.ccf` younger than 24 h in the store |
 
-## 4. `cerebrum-db-config.yml` — the settings as data
-
-| # | Step | How | Value from | Check |
-|---|---|---|---|---|
-| 4.1 | Export the live `_Config` to the controller (user, category, property, value), secrets masked | `mssql_script` with the audit login, `copy` to a dated file | `<tier>/cerebrum/<host>/audit-ro` | file |
-| 4.2 | Declared rows: settings 12 to 28 from `inventories/<tier>/group_vars/cerebrum.yml` (`cerebrum_config_rows`), the broadcaster's standard as the role default | role defaults + inventory | README §15 | — |
-| 4.3 | Converge: diff declared against live, `UPDATE`/`INSERT` only the differences, with the application login | `mssql_script`, `changed_when` on the diff | — | second run = 0 changes |
-| 4.4 | Rows never written: setting 29 (`IP/INSTANCE_*`, `SECURITY/KEY`, `GUI/LAST_PASSWORD`) | explicit exclusion list | — | — |
-| 4.5 | Cerebrum restarted after a change (settings are read at start) | `cerebrum-ops.yml -e op=restart` | — | API login after restart |
-
-## 5. `cerebrum-device-service.yml` — the Device Service
+## 3. `cerebrum-db-config.yml` — the settings as data
 
 | # | Step | How | Value from | Check |
 |---|---|---|---|---|
-| 5.1 | Installer with the Device Service component only | `win_package` | `cerebrum_version` | — |
-| 5.2 | Service registration `CerebrumServiceManager` with `MGMT_PORT` = setting 15, restart-on-failure | `win_service` (`path` with arguments), `win_service` failure actions | inventory | service running |
-| 5.3 | Firewall: the management port from the server, the device protocols (XS via Linx 31150–31155, video mixer 62010) from the device zones | `win_firewall_rule` | README §4 | rule listing |
-| 5.4 | Registration on the server: the Service Manager appears under `02: Services › SERVERS[*]`; its services `STATE=Running` | API read after the first start | — | `cerebrum-watch` alarm template |
-| 5.5 | Failover with a second Device Service, when there is one | `FAILOVER_ENABLED` on the device rows (seq 11 op) | HA decision | `DATA_CONNECTION_HEALTH` |
+| 3.1 | Export the live `_Config` (user, category, property, value) to a dated file, secrets masked | `mssql_script` with the audit login, `copy` | `<tier>/cerebrum/<host>/audit-ro` | file |
+| 3.2 | Declared rows: settings 12 to 28 in `inventories/<tier>/group_vars/cerebrum.yml`; the broadcaster's standard as the role default | role defaults + inventory | README §15 | — |
+| 3.3 | Converge: diff declared against live, write only the differences with the application login | `mssql_script`, `changed_when` on the diff | — | second run = 0 changes |
+| 3.4 | Never written: setting 29 (`IP/INSTANCE_*`, `SECURITY/KEY`, `GUI/LAST_PASSWORD`) | exclusion list | — | — |
+| 3.5 | Restart after a change (settings are read at start) | `cerebrum-ops.yml -e op=restart` | — | API login after restart |
 
-## 6. `cerebrum-nmos.yml` — the NMOS registry
+## 4. `cerebrum-nmos.yml` — the registry Cerebrum hosts
 
-| # | Step | How | Value from | Check |
-|---|---|---|---|---|
-| 6.1 | Bonjour from the object store (`BonjourPSSetup.exe`) for mDNS | `win_package` | pack | service running |
-| 6.2 | The registry (vendor's NMOS component) on 8080, the URL reservation it needs (`netsh http add urlacl` as the broadcaster did, through `win_command` with argv) | `win_package`, `win_command` | `cerebrum_nmos_port` | `uri` on `x-nmos/registration` and `x-nmos/query` |
-| 6.3 | DNS-SD records on the platform resolver for the zones where mDNS does not reach (README §7) | the DNS chain, separate PR | inventory | `dig _nmos-register._tcp` |
-| 6.4 | Firewall: 8080 tcp and 5353 udp from the media zones | `win_firewall_rule` | README §4 | rule listing |
-| 6.5 | The device row in Cerebrum (`DEVICE_CONFIG`, type Network Media Server) through the `.ccf` of seq 11 | — | site export | `01: IP Router` objects over the API |
-
-## 7. `cerebrum-web.yml` — the web client, RCP and panels
+From the vendor's *NMOS IS-04/05* help: Cerebrum hosts the IS-04 registration server when a **Network Media Server** device is added; it depends on Bonjour for Windows for mDNS and DNS-SD; registration mode works across subnets, peer-to-peer mode (mDNS only) does not; the registry answers the registration API on 8080 and does **not** serve the Query API to third parties; nodes heartbeat every 5 s and are dropped after 12 s.
 
 | # | Step | How | Value from | Check |
 |---|---|---|---|---|
-| 7.1 | Settings 16 and 17: `WEB_CLIENT` (ENABLED, PORT, WEB_SERVER_PORT, USE_SSL=1, idle timeout, MAX_CONNECTIONS), `RCP` (ENABLE_RCP, HTTP_PORT, USE_SSL), `PROXY` | rows of seq 4 (`cerebrum_config_rows` web subset) | inventory | — |
-| 7.2 | The certificate for the web client (`SECURITY/CERTIFICATE`, `CERT_HASH`) from the platform CA, in the Windows store | certificate role, `win_certificate_store`, the thumbprint written as the setting | Step-CA | browser check through Traefik |
-| 7.3 | Web client files and `Projects\Common\WebClient` from the project | part of seq 3.6 | — | `uri` on the web client URL |
-| 7.4 | Hardware panels: the `.cpf` set of the site, `HW_PANEL` settings | `win_copy`, rows | site files | panel visible in the Clients table |
-| 7.5 | Exposure: through the platform edge with SSO where the web client allows it, else private | Traefik route, separate PR | README §11 | — |
+| 4.1 | Bonjour for Windows from the object store (the pack's `BonjourPSSetup.exe`) | `win_package` | pack | Bonjour service running |
+| 4.2 | URL reservations the help requires: `http://*:8080/x-nmos/registration/` and `http://*:8080/x-nmos/query/` for Everyone (the account name differs on non-English systems) | `win_command` with `netsh http add urlacl` as argv, `changed_when` on the listing | `cerebrum_nmos_port` | `netsh http show urlacl` |
+| 4.3 | Firewall: 8080 tcp inbound from the media zones; 5353 udp for mDNS where nodes share the subnet | `win_firewall_rule` | README §4 | rule listing |
+| 4.4 | DNS-SD for nodes on other subnets: `_nmos-register._tcp` and `_nmos-registration._tcp` PTR/SRV/TXT records on the platform resolver, one registry only | the DNS chain, separate PR | inventory | `dns-sd -B _nmos-register._tcp` from a node's subnet lists one entry |
+| 4.5 | The Network Media Server device row in Cerebrum (through the `.ccf` of seq 7, or declared) | `.ccf` import | site export | `http://<server>:8080/x-nmos/registration` lists the versions; `01: IP Router › Senders/Receivers` over the API |
+| 4.6 | Node labels and SubIDs kept in the IP Routing configuration, stored in the device datastore XML (replicated in SQL when the server hosts the registry) | documented, data in the `.ccf` | — | — |
+| 4.7 | Later, with a Device Service: the registry hosted there with a service virtual IP shared by two Cerebrum systems | seq 9 | — | — |
 
-## 8. `cerebrum-client.yml` — the desktop seats
-
-| # | Step | How | Value from | Check |
-|---|---|---|---|---|
-| 8.1 | Installer with the client (and Designer where declared) components | `win_package` | `cerebrum_client_components` per host | product present |
-| 8.2 | Client data files: `User_Configuration.xml`, `LOCAL_SETTINGS.XML`, the server address, `GUI` settings for clients (setting 25) | `win_template` | inventory | file diff |
-| 8.3 | Firewall: outbound to the server ports only; inbound nothing | `win_firewall_rule` | README §4 | rule listing |
-| 8.4 | Version equal to the server (vendor checklist rows 18, 20) | `cerebrum-ops.yml -e op=version` | — | report |
-| 8.5 | The tooling the owner asked for on the seats (browser, Wireshark with the connector's dissectors, VS Code with the language extensions) | the Windows profile of infra/0011 | PR #75 | — |
-
-## 9. `cerebrum-sdn.yml` — IP-Core, when IP routing is used
+## 5. `cerebrum-web.yml` — the web client, RCP and panels
 
 | # | Step | How | Value from | Check |
 |---|---|---|---|---|
-| 9.1 | Cerebrum SDN package from the object store; service `cerebrumipcore` through nssm with stdout/stderr files **and** rotation (`AppRotateFiles`, `AppRotateBytes`) | `win_package`, `win_regedit` on the nssm parameters | `cerebrum_sdn_version` | service running, log size bounded |
-| 9.2 | `etc\default_config.json`, `default_logging_config.json`, `prometheus.yml` | `win_template` | inventory | file diff |
-| 9.3 | Its own SQL login (never `sa`), TLS minimum raised from the vendor's `--tls-min-v1.0` | login of seq 1.4, service parameter | Vault | log shows the login |
-| 9.4 | The IP-Core log is not shipped as-is: the lines carrying the database configuration are dropped or masked by Alloy (README §15 finding 1) | `windows_logging` pipeline stage | — | Loki query shows no credential line |
-| 9.5 | Firewall: 5000 (IS-06), 5001, 5002 (gRPC) from the controller zones | `win_firewall_rule` | README §4 | rule listing |
+| 5.1 | Settings 16 and 17: `WEB_CLIENT` (ENABLED, PORT, WEB_SERVER_PORT 443, USE_SSL=1, idle timeout, MAX_CONNECTIONS), `RCP` (ENABLE_RCP, HTTP_PORT, USE_SSL=1), `PROXY` | rows of seq 3 | inventory | — |
+| 5.2 | The TLS certificate (see Certificates): from the platform CA, CN and SAN = the server FQDN (the virtual address for a redundant pair), in the machine store; `SECURITY/CERTIFICATE`, `CERT_HASH` written as settings | certificate role, `win_certificate_store`, rows | Step-CA | browser check through the edge |
+| 5.3 | Web client files from the project (seq 2.7) | — | — | `uri` on the web client URL |
+| 5.4 | Hardware panels: the site's `.cpf` set and `HW_PANEL` settings | `win_copy`, rows | site files | the panel in the Clients table |
+| 5.5 | Exposure: the web client behind the platform edge (forwardAuth; the application keeps its own login, it has no OIDC) | Traefik route, separate PR | README §11 | — |
 
-## 10. `cerebrum-watch.yml` — the subscription
+## 6. `cerebrum-client.yml` — the desktop seats
 
 | # | Step | How | Value from | Check |
 |---|---|---|---|---|
-| 10.1 | The connector binary (go-acp release, checksum) on the monitoring host | `get_url` + `file` | `cerebrum_watch_version` | `dhs version` |
-| 10.2 | One systemd unit per server and sub-device: `watch --device 0.0.0.0 --sub-device N --object <list>` with the monitoring user from Vault as environment of the unit (not argv), `--syslog-addr` to Alloy, `--metrics-addr` for Prometheus, `--alarm` with the vendor severities | `template` of the unit, `systemd` | README §14.3 and §14.4 | unit active, Loki lines, Prometheus target up |
-| 10.3 | Per controlled device a unit with its own object list | `cerebrum_watch_devices` | inventory | — |
-| 10.4 | Alert rules from README §14.3 | Prometheus rules through the monitoring role | — | rule listing |
+| 6.1 | Installer with the client (and Designer where declared) components | `win_package` | `cerebrum_client_components` per host | product present |
+| 6.2 | Client data files: `User_Configuration.xml`, `LOCAL_SETTINGS.XML`, the server address, `GUI` settings for clients (setting 25) | `win_template` | inventory | file diff |
+| 6.3 | Firewall: outbound to the server ports only | `win_firewall_rule` | README §4 | rule listing |
+| 6.4 | Version equal to the server (vendor checklist rows 18, 20) | `cerebrum-ops.yml -e op=version` | — | report |
+| 6.5 | The seats' tooling (browser, Wireshark with the connector's dissectors, VS Code with the language extensions) | the Windows profile of infra/0011 | PR #75 | — |
 
-## 11. `cerebrum-ops.yml` — operations, `-e op=`
+## 7. `cerebrum-ops.yml` — operations, `-e op=`
 
 | # | `op` | What it does | Check |
 |---|---|---|---|
-| 11.1 | `version` | version of server, clients, Device Service, licence manager into the register | report |
-| 11.2 | `start` / `stop` / `restart` | the application and Watchdog on the server, the Device Service, in the vendor's power sequence (help topic *server power sequencing*) | API login, `ALL_RESPONSIVE` |
-| 11.3 | `export` | a dated `.ccf` export plus the settings export of seq 4.1 to the object store with access control (the export holds the user table) | file in the store, decodable (README §15.1) |
-| 11.4 | `import` | the site's `.ccf` into a server, `IMPORT_ENABLE` set for the tables allowed (setting 27); unattended path: **vendor question**, until then the documented manual step | device rows over the API |
-| 11.5 | `failover` | the Device Service failover and the redundant pair switch through the API's writable objects (`FAILOVER`, `ACTIVATE_DEVICE`) with the ops user | `Redundancy_Status`, `DATA_CONNECTION_HEALTH` |
-| 11.6 | `support-capture` | the vendor's *Export Today's Logs* plus the audit trail and the IP-Core log to the object store for a ticket (vendor checklist row 23) | archive present |
-| 11.7 | `services` | start, stop or disable a service row under `02: Services` through the API | `SERVICES[*].STATE` |
+| 7.1 | `version` | versions of server, clients and licence into the register | report |
+| 7.2 | `start` / `stop` / `restart` | the application and Watchdog in the vendor's power sequence | API login, `ALL_RESPONSIVE` |
+| 7.3 | `export` | a dated `.ccf` export plus the settings export (3.1) to the object store with access control (the export holds the user table) | file in the store, decodable (README §15.1) |
+| 7.4 | `import` | the site's `.ccf` into a server, `IMPORT_ENABLE` set for the allowed tables (setting 27); unattended path: **vendor question**, documented manual step until then | device rows over the API |
+| 7.5 | `support-capture` | *Export Today's Logs* plus the audit trail to the object store for a ticket (vendor checklist row 23) | archive present |
+| 7.6 | `services` | start, stop or disable a service row under `02: Services` through the API, with the ops user | `SERVICES[*].STATE` |
+
+## 8. `cerebrum-watch.yml` — the subscription
+
+| # | Step | How | Value from | Check |
+|---|---|---|---|---|
+| 8.1 | The connector binary (go-acp release, checksum) on the monitoring host | `get_url` + `file` | `cerebrum_watch_version` | `dhs version` |
+| 8.2 | One systemd unit per server and sub-device: `watch` with the monitoring user from Vault in the unit's environment (never argv), `--syslog-addr` to Alloy, `--metrics-addr` for Prometheus, `--alarm` with the vendor severities | `template` + `systemd` | README §14.3, §14.4 | unit active, Loki lines, target up |
+| 8.3 | One unit per controlled device with its own object list | `cerebrum_watch_devices` | inventory | — |
+| 8.4 | Alert rules from README §14.3 | monitoring role | — | rule listing |
+
+## 9. `cerebrum-device-service.yml` — later
+
+Installer with the Device Service component; service `CerebrumServiceManager` registered with the server's management port (setting 15) and restart-on-failure; firewall for the device protocols; registration visible under `02: Services › SERVERS[*]`; failover through the API's writable objects. Written when a second control point or a shared registry is wanted.
 
 ---
 
-## What is decided here, what is not
+## Certificates — where TLS applies and what the platform does
 
-- Decided by the owner on 2026-10-21 and 2026-10-22: one playbook per scope, everything in Ansible, Vault for every secret, no provisioning on the WS2025 guests until the template is tuned, IP-Core and the gauges parked, the database provisioned by the platform.
-- Vendor questions that gate a step: the unattended `.ccf` import (11.4), the Device Service's exact package and registration (5.1, 5.2), whether `External Logging` licensing gates the per-service syslog, whether the settings table has a vendor import path besides SQL (4.3).
-- Open on the platform side: the read-only SQL login on the lab (parked), the `sa` rotation on the lab (owner), infra/0011 (#75) for the seats' tooling.
+The lab has **no certificate at all** in its machine store and no TLS anywhere: the web client, RCP, the Northbound API, SQL (`ForceEncryption=0`, no certificate) and the registry all run in clear. The platform CA (Step-CA) issues everything below; nothing self-signed, nothing bought. The seats and the server trust the platform CA through the Windows profile.
+
+| # | Where | What the vendor says | What the platform does |
+|---|---|---|---|
+| C1 | Web client (HTTPS + WebSocket Secure) | an X.509 v3 certificate, CN and SAN = the server FQDN (the virtual address on a redundant pair), installed on the server; `WEB_CLIENT/USE_SSL`, `WEB_SERVER_PORT 443`; the application must then run **elevated** | a server certificate from Step-CA, in the machine store, its path and thumbprint as `SECURITY/CERTIFICATE` and `CERT_HASH`; the auto-start task with highest privileges; renewal by the certificate role, thumbprint rewritten |
+| C2 | RCP (HTTP 9080) | `RCP/USE_SSL` | the same certificate; verified with `uri` |
+| C3 | Northbound API (WebSocket 40009) | `USE_SSL` on the control-interface device row | the same certificate is the assumption, *to prove on the lab with the connector's `--tls`*; until proven the API stays on the management zone only |
+| C4 | Devices Cerebrum connects to over HTTPS or mTLS (NMOS nodes with BCP-003-01, REST devices) | device rows carry `USE_SSL`, `USE_SSL_MTLS`, `IGNORE_CERT_ERRORS`, `MTLS_CLIENT_CERT_THUMBPRINT` | the platform CA in the server's Root store (`IGNORE_CERT_ERRORS=0`), a client certificate from Step-CA where a device demands mTLS, its thumbprint in the row |
+| C5 | The NMOS registry (8080) | HTTP only in the IS-04/05 help | kept on the media control zone; BCP-003-01 (TLS) support: *vendor question* |
+| C6 | SQL (the server to the instance) | nothing; the packs hold the vendor's `Unlock_sql_certificate_issue.ps1`, a hint of a known issue (*to read*) | a server-authentication certificate from Step-CA on the instance, `ForceEncryption=1`, the ODBC driver on the server encrypting without `TrustServerCertificate` |
+| C7 | Hardware panels (C-Link 40001/40002) | proprietary; one certificate mention in the nVision panels topic (*to read*) | kept on the control zone; no TLS assumed |
+| C8 | The web client behind the platform edge | — | Traefik terminates with the platform certificate and forwardAuth protects the path; the application's own login stays (no OIDC in the product; EVS's Foundation/Keycloak layer is off on the lab, *vendor question*) |
+| C9 | VIA License Manager (8558, TLS 1.2, own `ssl.conf`) | — | Neuron scope, not here |
+
+Three items wait for the lab's guest agent, which stopped answering during the last reads: the licence upgrade procedure (2.2), the SQL certificate script (C6), the hardware panels topic (C7).
+
+---
+
+## What is decided, what is not
+
+- Decided (owner, 2026-10-21 and 2026-10-22): one playbook per scope, everything in Ansible, Vault for every secret, no provisioning on the WS2025 guests until the template is tuned, the database provisioned by the platform, IP-Core not used, VIA License Manager out of scope, the Device Service later.
+- Vendor questions gating a step: the unattended `.ccf` import (7.4), TLS on the registry (C5), the Northbound certificate (C3), the Foundation identity layer (C8), whether `External Logging` licensing gates the per-service syslog.
+- Platform items: the read-only SQL login on the lab (parked), the `sa` rotation on the lab (owner), PR #75 for the seats' tooling.
