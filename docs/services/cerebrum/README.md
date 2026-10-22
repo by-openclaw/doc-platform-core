@@ -311,7 +311,7 @@ Facts the walk added: `License.Supported_Options.External_Logging` is an object 
 ### 14.6 Still open
 
 - A **read-only Cerebrum user** for monitoring: the lab's API user sits in the Admin group; the roles create a monitoring user in a group without control rights, and keep the write-capable one for `cerebrum-ops`.
-- **Per-object gauges** in the connector (or the Loki-side alerting), see §14.4.
+- **Per-object gauges** in the connector (or the Loki-side alerting), see §14.4 — **parked by the owner on 2026-10-22**; the alarm template and the syslog stream are the signals until then.
 - The **Northbound port and enablement setting** (server device › Control Interfaces tab) for §12.
 - The Services and Device Service rows (§14.2) proven when a Device Service is registered.
 - The Vault entry added to the platform's generated vault register when the `cerebrum_*` roles land (`playbooks/vars/vault_kv_map.yml`).
