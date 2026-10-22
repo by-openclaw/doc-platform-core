@@ -1,0 +1,68 @@
+# Cerebrum — settings per concern, values we will set, for EVS to confirm
+
+One table. Each row: the setting, where it lives, the value the platform will provision, where that value comes from, and what EVS confirms or corrects. Placeholders in angle brackets are site values (addresses, names) filled from the inventory. "Standard" = identical on the broadcaster's three systems (test, playout A, playout B); "lab" = the staging server 2.9.3; "vendor" = checklist v2.01 or the help file.
+
+| Seq | Concern | Setting (where) | Value we will set | Source | EVS: confirm / correct |
+|---|---|---|---|---|---|
+| 1 | Installer | `Cerebrum_<version>_Installer.exe`, Inno Setup | 2.9.3; `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=…` | broadcaster | silent switches; exit code meaning "reboot required" |
+| 2 | Installer | `/COMPONENTS=` on a server | `cerebrum,cerebrum_watchdog` | broadcaster | component names; which Windows services each installs |
+| 3 | Installer | `/COMPONENTS=` on a client seat | `cerebrum_client` (+ `cerebrum_designer` on a Designer seat) | broadcaster | `cerebrum_client_updater` needed? its service and port |
+| 4 | Installer | `/InstallSQL=` | `Skip` always: SQL Server comes from Microsoft's media and Microsoft's patches | owner rule | supported SQL versions and editions for 2.9.x |
+| 5 | Installer | `/InstallSentinel=` | `Skip` (software licence) or `Install` (hardware key) | lab, broadcaster | how a software licence is applied unattended |
+| 6 | Installer | prerequisite | Microsoft Edge WebView2 runtime installed first | broadcaster | still a prerequisite in 2.9.x, or bundled? |
+| 7 | Installer | upgrade | the same silent install over the existing version; ini and data kept | broadcaster | supported in-place path (2.8.x → 2.9.3), anything to do before/after |
+| 8 | SQL | edition, instance | Microsoft SQL Server 2019 Express (Standard for a redundant pair), named instance `CEREBRUMSQL`, mixed mode | lab, vendor help | Express acceptable in production for a standalone? |
+| 9 | SQL | network | static TCP 1433, dynamic ports off, Browser off, encryption forced with the platform certificate | CIS | Cerebrum's ODBC driver accepts `ForceEncryption=1`? |
+| 10 | SQL | logins | `sa` disabled; application login `cerebrum` (owner of the database); audit login `cerebrum_audit` (read-only) | CIS, owner | rights the application needs beyond its database (the help lists `sys.*` views for a remote instance) |
+| 11 | SQL | database | name `Cortex`, created by Cerebrum at first start | lab | — |
+| 12 | SQL | hardening | CIS section 2 server options off (ad hoc queries, CLR, xp_cmdshell, OLE automation, remote access, Database Mail, cross-db chaining); login auditing both outcomes | CIS | any option Cerebrum requires on |
+| 13 | SQL | backup | native full backup nightly 02:00, 7 rotating files, verified; guest backup carries them | infra/0008 | — |
+| 14 | SQL | redundancy (later) | mirroring high-safety with a witness, or Always On | vendor help | which of the two for 2.9.x; Standard edition required? |
+| 15 | Cerebrum.ini | `SQL:USE_DEFAULT`, `SQL:LOGIN_CREDENTIALS` | `0`, `2` | broadcaster | meaning of `LOGIN_CREDENTIALS` values |
+| 16 | Cerebrum.ini | `SQL:LOGIN_USERNAME`, `SQL:LOGIN_PASSWORD` | `cerebrum`, password from Vault | owner | password stored in clear in the ini: any encrypted form? |
+| 17 | Cerebrum.ini | `SQL:PRIMARY_CONNECTION`, `SQL:DATABASE` | `<db-host>\CEREBRUMSQL,1433`, `Cortex` | lab | `host\instance,port` syntax accepted? |
+| 18 | Cerebrum.ini | `SQL:REDUNDANT`, `SQL:SECONDARY_CONNECTION`, `SQL:SECONDARY_DATABASE`, `SQL:USE_MULTI_SUBNET_CLUSTERING` | `0`, same as primary, `Cortex`, `0` (standalone) | lab | — |
+| 19 | Cerebrum.ini | `VIRTUAL:BIND_ADDRESS` … `FOURTH_BIND_ADDRESS`, `COR_LINK:BIND_ADDRESS` | the server's own address (`0.0.0.0` on the lab) | lab | when a bind address must be set (multi-homed) |
+| 20 | Cerebrum.ini | `IP:PRIMARY`, `CORTEX:DISABLE_CRASH_DUMP`, `CORTEX:RUNNING` | `0`, `0`, `1` | lab | — |
+| 21 | Cerebrum.ini | `License:Demonstration_Key` | empty on a licensed server | lab | — |
+| 22 | Settings `_Config` | `CORTEX`: `DISABLE_CTL_NAV_TALLY_ON_SERVER`, `USE_STRONG_PASSWORD`, `IS_REDUNDANT`, `INDEPENDENT_CONFIGS`, `ALLOW_VIRTUALISE` | `1`, `1`, `0`, `0`, `0` | vendor checklist row 3, standard | — |
+| 23 | Settings | `CRASH_DUMP`: `ENABLE_WATCHDOG`, `PROTOCOL_PROTECTION`, `WATCHDOG_ABORT_AFTER_FAILOVER`, `EXTENDED`, `WRITE_THREAD_IDS_TO_AUDIT` | `1`, `1`, `1`, `0`, `0` | vendor checklist row 6, standard | — |
+| 24 | Settings | `LOGGING`: `USE_LOGGING_SERVER`, `SERVER_1_ADDRESS`, `SERVER_1_PORT`, `TRANSPORT_TYPE`, `USE_SSL`, `MESSAGES_TO_LOG` | `1`, `<alloy-host>`, `1514`, `1`, `1` if supported, `2` | standard (port and TLS ours) | meaning of `TRANSPORT_TYPE` (0 UDP / 1 TCP?) and `MESSAGES_TO_LOG` (0–2); syslog format (RFC 3164 or 5424) and the field order; is **External Logging** licensing required for this? |
+| 25 | Settings | `SNMP`: `AGENT_PORT`, `DEFAULT_VERSION`, `RO_COMMUNITY_STRING`, `RW_COMMUNITY_STRING`, `TRAP_RX_PORT`, `POLL_TIME` | `1161`, `v2c`, from Vault, empty (no write), `162`, `3` | standard (communities ours) | can the agent be read-only; SNMPv3 supported? |
+| 26 | Settings | `TRAP`: `TRAP_SERVER`, `TRAP_PORT`, `TRAP_COMMUNITY`, `TRAP_VERSION`, `NOTIFY`, `ON_STARTUP` | `<monitoring-host>`, `162`, from Vault, `2c`, `1`, `1` | standard | — |
+| 27 | Settings | `EMAIL`: `SMTP_SERVER`, `SMTP_PORT`, `SECURITY`, `SMTP_USERID`, `SMTP_PASSWORD`, `FROM_ADDRESS`, `SENDER_NAME`, `ERROR_TO_ADDRESS`, `NOTIFY`, `NOTIFIY_CRITICAL_ERROR`, `PERIODIC_REPORT` | `<mail-host>`, `587`, STARTTLS, the service mailbox, from Vault, `cerebrum@<domain>`, `<server-name>`, `<ops-mailbox>`, `1`, `1`, `0` | platform mail rule | `SECURITY` values (none / STARTTLS / TLS); authenticated submission on 587 supported? |
+| 28 | Settings | `AUDIT` levels | `ACP 3`, `APP 1`, `FILE 1`, `PROT 1`, `SERVICES 3`, `SQL 1`, `UDP 1`, `WEB_CLIENT 1`, others `0`; `RX_BUFFER_LOG_SIZE 1024`, `RX_QUEUE_LOG_LENGTH 1000` | standard | recommended production levels; cost of level 3 |
+| 29 | Settings | `ALARM` switches | `LOG_CLIENT_EVENTS 1`, `LOG_GD_CONTROL 1`, `LOG_GPI/GPO_CHANGES 1`, `LOG_RX_TRAPS 1`, `LOG_SCHEDULER_EVENTS 1`, `LOG_UMD_CHANGES 1`, `NOTIFICATION_MODE 1`, `REACTIVATE_ON_ERROR 1`, `PAL 1`, others `0` | standard | — |
+| 30 | Settings | `SQL`: `ARCHIVE_DIRECTORY`, `LOG_ARCHIVING`, `TRAIL_ARCHIVING`, `MAX_DB_APP_SIZE`, `MAX_DB_LOG_SIZE`, `MAX_DB_TRAIL_SIZE`, `MAX_LOG_ARCHIVE_SIZE`, `MAX_TRAIL_ARCHIVE_SIZE`, `FORCE_TRUNCATE`, `AUTO_FAILOVER` | `D:\Cerebrum\Archive` (outside the program folder), `1`, `1`, `512`, `512`, `128`, `4096`, `4096`, `1`, `0` | vendor checklist row 11 (archiving on, outside the folder); sizes standard | units (MB); sizes for 48 h of history on a busy site |
+| 31 | Settings | `TALLY_ROUTER`: `AUTO_BACKUP`, `BACKUP_DIRECTORY`, `BACKUP_PERIOD`, `BACKUP_LIMIT`, `BACKUP_SIZE` | `1`, `D:\Cerebrum\Backup`, `24`, `14`, `30` | vendor checklist row 2; standard has limit 1 | meaning of `BACKUP_LIMIT` (files kept?) and `BACKUP_SIZE` |
+| 32 | Settings | `Admin/File Paths`: `Backup Files`, `EXPORT_TODAYS_LOGS`, `AUDITLOG_FILE`, `SQLXML_FILE` | all under `D:\Cerebrum\…`, outside the program folder | vendor checklist rows 11, 23 | — |
+| 33 | Settings | `WEB_CLIENT`: `ENABLED`, `USE_SSL`, `WEB_SERVER_PORT`, `PORT`, `ENABLE_IDLE_TIMEOUT`, `IDLE_TIMEOUT`, `MAX_CONNECTIONS`, `MAC_ADDRESS_IDENTIFICATION`, `DISTRIBUTED_HOSTING` | `1`, `1`, `443`, `40002`, `1`, `1800000`, `40`, `1`, `0` | playout A (TLS) | elevated run required with `USE_SSL=1` (help): any alternative? |
+| 34 | Settings | `RCP`: `ENABLE_RCP`, `HTTP_PORT`, `USE_SSL` | `1`, `9080`, `1` | lab (9080), playout A | — |
+| 35 | Settings | `SECURITY`: `CERTIFICATE`, `CERT_HASH`, `KEY` | path and thumbprint of a certificate from the platform CA (CN/SAN = server FQDN or virtual address); `KEY` left as Cerebrum writes it | help topic | certificate store or file; renewal procedure without downtime |
+| 36 | Settings | `PROXY`: `USE_PROXY`, `PROXY_FQDN`, `WEB_CLIENT_SERVICE_IP_CSV` | `0`, empty, empty (the platform edge terminates TLS in front) | — | reverse proxy in front of the web client supported? |
+| 37 | Settings | `SERVICES/SERVICE_MANAGEMENT_PORT` | `40009` | lab | same port as the Northbound API? |
+| 38 | Settings | `COR_LINK`: `MULTICAST_ADDRESS`, `MULTICAST_PORT`, `FILETRANS_PORT`, `HEALTH_FAILOVER_GRACE_PERIOD`, `MAX_RESENDS`, `SEND_MULTICAST_PACKET`, `SERVER_NAME` | `239.1.1.1`, `40001`, `40006`, `60000`, `4`, `0`, `<server-name>` | standard | `SEND_MULTICAST_PACKET=0` acceptable with panels on another subnet? |
+| 39 | Settings | `GUI` (server) | `AUTO_LOGON 1`, `DEMO_MODE_LOGON 0`, `WINDOWS_CREDENTIALS 1`, `CONFIRM_SHUTDOWN 1`, `SYSTEM_TRAY_MESSAGE 1`, display switches standard | standard (demo off) | `AUTO_LOGON` with which account |
+| 40 | Settings | `IMPORT_ENABLE` (what a `.ccf` import may overwrite) | `DEVICES 1`, `DEVICE_DETAILS 1`, every other table `0` on a running system; all `1` on a fresh server | standard | recommended set for a restore on a fresh server |
+| 41 | Settings | `FEDERATION/USE_FEDERATION`, `IP_RTR` defaults, `GENERIC_DEV` severities, `SCHEDULER`, `HW_PANEL/STARTUP_DELAY` | `0`; standard; standard; standard; `60` | standard | — |
+| 42 | Settings | `IP/INSTANCE_1`, `IP/INSTANCE_2`, `GUI/LAST_PASSWORD`, `SECURITY/KEY` | never written by the platform | — | confirm they are generated and must not be copied between servers |
+| 43 | Settings | the settings table itself | exported, diffed and written by SQL on `dbo._Config` (user, category, property, value), Cerebrum restarted after | — | a vendor import/export path besides SQL? |
+| 44 | Accounts | `Global Data Files\USERS.XML` | `Admin` (password from Vault), `monitor` (read-only, Northbound), `ops` (write, Northbound) | — | how to create users unattended; read-only group for the API |
+| 45 | Data files | `CLIENTS.XML`, `INDEX.XML`, `MENUS.XML`, `User_Configuration.xml`, `LOCAL_SETTINGS.XML`, `Variables\*.cvf` | templated from the lab's files, UTF-16 | lab | — |
+| 46 | Device library | `GenericDevices\*.cgd` | only the declared families + the server's own 8 files; everything else removed | vendor checklist row 7 | list of files that must never be removed |
+| 47 | Configuration | `.ccf` export | nightly `Auto Backup` plus a dated export to the object store (holds `USERS`) | — | unattended import on a fresh server: command line, API or UI only? |
+| 48 | Configuration | `DEVICE_CONFIG` control interface | Northbound API (XML), WebSocket server `40009`, `USE_SSL=1` | lab (`USE_SSL=0`) | certificate the Northbound API uses with `USE_SSL=1`; port configurable? |
+| 49 | Northbound API | licence | 10 sessions (`XML licenses`); platform uses 2–3 (watch per sub-device) + 1 ops | lab License tab | — |
+| 50 | NMOS registry | Bonjour, URL reservations, firewall, DNS-SD | Bonjour installed; `netsh http add urlacl http://*:8080/x-nmos/registration/` and `/query/` for Everyone; 8080 tcp + 5353 udp in; `_nmos-register._tcp` and `_nmos-registration._tcp` records on the resolver | IS-04/05 help | registry TLS (BCP-003-01) supported? Query API for third parties? |
+| 51 | Firewall (host, per program) | inbound | 40001/40002 tcp+udp (clients, panels), 40009 tcp (Northbound), 2071/2072 udp (ACP), 162 udp (traps), 1161 udp (SNMP agent), 443/9080 tcp (web, RCP), 8080 tcp + 5353 udp (NMOS) | lab, README §4 | ports 2000, 40003, 40030, 40006, 40007, 40051, 8080–8095, 8090–8095 seen in the broadcaster's rules: which are needed on a standalone server |
+| 52 | Firewall | outbound | SQL to the database host; ACP/SNMP to the device ranges; syslog, traps, mail to the platform hosts; nothing else | platform rule | any outbound Cerebrum needs that is not in this list (licence server, updates) |
+| 53 | Logging | audit trail, error logs | `ErrorLogs\AuditTrail\*.log` shipped to Loki; `.dmp` alerted; retention 30 days | lab | — |
+| 54 | Logging | IP-Core (`cerebrumipcore`) | not installed (IP routing not used) | owner | defect report: the service logs the SQL login and password at INFO on every ini re-read |
+| 55 | Service account | the Windows session that hosts Cerebrum and Watchdog | local account `cerebrum`, logon task starts Watchdog then server; `Administrators` only while `USE_SSL=1` requires it | broadcaster, help | recommended account and privilege; auto-logon method the vendor supports |
+| 56 | Licence | Cerebrum | Sentinel key (hardware) or software licence file; options: web client 10, clients 10, Northbound 10, SNMP, Redundant server, External Logging | lab License tab | **External Logging** option: what it gates; how the software licence is applied unattended |
+| 57 | Device Service (later) | `CerebrumServiceManager` | `CerebrumService.exe … MGMT_PORT=40009`, restart on failure; ports 31150–31155, 62010 only with those devices | broadcaster | component name, its own ports, registration on the server |
+| 58 | Monitoring | Northbound subscription | `00: System` leaves (CPU, handles, commit size, queues, backlog age, redundancy, licence) and `02: Services` → syslog + Prometheus; thresholds from the checklist (CPU < 15 %, queues 0, run rate < 2000) | vendor checklist row 12, object tree | thresholds confirmed; `Clients` and `CorLinkStats` as the C-Link health |
+| 59 | Backup | guest | nightly image backup of every Cerebrum guest (PBS), plus rows 13, 31, 47 | infra/0008 | — |
+| 60 | Time | Windows time source | the platform's NTP on every host, same time zone (Brussels) | vendor checklist row 14 | — |
+
+Rows with an empty last column need no answer from EVS: they are the platform's own choices or the lab's observed values.
