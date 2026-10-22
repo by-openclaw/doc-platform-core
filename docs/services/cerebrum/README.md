@@ -315,3 +315,22 @@ Facts the walk added: `License.Supported_Options.External_Logging` is an object 
 - The **Northbound port and enablement setting** (server device › Control Interfaces tab) for §12.
 - The Services and Device Service rows (§14.2) proven when a Device Service is registered.
 - The Vault entry added to the platform's generated vault register when the `cerebrum_*` roles land (`playbooks/vars/vault_kv_map.yml`).
+
+## 15. Where the three kinds of Cerebrum state live, and the findings of 2026-10-22
+
+Checked on the lab after the owner's export of the day (`Configurations\261022 - cerebrum - staging - standalone.ccf`, 628 KB) and the vendor's statement that "the .ccf holds all details".
+
+| Kind | Where | What it holds | How the platform provisions it |
+|---|---|---|---|
+| **Bootstrap** | `Cerebrum.ini` (15 keys) | the database connection: server, instance, database, login mode and credentials; the bind addresses; the demo key | templated by the role; the SQL login comes from Vault, never a default account |
+| **Settings** (application behaviour) | SQL table `dbo._Config` (33 categories: LOGGING, SNMP, TRAP, AUDIT, ALARM, EVENT_LOG, SECURITY, WEB_CLIENT, EMAIL, CRASH_DUMP, CORTEX, COR_LINK, TALLY_ROUTER …) | every setting of §12.2 | rows as data, written by `cerebrum-db-config.yml` with a write login, audited with a read-only one |
+| **Configuration** (what operators build) | the `.ccf` export: 39 serialised tables (`ROUTING_*`, `TALLY_*`, `CABLE_*`, `UMD_CONFIG`, `CATEGORIES`, `TIELINE*`, `GPIO_NAMES`, `MACROS`, `SALVO_*`, `JOYSTICKS`, `IP_PROFILE`, `IP_AREAS`, `IP_ROUTING`, `IP_CAPABILITIES`, `DEVICE_CONFIG`, `DEVICE_DETAILS`, `SERVICES`, `RESOURCES`, `PACKAGE_ROUTER_CONFIG`, `ROUTER_LOCKS`, `ROUTER_STATES`, `GROUPS`, `USERS`) — a proprietary binary container, not compressed, no `_Config` content | exported by `cerebrum-ops` (the nightly `Auto Backup` at 02:30 and `LastShutdown.ccf` already exist) to the object store with access control, because `USERS` is inside; restored on a fresh server by the role's import step (*how the import is driven unattended: vendor question*) |
+
+So "the .ccf holds all details" is true for the configuration, not for the settings and not for the bootstrap: a complete rebuild needs the three.
+
+**Findings for the vendor and for the roles:**
+
+1. **IP-Core (Cerebrum SDN) writes the database credentials to its log.** The `cerebrumipcore` service (nssm) sends stdout to `C:\EVSLogs\Cerebrum\IP-Core\ipcore.log`; the `DatabaseConfigurationWatcher` logs the whole database configuration, login and password included, at INFO level every time it re-reads `Cerebrum.ini` — 270 occurrences since 2026-08-28 on the lab. Vendor defect to report. For the platform: that log is never shipped as-is (Alloy drops or masks those lines), the file ACL is checked, and the lab's SQL password is rotated now, since the scan of 2026-10-22 exposed one of those lines.
+2. **IP-Core connects as `sa`** (`credentialMode 2`). The role gives it a dedicated SQL login with the rights it needs, never the server administrator.
+3. **No rotation on `ipcore.log`**: 328 MB in eight weeks, growing; nssm's `AppRotateFiles` / `AppRotateBytes` are unset and `default_logging_config.json` only sets the level. The role sets the rotation parameters of the service.
+4. **Cerebrum itself rotates** its audit trail and error logs (10 MB); the nightly `.ccf` auto-backup works (02:30, 627 KB, 14 days present).
