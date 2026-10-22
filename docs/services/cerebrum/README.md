@@ -48,7 +48,7 @@ Every role: pinned installer with checksum from the platform object store, setti
 | server | 162 | UDP | SNMP trap receiver |
 | server | 1161 | UDP | Cerebrum's SNMP agent |
 | server | 2071, 2072 | UDP | ACP1, ACP2 (Axon Control Protocol) |
-| server | 2000 | UDP | listening on the lab, *to confirm* |
+| server | 2000 | UDP | the `TSL-UMD-V5` generic device of the lab configuration (virtual device `2.0.0.1`, found in the `.ccf`, §15.1) — a listener Cerebrum opens for that device, not a server service |
 | server | 40003, 40030 | TCP | Federation (from the repository) |
 | server | 40051 | TCP | Exchanger XML API (from the repository); the repository's 40007 is the Northbound API at its default port |
 | server | 8080–8085, 8090–8095 | TCP | FCR and SAMIX APIs (from the repository) |
@@ -312,7 +312,7 @@ Facts the walk added: `License.Supported_Options.External_Logging` is an object 
 
 - A **read-only Cerebrum user** for monitoring: the lab's API user sits in the Admin group; the roles create a monitoring user in a group without control rights, and keep the write-capable one for `cerebrum-ops`.
 - **Per-object gauges** in the connector (or the Loki-side alerting), see §14.4 — **parked by the owner on 2026-10-22**; the alarm template and the syslog stream are the signals until then.
-- The **Northbound port and enablement setting** (server device › Control Interfaces tab) for §12.
+- ~~The Northbound port and enablement setting~~ — found on 2026-10-22 in the `.ccf` (§15.1): a `DEVICE_CONFIG` entry of type `ControlInterfaces`, protocol `Northbound API (XML)`, `CONNECTION_TYPE=WEBSOCKET_SERVER`, `PORT_NUMBER=40009`, `USE_SSL=0`. The role declares it as a device row (and sets `USE_SSL`).
 - The Services and Device Service rows (§14.2) proven when a Device Service is registered.
 - The Vault entry added to the platform's generated vault register when the `cerebrum_*` roles land (`playbooks/vars/vault_kv_map.yml`).
 
@@ -334,3 +334,25 @@ So "the .ccf holds all details" is true for the configuration, not for the setti
 2. **IP-Core connects as `sa`** (`credentialMode 2`). The role gives it a dedicated SQL login with the rights it needs, never the server administrator.
 3. **No rotation on `ipcore.log`**: 328 MB in eight weeks, growing; nssm's `AppRotateFiles` / `AppRotateBytes` are unset and `default_logging_config.json` only sets the level. The role sets the rotation parameters of the service.
 4. **Cerebrum itself rotates** its audit trail and error logs (10 MB); the nightly `.ccf` auto-backup works (02:30, 627 KB, 14 days present).
+
+### 15.1 The vendor file formats, read on 2026-10-22
+
+| Extension | Readable | Format |
+|---|---|---|
+| `.ccf` configuration export | **yes, fully** | a sequence of records: marker `FD FF FF FF`, `int32` header length, the table name in UTF-16 + NUL, `uint16` row count, `uint16` zero, `uint32` compressed size, `uint32` raw size, then a zlib stream of the table as UTF-16 XML (`<ROUTING_LEVELS VERSION="4"><LEVEL ID="1" NAME="Video" …/>`). Today's export: 44 records, 39 tables, 643 KB. `ROUTER_STATES` and `ROUTER_LOCKS` hold one zlib sub-stream per router (`int32` compressed, `int32` raw) with the crosspoint state. `USERS` (second occurrence) is not XML: an opaque text record with the accounts — sensitive |
+| `.cjf` project file | yes | records of `FE FF FF FF`, `int32` compressed, `int32` raw, zlib; the first is the manifest `<CORTEX_FILE_ARCHIVE><FILES><FILE Name=… Time=…/>` (3 463 files of `Projects\`: forms, panels, images, device definitions, MIBs, macros, backups), the rest the files |
+| `.cgd` device definitions, `.cvf` variables, data files | yes | plain XML (UTF-8 or UTF-16) |
+| `.cpf` panels, `.cmf` macros, `.clf` forms | **no** | `int32 0`, `int32` raw size, `int32 4`, then a stream the common codecs do not open (not zlib, deflate, bzip2, lzma, lz4): the Designer's own. They are design artefacts and travel inside the project file |
+
+What the lab's `.ccf` declares (`DEVICE_CONFIG`, 8 rows), which is the device inventory a role will write as data:
+
+| Device | Address | Type | Transport |
+|---|---|---|---|
+| DHS | — | Control interface, Northbound API (XML) | WebSocket server 40009, no TLS |
+| Neuron-convert-Hybrid, Neuron-shuffler, Neuron-neuronview | 10.6.255.102 / .103 / .104 | Neuron generic device + router control | ACP2 UDP 2072; router control TCP 7800 |
+| NMOS | 1.0.0.1 (virtual) | Network Media Server | HTTP 8080 |
+| NMOS IS-07 | 10.6.250.6 | NMOS IS-07 | HTTP 8060 |
+| Neuron-neuronview_1 | 2.0.0.1 (virtual) | TSL-UMD-V5 | UDP 2000 |
+| Admin (UIF) | 3.0.0.1 (virtual) | Admin UI framework | virtual 10001 |
+
+The device rows carry credential attributes (`API_KEY`, `API_SECRET`, router `PASSWORD`), empty on the lab: one more reason the export is handled as a secret-bearing artefact. The decoded tables of today's export sit in the quarantine folder beside the lab export, outside any repository.
