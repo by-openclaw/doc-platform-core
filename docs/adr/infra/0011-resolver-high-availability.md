@@ -1,7 +1,7 @@
 # infra/0011 — Platform Resolver: Two Instances Behind One Address
 
-**Status:** Draft
-**Date:** 2026-10-27 (proposed)
+**Status:** Accepted
+**Date:** 2026-10-27 (proposed), accepted by the owner on 2026-10-27 ("approval for 2x adguard yes")
 **Scope:** How the platform's guests resolve names when the resolver they are handed fails: the number of resolver instances, the address the guests are given, the failover mechanism and its acceptance test. Not in scope: the resolver chain itself (AdGuard Home → the firewall's Unbound → dnscrypt-proxy, owner-stated 2026-05-25), filtering policy, the firewall's DHCP and router-advertisement catalog entries that carry the address.
 **Related:** `infra/0004-network-architecture` (OPNsense is the only router, DHCP and DNS authority), `infra/0007-monitoring`, `infra/0010-provisioning-ansible-only`, `security/0003-hardening`
 
