@@ -57,7 +57,14 @@ The two instances run on two hypervisors as soon as two are available (`br-pmox-
 
 ### 4. Acceptance test (the same test every time the tier changes)
 
-With both instances up, stop AdGuard on the instance that owns the address. From a guest host and from a container on that guest, lookups of an internal name and a public name must keep answering with no lookup slower than 100 ms, and the address must move within 3 s. Then stop keepalived on the owner (not only AdGuard) and repeat. Then start everything again and confirm the address returns to the preferred instance. The result is recorded in the pull request that changes the tier.
+With both instances up, lookups of an internal name run through the virtual address from a guest host and from a container on that guest, about once per second, while:
+
+1. AdGuard is stopped on the instance that owns the address — the health probe fails and the address moves; lookups in the detection window (probe interval × fall + one advertisement) may fail or wait; after it every lookup answers again;
+2. AdGuard is started again — the address returns to the preferred instance without a failed lookup (both are healthy while it moves);
+3. keepalived is stopped on the owner — the address moves within one advertisement interval; at most one lookup is lost;
+4. keepalived is started again — the address returns without a failed lookup.
+
+Measured 2026-10-28 (`ansible-platform` #1052, probe interval 2 s, fall 2): step 1 moved the address in 6 s with one container lookup and one host lookup lost; step 2 lost nothing; step 3 moved it in 1 s with one host lookup lost; step 4 lost nothing. The probe now runs at keepalived's default interval of 1 s (#1057), which brings step 1 to about 3 s; the detection window is the price of a health probe and is bounded, where the 2026-10-24 outage was not. The result is recorded in the pull request that changes the tier.
 
 ### 5. What stays as it is
 
