@@ -64,7 +64,7 @@ With both instances up, lookups of an internal name run through the virtual addr
 3. keepalived is stopped on the owner — the address moves within one advertisement interval; at most one lookup is lost;
 4. keepalived is started again — the address returns without a failed lookup.
 
-Measured 2026-10-28 (`ansible-platform` #1052, probe interval 2 s, fall 2): step 1 moved the address in 6 s with one container lookup and one host lookup lost; step 2 lost nothing; step 3 moved it in 1 s with one host lookup lost; step 4 lost nothing. The probe now runs at keepalived's default interval of 1 s (#1057), which brings step 1 to about 3 s; the detection window is the price of a health probe and is bounded, where the 2026-10-24 outage was not. The result is recorded in the pull request that changes the tier.
+Measured 2026-10-28 (`ansible-platform` #1052, probe interval 2 s, fall 2): step 1 moved the address in 6 s with one container lookup and one host lookup lost; step 2 lost nothing; step 3 moved it in 1 s with one host lookup lost; step 4 lost nothing. The probe now runs at keepalived's default interval of 1 s (#1057): step 1 re-measured at 5 s (probe fall 2 × 1 s, the lowered priority advertised, the peer's take-over advertised back, the address released), 6 of 60 lookups through the address lost in that window and none after. `fall 2` stays: one slow probe must not move the address. The detection window is the price of a health probe and is bounded; the 2026-10-24 outage was not. The result is recorded in the pull request that changes the tier.
 
 ### 5. What stays as it is
 
