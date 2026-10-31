@@ -1,7 +1,7 @@
 # infra/0008 — Backup Strategy
 
 **Status:** Draft — several policy thresholds pending (`⚠ TBD` in §Pending decisions)
-**Amended:** 2026-10-20 (approved by the owner) — the PBS datastore lives off-site on Contabo S3 directly; the on-site S3 is not a backup destination; retention locked (§Backup destinations, decisions 1, 6, 7)
+**Amended:** 2026-10-20 (approved by the owner) — the PBS datastore lives off-site on Contabo S3 directly; the on-site S3 is not a backup destination; retention locked (§Backup destinations, decisions 1, 6, 7); **2026-11-01 (proposed — approve by merging)** — recovery objectives per class, decisions 2, 3, 5, 8, 9, 10, 11 (§Recovery objectives)
 **Date:** 2026-04-13 (supersedes flat ADR-0020, 2026-04-02)
 **Scope:** Platform-wide backup policy — what gets backed up, where to, how often, how long retained, how to restore. Does not define per-service backup mechanics beyond the class-level pattern.
 **Related:** `infra/0003-terraform-standard` (state backup), `security/0001-secret-storage` (Vault Raft snapshots), `infra/0005-environment-tiers §Tier-specific constraints`, `security/0003-hardening §8` (audit log retention)
@@ -27,9 +27,9 @@ Backups are defined **by service class**, not per individual service. Each servi
 
 | Class | Services | Primary method |
 |---|---|---|
-| **Relational DB** | PostgreSQL (Patroni), MariaDB | `pg_dump` / `mariabackup` + WAL archiving |
-| **Cache / queue** | Redis (Sentinel) | `BGSAVE` RDB snapshots |
-| **Object store** | MinIO | Bucket replication to secondary location |
+| **Relational DB** | PostgreSQL (Patroni), MariaDB | pgBackRest: continuous WAL archiving + daily differential + weekly full to the off-site repository (point-in-time recovery); `mariabackup` + binlog for MariaDB |
+| **Cache / queue** | Redis (Sentinel) | Redis persistence (AOF `everysec`); no separate copy — rebuildable class |
+| **Object store** | SeaweedFS | One-way mirror of every application bucket to the off-site provider (`weed filer.backup`) |
 | **Secret store** | HashiCorp Vault | `vault operator raft snapshot` |
 | **Application** | GitLab CE, NetBox, Authentik, Nextcloud, Mailcow | Application-native backup tool (`gitlab-backup`, `netbox.sh backup`, etc.) |
 | **File / volume** | Synology NFS shares, Proxmox VM snapshots | Proxmox Backup Server + NFS snapshot |
@@ -78,6 +78,23 @@ In-transit encryption is TLS on every leg — no plaintext NFS, no unencrypted H
 - ISO 27001:2022 A.8.13 compliance requires at least one documented drill per tier per year
 - Drill failures trigger an incident ticket, not a retry loop
 
+### Recovery objectives (proposed 2026-11-01 — approve by merging)
+
+Measured on 2026-10-31: every guest has exactly one restore point per night (NAS job, then the PBS job), so the recovery point objective (RPO) of every service is 24 hours. The owner's requirement is explicit: a lost day of business records is not acceptable. Objectives by class and the vendor-documented mechanism that reaches each:
+
+| Class | RPO target | Mechanism | RTO target (prod) |
+|---|---|---|---|
+| Relational DB (PostgreSQL) | ≤ 1 minute | pgBackRest: `archive_mode=on`, `archive_command=pgbackrest --stanza=<stanza> archive-push %p`, `archive_timeout=60s` (set through Patroni's DCS so every member archives when it leads); daily differential, weekly full, taken from a standby (`backup-standby`); repository = a dedicated off-site S3 bucket, `repo1-cipher-type=aes-256-cbc` (client-side), `repo1-retention-full=4`, `repo1-retention-diff=14`; restore to any second of the last 14 days with `--type=time --target=<timestamp with offset>` | ≤ 1 hour |
+| Cache / queue (Redis) | not applicable (rebuildable) | AOF with `appendfsync everysec` for restart durability (at most one second lost on a crash); the consumers hold caches, locks and job queues, no business records; no separate copy | ≤ 1 hour (restart) |
+| Application: GitLab | 24 h today → ≤ 6 h | daily full `gitlab-backup` to its bucket, mirrored off-site (locked); incremental repository backups every 6 h once validated on the lab tier. The repositories live on a ZFS bind mount outside vzdump: this backup is their only copy | ≤ 4 hours |
+| Application: mail, Nextcloud, Authentik, NetBox, CMDB and the rest | 24 h today → 15 minutes | nightly guest backups as today, plus PVE Storage Replication of every guest to a second node every 15 minutes (ZFS, minimum interval one minute; "High-Availability is allowed in combination with storage replication") once `infra/0009` Phase 0 exists. Interim for mail: an hourly PBS job of the mail guest with `keep-hourly 24`, after one measured trial night against the off-site provider's request limits | ≤ 4 hours critical, ≤ 24 hours non-critical |
+| Secret store (Vault) | 24 h (decision 4, locked) | raft snapshot daily; the data changes rarely | ≤ 1 hour |
+| Whole guest, any class | 24 h today → 15 minutes | as above | ≤ 4 hours |
+
+Restore drills (decision 10): **monthly, automated by a playbook** — one guest chosen at random is restored from the PBS datastore to a spare VMID on the other node (this proves the escrowed client key of the source node), started with its network device disabled, checked for a reached login (guest agent or `pct exec`), timed, destroyed; the report is written to `docs/runbooks/restore-drills/<date>-<guest>.md` in this repository by the play. **Quarterly in addition:** a PostgreSQL point-in-time restore to a scratch instance with a row-count check against the target time. A failed drill is an incident, never a retry loop.
+
+Key escrow (decision 11): backup keys live in Vault KV, as implemented for the PBS client key — the pgBackRest cipher passphrase, the PBS client key of every node, the NAS folder key. No Transit engine, no provider KMS: one escrow, one break-glass path.
+
 ### Audit logging of backup activity
 
 Backup runs themselves produce logs. These logs are forwarded to Loki per `infra/0006-logging`:
@@ -95,23 +112,23 @@ The following policy thresholds must be set by @yboujraf before this ADR moves f
 | # | Decision | Options / reference | Status |
 |---|---|---|---|
 | 1 | **Off-site backup target** | **LOCKED 2026-08-30: Contabo S3**; **clarified 2026-10-20:** the PBS datastore is on Contabo directly (not on the on-site S3 with a mirror); Vault snapshots and the application buckets' mirror also go there | ✅ locked |
-| 2 | **PostgreSQL backup schedule** | Daily `pg_dump` + continuous WAL archiving? PITR window length? | ⚠ TBD |
-| 3 | **Redis backup schedule** | `BGSAVE` hourly / daily? RDB + AOF hybrid? | ⚠ TBD |
+| 2 | **PostgreSQL backup schedule** | **PROPOSED 2026-11-01:** pgBackRest continuous WAL archiving (`archive_timeout` 60 s) + daily differential + weekly full to a dedicated off-site bucket, encrypted client-side; 14-day point-in-time window (§Recovery objectives) | 🟡 proposed |
+| 3 | **Redis backup schedule** | **PROPOSED 2026-11-01:** persistence only — AOF `appendfsync everysec`; rebuildable class, no separate copy | 🟡 proposed |
 | 4 | **Vault Raft snapshot schedule** | **LOCKED 2026-08-30: daily** raft snapshot → NFS + S3 + controller (`roles/vault_backup`) | ✅ locked |
-| 5 | **GitLab application backup schedule** | Daily? Delta or full? | ⚠ TBD |
+| 5 | **GitLab application backup schedule** | **PROPOSED 2026-11-01:** daily full `gitlab-backup` to its bucket (running since 2026-09) + incremental repository backups every 6 h after lab validation | 🟡 proposed |
 | 6 | **Retention — hot (NAS)** | **LOCKED 2026-10-20: 7 daily + 4 weekly** (full archives, on site) | ✅ locked |
 | 7 | **Retention — cold (off-site)** | **LOCKED 2026-10-20: 14 daily + 8 weekly + 12 monthly** on the Contabo PBS datastore (deduplicated, encrypted client-side) | ✅ locked |
-| 8 | **Restore SLA (RTO) — prod** | Typical: ≤ 4 hours for critical services, ≤ 24 hours for non-critical | ⚠ TBD |
-| 9 | **Restore SLA (RTO) — non-prod** | Typical: best-effort, no SLA | ⚠ TBD |
-| 10 | **Restore drill cadence** | Quarterly (ISO 27001 minimum) or monthly? | ⚠ TBD |
-| 11 | **Backup encryption KMS** | Vault Transit engine, or per-tool native KMS? | ⚠ TBD |
+| 8 | **Restore SLA (RTO) — prod** | **PROPOSED 2026-11-01:** ≤ 1 hour database and secret store, ≤ 4 hours other critical services, ≤ 24 hours non-critical | 🟡 proposed |
+| 9 | **Restore SLA (RTO) — non-prod** | **PROPOSED 2026-11-01:** best effort, no SLA | 🟡 proposed |
+| 10 | **Restore drill cadence** | **PROPOSED 2026-11-01:** monthly automated guest restore + quarterly PostgreSQL point-in-time restore, reports in `docs/runbooks/restore-drills/` | 🟡 proposed |
+| 11 | **Backup encryption KMS** | **PROPOSED 2026-11-01:** Vault KV escrow as implemented for the PBS client key; no Transit engine, no provider KMS | 🟡 proposed |
 
 ## Consequences
 
 - **Formal compliance evidence.** ISO 27001:2022 A.8.13 and NIS2 Art. 21(2)(c) are supported by a documented policy + per-service runbooks + drill reports.
 - **No stateful service is production-ready without a backup entry.** The deploy checklist for every Layer 5 service includes "backup class assigned, runbook written, first backup verified".
 - **Synology NAS is a single point of failure** until off-site is deployed — tracked as a compliance gap in `security/0002-compliance-mapping`.
-- **3-2-1 rule is the target, 2-1-0 is the current state** for pre-off-site deployment.
+- **3-2-1 reached on 2026-10-20** (production, NAS on site, PBS datastore off site). **Recovery objectives are per class** (§Recovery objectives): the database class gets continuous archiving; every other class leaves the 24-hour window through the hypervisor cluster's storage replication.
 - **Encryption at rest is mandatory** — no unencrypted backup data anywhere.
 - **Restore drills are mandatory and timed** — the evidence of backup working is a successful restore, not a completed backup script.
 - **Several policy thresholds are pending** (§Pending decisions) — the ADR ships partial and is amended as each decision locks.
