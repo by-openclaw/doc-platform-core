@@ -33,10 +33,10 @@ Repo-scoped decisions live in each repo's `docs/adr/` directory (e.g., `lib-syno
 | Git (workflow, platform strategy, configuration) | [`git/`](git/) | 3 |
 | Naming (infra, identity, firewall, automation) | [`naming/`](naming/) | 4 |
 | Security (secret storage, compliance, hardening, certificates, licensing) | [`security/`](security/) | 5 |
-| Infra (stack, charter, terraform, network, env tiers, logging, monitoring, backup) | [`infra/`](infra/) | 8 |
+| Infra (stack, charter, terraform, network, env tiers, logging, monitoring, backup, workload placement) | [`infra/`](infra/) | 9 |
 | Services (opnsense, email, netbox CMDB, database, notifications, firewall services, provisioning, opnsense config management, object storage, intrusion prevention, container registry) | [`services/`](services/) | 11 |
 | Lib — Python (design standard) | [`lib/python/`](lib/python/) | 1 |
-| **Total** | — | **30** |
+| **Total** | — | **31** |
 
 ## Refactor status
 
