@@ -1,216 +1,183 @@
 # services/0003 — NetBox CMDB
 
-**Status:** Draft
-**Date:** 2026-04-14 (supersedes flat ADR-0009, 2026-03-31)
-**Scope:** How NetBox works as the platform CMDB — data model, role vocabulary, plugin pipeline, sync architecture, and deployment parameters. Does **not** re-assert "NetBox is the source of truth" — that is already stated in `naming/0001-infra §1`, `infra/0001-platform-stack`, and referenced from `infra/0007-monitoring`, `security/0001-secret-storage`, `services/0004-database-strategy`.
-**Related:** `naming/0001-infra`, `infra/0001-platform-stack`, `infra/0003-terraform-standard`, `infra/0004-network-architecture`, `infra/0007-monitoring`, `services/0004-database-strategy`
+**Status:** Draft (rewritten 2026-10-31 against the running platform — proposal, approve by merging)
+**Date:** 2026-04-14 (supersedes flat ADR-0009, 2026-03-31); rewritten 2026-10-31
+**Scope:** How NetBox works as the platform CMDB — what it models (physical, virtual, logical, services), the mandatory fields that are the contract with every other ADR, the closed role vocabulary, how data gets in (bootstrap import, our own collection library, plugins), who reads it (Ansible, Terraform, monitoring, the register), the lifecycle that lets hardware go in and out of the rack, and the build plan from the empty instance that exists today. Does **not** re-assert "NetBox is the source of truth" (`naming/0001-infra §1`) nor define hostnames (`naming/0001-infra §3–5`).
+**Related:** `naming/0001-infra`, `infra/0001-platform-stack`, `infra/0003-terraform-standard`, `infra/0004-network-architecture`, `infra/0005-environment-tiers`, `infra/0007-monitoring`, `infra/0008-backup-strategy`, `infra/0010-provisioning-ansible-only`, `security/0001-secret-storage`, `services/0004-database-strategy`
 
 ---
 
 ## Context
 
-Multiple merged ADRs assert "NetBox is the source of truth" as a rule: `naming/0001-infra §1`, `infra/0007-monitoring` (`prometheus_job` custom field), `security/0001-secret-storage` (service vocabulary match), etc. None of them define **how** NetBox actually implements that role — what data model, what custom objects, what role vocabulary, what sync mechanisms.
-
-This ADR **completes** the model: it specifies the data, the roles, the plugin pipeline for missing domains, and the sync architecture between NetBox and the rest of the platform (Ansible, Terraform, Neo4j, Prometheus, Vault).
+- NetBox **runs** (`lxc-nbox-01`, NetBox 4.7, Authentik OIDC, shared PostgreSQL and Redis, PBS backup, metrics scraped). Its data model is **empty**: on 2026-10-31 every object class — sites, racks, devices, device types, interfaces, cables, power, VLANs, prefixes, addresses, circuits, VMs, custom fields, tags, webhooks — counted zero. The role deploys the application; nothing seeds the model.
+- The platform's facts live in four other places: `inventories/<env>/hosts.yml` (guests, addresses, groups), `register.yml` → `docs/register.md` (the 34 services with exposure, SSO, database, backup, monitoring, owner), the Terraform environment (guests, SDN VLANs, prefixes) and the firewall catalog (aliases, rules, VLAN interfaces). None of them knows a rack unit, a cable, a power feed or an ISP circuit.
+- The owner decided on 2026-09-02/03: NetBox is inventory-only (metrics stay in Prometheus/Grafana, each device deep-links to its dashboard); the model covers **everything** in the DevOps infrastructure (network, compute, storage, power, racks, cabling of every medium, modules, connectors); collection goes through a **single owned library** pushing into NetBox via Diode, no third-party discovery sprawl; physical switching is Arista (core and PoE campus) with the interim Netgear disappearing and Cisco Nexus for interop.
+- The previous text of this ADR carried placeholder names (`vm-nbox-01`, Pi-hole, MinIO, WireGuard, a graph database) that never matched the platform. This rewrite replaces them with the running estate and removes what has no owner decision behind it.
 
 ## Decision
 
 ### 1. Data model — what NetBox holds
 
-NetBox holds **every managed asset on the platform** — physical, virtual, logical, and software. No asset exists outside NetBox. If it isn't in NetBox, it isn't managed.
+**Everything managed is in NetBox; if it is not in NetBox it is not managed.** Secrets, metrics, logs and audit trails stay where their ADRs put them (Vault, Prometheus, Loki); NetBox may reference a Vault **path**, never a value.
 
-**Physical assets:**
-- Servers, switches, firewalls, NAS, WiFi access points
-- PDUs, UPS, rack-mounted equipment, patch panels
-- Cables, power feeds, circuits
-- Secondary devices: printers, TVs, mobile management stations (when part of the platform scope)
+#### 1.1 Physical (site `br`, naming/0001 §4)
 
-**Virtual assets:**
-- VMs (Proxmox + cloud: Contabo, Hetzner)
-- LXC containers on Proxmox
-- Kubernetes nodes (k3s) — when deployed
-
-**Logical assets:**
-- Interfaces, IP addresses (v4 + v6), prefixes, VLANs, VRFs
-- Cables, patch-panel terminations
-- DNS zones (as reference — authoritative source is the DNS server)
-
-**Software / services:**
-- Deployed platform tools modeled as NetBox `Service` objects (or custom objects in 4.x)
-- Service endpoints (ports, protocols, TLS status)
-- Application configuration metadata (admin URL, API endpoint, version)
-
-**Custom objects (NetBox 4.x):**
-- Domain-specific entities that don't fit the stock data model
-- Examples: NAS shared folders, NFS export rules, group ACLs, quotas, OPNsense zones, WireGuard peer registrations
-
-**Out of scope for NetBox:**
-- Runtime metrics (Prometheus)
-- Log streams (Loki)
-- Secret values (HashiCorp Vault — NetBox may reference a Vault **path**, never a secret value)
-- Audit logs (forwarded to Loki)
-- User passwords (Authentik)
-
-### 2. Mandatory custom fields
-
-Every deployed asset carries the following NetBox custom fields — these are the **interface between NetBox and the rest of the platform ADRs**:
-
-| Field | On | Type | Purpose | Consumed by |
-|---|---|---|---|---|
-| `env` | Device, VM, LXC | Choice (`dev`/`test`/`staging`/`acc`/`prod`/`drp`) | Environment tier | `infra/0005-environment-tiers`, Vault path, DNS zone |
-| `role` | Device, VM, LXC | Choice (see §3) | Platform service role | `naming/0001-infra §5`, monitoring labels |
-| `service_url` | VM, LXC | URL | User-facing HTTPS URL (e.g. `gitlab.by-research.be`) | DNS CNAME target, Traefik routing |
-| `prometheus_job` | VM, LXC | Text | Prometheus `job=` label | `infra/0007-monitoring` — observability registry pattern |
-| `vault_path_prefix` | VM, LXC | Text | `secret/{env}/{service}` — root of this asset's Vault scope | `security/0001-secret-storage` |
-| `backup_class` | VM, LXC | Choice (see `infra/0008 §1`) | Service class → backup policy | `infra/0008-backup-strategy` |
-| `owner` | Device, VM, LXC | Contact reference | Human or team responsible | RCA, incident response |
-
-Adding a new mandatory custom field requires an ADR amendment (this ADR).
-
-### 3. Canonical role vocabulary
-
-The `role` custom field is a **closed choice list**. The list below is the initial canonical vocabulary — new roles are added via amendment to this ADR, not by operators adding values in the NetBox UI.
-
-| Role | Example asset | Example name | Layer (`infra/0002`) |
+| Object | NetBox class | Today | Source for the load |
 |---|---|---|---|
-| `hypervisor` | Proxmox VE host | `br-pmox-01` | Layer 1 |
-| `firewall` | OPNsense | `vm-opns-01` | Layer 2 (prereq) |
-| `storage` | Synology DSM, MinIO | `br-syno-01`, `vm-minio-01` | Layer 4 |
-| `pki` | step-ca | `vm-stca-01` | Layer 2 |
-| `secrets` | HashiCorp Vault | `vm-hvlt-01` | Layer 2 |
-| `pwmgr` | Vaultwarden | `vm-vwrd-01` | Layer 5 |
-| `identity` | Authentik | `vm-auth-01` | Layer 3 |
-| `cmdb` | NetBox (self) | `vm-nbox-01` | Layer 5 |
-| `dns` | Pi-hole, Unbound | `vm-phole-01`, `vm-unbnd-01` | Layer 5 |
-| `proxy` | Traefik | `vm-trfk-01` | Layer 5 |
-| `git` | GitLab CE | `vm-glab-01` | Layer 5 |
-| `runner` | GitLab Runner | `vm-glrn-01` | Layer 5 |
-| `db` | PostgreSQL | `vm-pgsql-01` | Layer 5 |
-| `cache` | Redis | `vm-redis-01` | Layer 5 |
-| `mon` | Prometheus, Grafana, Alertmanager | `vm-prom-01`, `vm-graf-01` | Layer 5 |
-| `log` | Loki, Promtail | `vm-loki-01` | Layer 5 |
-| `mail` | Mailcow | `vm-mcow-01` / `cb-mcow-01` | Layer 5 |
-| `vpn` | WireGuard endpoint (on OPNsense) | — (interface on firewall) | Layer 2 |
-| `app` | Generic application VM (fallback role) | `vm-nextcloud-01` | Layer 5 |
+| Site, location | `Site` `br`, `Location` for each room (the basement rack room first) | 1 site | owner |
+| Racks | `Rack` with height, width, role, reservation for planned gear | 1 rack room, racks counted on the pictures | owner's front/rear photographs (2026-10-31) |
+| Servers | `Device` — `srv-proxmox-poc-01` (HPE ProLiant DL380p Gen8, the live platform host), `pve01` (DL380p Gen8, production host: OOB gateway, PTP grandmaster), `br-pmox-03` (Tyan GT24-B8236-IL), the fourth DL380p Gen8 once it powers on | 3 + 1 | `dmidecode`, iLO/IPMI, Terraform, Proxmox API |
+| Storage | `Device` — Synology DS1513+ (`nas01`) | 1 | DSM |
+| Network | `Device` — interim Netgear GS switch(es), Arista core and PoE campus when installed, UniFi access points, ISP CPE (Telenet, Proximus) | from the photographs | owner, LLDP via the collection library |
+| Power | `PowerPanel`, `PowerFeed`, PDU and UPS as `Device` with power ports and outlets | unknown — read from the photographs | photographs, UPS/PDU API |
+| Passive | patch panels as `Device` with `FrontPort`/`RearPort`, cable trays as `Location` notes | from the photographs | photographs |
+| Cables | `Cable` for **every** medium — copper, fibre, serial console, power, video, audio — with type, colour, length, label; modules (`ModuleType` SFP/QSFP) in `ModuleBay`s | 0 | photographs, LLDP, rewiring day |
+| Circuits | `Provider` + `Circuit` + terminations: Telenet (static anchor), Proximus PPPoE (dynamic anchor); the off-site object store and PBS target as a cloud `Site` | 0 | firewall seed, contracts |
+| Management | native `Device.oob_ip` for iLO/IPMI/BMC addresses, `console-port` for serial | 0 | iLO, IPMI |
 
-**Rules:**
-- New roles are added by ADR amendment (edit this table, submit PR)
-- The role token is used as the `service` segment in `naming/0001-infra §5` hostnames (with the mapping: `cmdb` → `nbox` short code, `identity` → `auth` short code, etc.)
-- Roles that straddle multiple assets (e.g. `mon` covers Prometheus + Grafana + Alertmanager) use tags to distinguish the individual component
+Device types come from the public `netbox-community/devicetype-library` where they exist (HPE ProLiant DL380p Gen8 with front and rear elevation images, Netgear GS, Arista, Ubiquiti U6, APC and Eaton power gear, Synology DS15xx siblings); the **DS1513+** and the **Tyan GT24-B8236-IL** are missing there and are authored by us in the same YAML format (and contributed upstream).
 
-### 4. Plugin pipeline — when a plugin is missing
+Passive and physical assets get names under the `naming/0001` pattern: `br-rk-NN` rack, `br-pp-NN` patch panel, `br-pdu-NN`, `br-ups-NN`, `br-sw-NN` switch, `br-ap-NN` access point, `br-cpe-<isp>-01` ISP equipment. These rows are mirrored into `naming/0001 §5` in the companion PR on approval.
 
-When NetBox's stock data model does not cover a domain (example: Synology NAS shared folders, OPNsense firewall alias registry), **develop a plugin**. Do not store the data in a YAML file, a wiki page, or "temporarily" in Ansible vars. NetBox is the only acceptable home.
+#### 1.2 Virtual
 
-| Phase | Scope | Deliverable |
+`Cluster` per hypervisor (the three nodes, the fourth on arrival; cluster type `proxmox`), one `VirtualMachine` per VM **and** per LXC (NetBox has no container class; the custom field `guest_type` = `vm`/`lxc` carries it), with vCPU, memory, disk, interfaces, addresses and the service fields of §2. Kubernetes nodes (`vm-k3s-01`) are VMs; cloud guests (`cb-*`) sit in the cloud `Site`.
+
+#### 1.3 Logical
+
+VLANs as a `VLANGroup` per fabric — the production SDN set (`mgmt` 1010, `dmz` 1020, `svc` 1030, `vpn` 1040, `iot` 1100, `voip` 1110, `storage` 1200, `media` 1300, `cctv` 1400), the out-of-band and fabric-management VLANs, the ISP-facing bridges — with their IPv4 **and** IPv6 prefixes (`naming/0001 §6.1`: dual-stack is mandatory), every guest address, the firewall's interface addresses and the VRRP/virtual addresses (resolver VIP). The supernets and ULA prefixes are imported from the Terraform SDN definition and the inventory, not typed by hand.
+
+#### 1.4 Services
+
+One `Service` object per platform service bound to its guest(s) with port and protocol, carrying the fields of §2. **This replaces `register.yml` as the home of the register:** `docs/register.md` is generated from NetBox after the load (Phase 1 below) and `register.yml` is archived.
+
+### 2. Mandatory custom fields — the contract with the other ADRs
+
+The fields are the columns the register already enforces today, so the migration changes the store, not the contract.
+
+| Field | On | Type | Values / meaning | Consumed by |
+|---|---|---|---|---|
+| `env` | Device, VM | choice | `dev` `test` `staging` `acc` `prod` `drp` (`infra/0005`) | Vault path, DNS zone, inventory group |
+| `guest_type` | VM | choice | `vm` / `lxc` | Terraform module, swap and storage standards |
+| `service` | VM, Service | choice (closed list = §3) | which platform service this asset belongs to | playbook selection, naming short code |
+| `exposure` | Service | choice | `public` / `private` / `admin` | DNS, Traefik, Authentik groups, NetBird policy, host firewall, JumpServer grants |
+| `sso` | Service | choice | `oidc` / `forwardauth` / `ldap` / `local` / `none` | identity ADRs, audit |
+| `db` | Service | choice | `shared-pg` / `own` / `none` | `services/0004` consumer table |
+| `backup` | Service, Device | multi-choice | `pbs` `app-native` `pg-dump` `s3` `replica` `config-export` `nfs` `raft-snapshot` | `infra/0008` jobs and restore drills |
+| `monitoring` | Service, Device | multi-choice | `node` `cadvisor` `probe` `metrics` | `infra/0007` scrape and probe generation |
+| `service_url` | Service | URL | user-facing HTTPS entry | DNS, Traefik, blackbox probe |
+| `image` | Service | text | pinned image or package version (`never :latest`) | update review, CVE matching |
+| `vault_path_prefix` | VM, Service | text | `<env>/<service>` | `security/0001` |
+| `owner` | Device, VM, Service | contact | responsible person | incident response |
+| `doc_url` | Service | URL | vendor documentation the configuration follows | vendor-conformance reviews |
+| `grafana_url` | Device, VM | URL | deep link to the asset's dashboard (owner 2026-09-03: inventory-only, metrics elsewhere) | people |
+
+Adding or renaming a field is an amendment of this ADR; the fields are created by the `cmdb` playbook, never in the UI.
+
+### 3. Canonical vocabulary
+
+`service` is a closed list and equals the register's service keys as they run today:
+
+| Class | Values |
+|---|---|
+| Core / identity | `opnsense` `adguard` `step-ca` `vault` `authentik` `netbird` `traefik` `crowdsec` `warden` `wazuh` |
+| Data | `postgresql` `dbproxy` `redis` `seaweedfs` `pbs` |
+| Platform | `proxmox` `k3s` `portainer` `monitoring` `netbox` `pgadmin` `jumpserver` `pkgcache` |
+| Delivery | `gitlab` `gitlab-runner` `harbor` `verdaccio` |
+| Collaboration | `nextcloud` `collab` `jitsi` `mailcow` `vaultwarden` `diagrams` `grc` |
+
+Device roles (`DeviceRole`) for physical assets: `hypervisor` `nas` `switch` `access-point` `isp-cpe` `pdu` `ups` `patch-panel` `workstation`. Virtual roles reuse the `service` value. New values enter by amendment of this ADR; the UI cannot add them (the playbook reconciles the choice sets and removes strays).
+
+### 4. How data enters NetBox
+
+| Writer | What | How |
 |---|---|---|
-| **Phase 1 — Minimum viable** | List, CRUD, read-back actual state from the target system | Working plugin, installable, CI green |
-| **Phase 2 — Integration** | Relationships to other NetBox objects, webhook triggers, Ansible dynamic inventory support | Ansible reads NetBox for this domain via `netbox.netbox.nb_inventory` |
-| **Phase 3 — Graph** | Neo4j sync nodes + edges, agent-queryable metadata | Agent (Rune) can reason about this domain via graph queries |
+| **Bootstrap import** (once per environment) | sites, racks, device types, devices, VLANs, prefixes, guests, services | `cmdb` playbook with the `netbox.netbox` collection reading today's sources: Terraform state, `hosts.yml`, `register.yml`, the firewall catalog, Proxmox and iLO/IPMI APIs, the photographs for rack units and cabling |
+| **Operator** | intent before provisioning: a planned device in a reserved rack unit, a new VLAN, a new service | pull request on the `cmdb` playbook data (reviewed like any change), applied by the playbook — the UI is read and browse |
+| **Collection library** (owned, like `lib-opnsense`) | discovered state: LLDP neighbours, interface states, optics, serials, firmware, UPS load | minimal protocols (SNMP, SSH, vendor APIs: eAPI, NX-API, UniFi, OPNsense, iLO/Redfish, IPMI, DSM) → Diode → NetBox; no Oxidized, Orb or NAPALM |
+| **Provisioning** | status transitions and last-check timestamps | post-tasks of the service playbooks (`infra/0010`) |
+| **Plugins** | domains the stock model lacks (NAS shares and exports, firewall alias registry, AV signal paths) | `netbox-plugin-<domain>`, three phases: minimum viable → integration (webhooks, inventory) → graph/agent; no phase skipped |
 
-**Rules:**
-- No phase is skipped. No Phase 3 without a working Phase 1.
-- Plugin repo name: `netbox-plugin-{domain}` per `naming/0004-automation §1`
-- Language: Python (NetBox plugin standard). Minimal runtime dependencies.
-- DoD: tested, linted, CHANGELOG, CI gate — same as every other platform repo per `git/0001-workflow`
-- Plugin development effort is **time-boxed per phase.** No gold-plating Phase 1.
+Drift (discovered ≠ intent) is logged to Loki and flagged on the object; the playbook never silently overwrites intent.
 
-### 5. Sync architecture
+### 5. Who reads NetBox
 
-NetBox is the intent layer. Other systems read from NetBox; none of them are authoritative for any field NetBox models.
-
-| Consumer | Read mechanism | Cadence |
+| Consumer | Mechanism | Phase |
 |---|---|---|
-| **Ansible** | `netbox.netbox.nb_inventory` dynamic inventory plugin | Every playbook run — live query |
-| **Terraform** | `terraform-provider-netbox` data sources + resources | Read on every `plan`, write on `apply` for NetBox-managed resources |
-| **Prometheus** | `netbox_sd` service discovery (future) or static config generated from NetBox | Scrape config regenerated on NetBox webhook |
-| **Traefik** | Dynamic config generated from NetBox `service_url` custom field | On change via Ansible reconciliation |
-| **Neo4j** | ETL job — reads NetBox API, writes nodes + edges | Event-driven via NetBox webhook + safety-net cron every 4h |
-| **Agent (Rune)** | Queries Neo4j via Cypher for RCA, blast-radius, dependency traversal | Per user request |
+| Ansible | `netbox.netbox.nb_inventory` dynamic inventory, groups from `env`, `service`, `exposure`, cluster, site; `hosts.yml` kept beside it until parity, then archived | 3 |
+| Register | `docs/register.md` generated from NetBox `Service` objects | 1 |
+| Terraform | `terraform-provider-netbox` data sources for addresses, VLANs, device facts; resources for what Terraform creates | 3 |
+| Monitoring | scrape and probe targets generated from `monitoring` and `service_url` | 3 |
+| Firewall catalog | host and network aliases generated from prefixes and addresses | 4 |
+| Switch configuration | vendor-neutral intent (ports, VLANs, LAGs, PoE, cabling) rendered per vendor (EOS, NX-OS) | 4 |
+| People | the rack elevation, the cable list, the patch map, the deep links | 2 |
 
-**Write path — who updates NetBox:**
+### 6. Lifecycle — hardware in and out of the rack
 
-| Writer | What | When |
+NetBox's native device statuses are the state machine; each transition is a playbook, not a hand edit.
+
+| Status | Meaning | Playbook effect |
 |---|---|---|
-| **Operator (human)** | Intent: creates or edits an asset record before it is provisioned | Manual, via NetBox UI or API |
-| **Ansible** | Status updates after provisioning: `status = active`, last-check timestamp, discovered interfaces | Post-playbook task in every role |
-| **Terraform** | Resources it creates (when using `terraform-provider-netbox`): VMs, VLANs, IPs | On `terraform apply` |
-| **NetBox plugins** | Discovered state from target systems: actual NFS shares, actual firewall aliases, actual WireGuard peers | On discovery cycle (per-plugin cadence) |
+| `planned` | ordered or on the bench; a rack unit is reserved, addresses allocated from NetBox | nothing runs; DNS and firewall prepared |
+| `staged` | racked and cabled per the model, management interface reachable | adoption: BMC credential to Vault, firmware baseline, hypervisor install or NAS join |
+| `active` | in production | normal operation, monitoring, backup |
+| `decommissioning` | leaving: data migrated | monitoring silenced, backup job retired after the last restore test, DNS and firewall entries removed, addresses released |
+| `offline` / `inventory` | out of the rack, kept | record archived, never deleted (`feedback: never delete, archive`); the rack unit is free |
 
-**Drift handling:** NetBox always holds intent. If a plugin or Ansible discovers drift (actual state ≠ NetBox intent), the drift is logged to Loki (see `infra/0006-logging §Audit log destinations`), flagged on the NetBox record with a `drift` tag, and either auto-reconciled (if safe) or queued for human review.
+A proof-of-concept machine goes `planned → staged → active → decommissioning → inventory` in days; the model stays correct at each step because the playbooks refuse to act on a status they do not expect.
 
-### 6. NetBox → Neo4j graph sync
-
-NetBox's relational model cannot express dependency chains, impact analysis, or multi-hop traversal efficiently. Neo4j is used as a **graph projection** of NetBox's data, updated on every NetBox change.
-
-**Node types (initial):**
-`Device`, `VM`, `LXC`, `Service`, `Share`, `Group`, `User`, `VLAN`, `Interface`, `IPAddress`, `Secret` (reference only, no value), `DNSRecord`
-
-**Edge types (initial):**
-`runs_on`, `mounts`, `has_access`, `member_of`, `connected_to`, `depends_on`, `exposes`, `manages`, `routes_to`, `belongs_to_env`
-
-**Example query (RCA):**
-```
-MATCH (v:VM {name: 'vm-glab-01'})-[:depends_on*1..3]->(dep)
-WHERE dep.status <> 'healthy'
-RETURN dep, collect(nodes(p))
-```
-
-**Sync implementation:** custom Python ETL job, deployed as a NetBox plugin that uses NetBox webhooks + a 4-hour safety-net cron. Neo4j is **read-only** for the platform — no application writes to Neo4j directly, every change is ETL-ed from NetBox.
-
-### 7. NetBox deployment parameters
-
-NetBox itself is a Layer 5 service per `infra/0002-platform-charter`. Its deployment follows the generic Linux VM pipeline (not a provisioning exception like `services/0001-opnsense`).
+### 7. NetBox deployment parameters (as running)
 
 | Parameter | Value |
 |---|---|
-| **Hostname** | `vm-nbox-01` per `naming/0001-infra §5` |
-| **Service URL** | `netbox.{domain}` (prod), `netbox.{env}.{domain}` (non-prod) per `naming/0001-infra §7` |
-| **Version** | NetBox **4.x** minimum (custom objects require 4.x) |
-| **Database** | PostgreSQL — consumer of the shared instance per `services/0004-database-strategy §Consumers` |
-| **Cache** | Redis — consumer of the shared instance per `services/0004-database-strategy §Consumers` |
-| **Object storage** | MinIO for image uploads, exports, attachments |
-| **Authentication** | Authentik OIDC per `identity/0001-authentication`. Break-glass local admin account in Vault at `secret/{env}/netbox/break-glass`. |
-| **Secrets** | API tokens, DB credential, OIDC client secret all in Vault at `secret/{env}/netbox/...` per `security/0001-secret-storage` |
-| **Role in own registry** | `role = cmdb` — NetBox is modeled as an asset in itself |
+| Hostname | `lxc-nbox-01` (`naming/0001 §5`, short code `nbox`) |
+| Service URL | `netbox.{domain}` per `naming/0001 §7`; exposure `private` |
+| Version | NetBox 4.7 line, image pinned by the role (`never :latest`) |
+| Database, cache | shared PostgreSQL and Redis (`services/0004`), own database and ACL login |
+| Media | local media volume backed up by PBS; moves to the platform object store when it grows past the volume class |
+| Authentication | Authentik OIDC; break-glass local superuser and API token reconciled from `people.yml`, values in Vault (`security/0001`) |
+| Automation identity | one API token per writer (playbook, collection library, Diode), scoped, in Vault, rotated with the platform rotation |
+| Own record | NetBox is itself a `Service` (`service = netbox`) on `lxc-nbox-01` |
 
 ### 8. Deferred decisions
 
-The following are intentionally **not** decided in this ADR; they require empirical data at deployment time.
-
 | Decision | Deferred until |
 |---|---|
-| Priority order for plugin development (NAS vs OPNsense vs Ansible inventory vs other) | NetBox deployment + first gap encountered |
-| Use NetBox 4.x custom objects vs NetBox plugin API for a given domain | Per-domain, evaluated at plugin kickoff |
-| Neo4j ETL: custom script vs existing OSS connector (e.g. `netbox-graph`) | Neo4j deployment |
-| Authentik → NetBox group sync: webhook push vs polling | Authentik identity-sync framework maturity |
-| Which tools are modeled as NetBox `VirtualMachine` vs `Service` vs custom object | Per-tool, at deployment time |
+| Graph projection (Neo4j or other) for multi-hop impact queries | the model is loaded and a consumer needs it; not before Phase 3 |
+| Order of plugins (NAS shares, firewall aliases, AV paths) | the first gap met after Phase 2 |
+| Diode self-hosted versus library direct writes | the collection library's first discovery flow |
+| Authentik → NetBox group sync: push or poll | the identity sync framework |
 
-These deferred decisions are **not TBD** in the `security/0003-hardening` sense — they are intentionally empirical and will be recorded as per-plugin or per-deployment notes, not as ADR amendments.
+## Build plan (from the empty instance)
+
+| Phase | Deliverable | Done when |
+|---|---|---|
+| 0 | this ADR and the `naming/0001` rows approved | merged |
+| 1 | `cmdb` playbook: custom fields, choice sets, tags, device roles, manufacturers and device types (library import + DS1513+ and GT24 authored), VLAN groups, prefixes, clusters; services and guests imported from `register.yml`, `hosts.yml`, Terraform and Proxmox; `register.md` generated from NetBox | every object class non-zero, register diff against today's file is empty |
+| 2 | physical load: racks, rack units, devices, power, patch panels, cables, circuits — from the photographs and iLO/IPMI reads; elevation and cable list printed | the printed elevation matches the rack; every cable has a label |
+| 3 | consumers: `nb_inventory` at parity with `hosts.yml`, Terraform reading addresses from NetBox, monitoring targets generated | one playbook run on each inventory gives identical results; `hosts.yml` archived |
+| 4 | rewiring day driven by the model; collection library first flows (LLDP, optics, serials); firewall aliases and switch intent rendered from NetBox | drift report clean after the rewiring |
+
+Each phase is a series of pull requests verified by reading the NetBox API back, never by the UI.
 
 ## Consequences
 
-- **Single source of truth is real, not aspirational.** NetBox holds every field; Ansible and Terraform are executors that read from NetBox and write back status.
-- **Role vocabulary is closed and versioned.** Operators cannot add ad-hoc role strings — every new role requires an ADR amendment, which keeps the vocabulary consistent across monitoring, naming, and backup.
-- **Mandatory custom fields are the contract between NetBox and other ADRs.** `env`, `role`, `service_url`, `prometheus_job`, `vault_path_prefix`, `backup_class`, `owner` — if any of these is missing on a deployed asset, the deployment is incomplete.
-- **Missing plugins become in-house plugins.** No YAML-file sources of truth, no temporary wiki pages. The 3-phase pipeline is mandatory.
-- **Graph queries are possible** (RCA, blast radius, dependency traversal) via Neo4j — but only for data that has been modeled in NetBox first.
-- **NetBox is itself in NetBox** (`role = cmdb`) — no special case.
+- The register, the inventory and the rack become one dataset with one editing path (pull request → playbook); the UI is for reading.
+- The vocabulary is closed and matches what runs; a new service exists only after this ADR has a row for it.
+- Hardware changes for proofs of concept cost a status change, not a hunt through five files.
+- Two device types and one collection library are our own code to maintain, with tests and CI like every platform repository.
 
 ## Revision triggers
 
-Revise this ADR when:
-- A new role is needed (add a row to §3)
-- A new mandatory custom field is required (add to §2)
-- NetBox replaces its plugin API (would affect §4)
-- Neo4j is replaced by a different graph store (or graph sync is abandoned)
-- A consumer is added to §5 (e.g. OPA / Kyverno policy engine reading NetBox)
-- The ETL mechanism changes (custom script → OSS connector → native NetBox 5.x feature)
-- NetBox 5.x data-model changes force a structural update
+- A new service, field or device role (§2, §3).
+- The fourth hypervisor arrives (cluster rows, rack units) — data, not an amendment, unless the model changes.
+- Arista core or PoE campus installed (§5 switch configuration becomes live).
+- NetBox 5.x changes the data model.
+- A consumer is added to §5.
 
 ## CISO mapping
 
 | Framework | Controls covered |
 |---|---|
-| ISO 27001:2022 | A.5.9 (inventory of information and other assets — NetBox holds every asset), A.8.9 (configuration management — mandatory custom fields are the contract), A.5.12 (classification of information — role vocabulary classifies every asset by function) |
-| NIS2 | Art. 21(2)(a) (risk management — asset visibility via NetBox is a prerequisite for risk assessment), Art. 21(2)(f) (cryptography use policies — NetBox models the topology that cryptographic controls protect) |
+| ISO 27001:2022 | A.5.9 (inventory of information and other assets — every asset, physical and virtual, in one register), A.5.12 (classification — `exposure`), A.7.4 (physical security monitoring — rack units and cabling known), A.8.9 (configuration management — mandatory fields are the contract), A.8.20 (networks security — VLANs, prefixes and cabling modelled), A.5.37 (documented operating procedures — lifecycle playbooks) |
+| NIS2 | Art. 21(2)(a) (risk analysis — asset visibility is the prerequisite), Art. 21(2)(e) (security in acquisition, development and maintenance — lifecycle states), Art. 21(2)(i) (asset management) |
