@@ -1,6 +1,6 @@
 # identity/0005 — Remote Access Session Expiry
 
-**Status:** Draft (proposal — approve by merging)
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-10-31
 **Scope:** How long an interactive remote-access session (a NetBird peer authenticated through Authentik) stays valid before the person must authenticate again, and which peers are outside that rule. Does not define who may reach what (NetBird policies derive from the service register) nor Authentik's own session lengths.
 **Related:** `identity/0001-authentication`, `security/0001-secret-storage`, `security/0002-compliance-mapping`, `security/0003-hardening`, `infra/0001-platform-stack`

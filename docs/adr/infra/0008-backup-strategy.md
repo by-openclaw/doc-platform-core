@@ -1,7 +1,7 @@
 # infra/0008 — Backup Strategy
 
-**Status:** Draft — several policy thresholds pending (`⚠ TBD` in §Pending decisions)
-**Amended:** 2026-10-20 (approved by the owner) — the PBS datastore lives off-site on Contabo S3 directly; the on-site S3 is not a backup destination; retention locked (§Backup destinations, decisions 1, 6, 7); **2026-11-01 (proposed — approve by merging)** — recovery objectives per class, decisions 2, 3, 5, 8, 9, 10, 11 (§Recovery objectives)
+**Status:** Accepted (approved by merging on 2026-11-01)
+**Amended:** 2026-10-20 (approved by the owner) — the PBS datastore lives off-site on Contabo S3 directly; the on-site S3 is not a backup destination; retention locked (§Backup destinations, decisions 1, 6, 7); **2026-11-01 (approved by merging)** — recovery objectives per class, decisions 2, 3, 5, 8, 9, 10, 11 (§Recovery objectives)
 **Date:** 2026-04-13 (supersedes flat ADR-0020, 2026-04-02)
 **Scope:** Platform-wide backup policy — what gets backed up, where to, how often, how long retained, how to restore. Does not define per-service backup mechanics beyond the class-level pattern.
 **Related:** `infra/0003-terraform-standard` (state backup), `security/0001-secret-storage` (Vault Raft snapshots), `infra/0005-environment-tiers §Tier-specific constraints`, `security/0003-hardening §8` (audit log retention)
@@ -78,7 +78,7 @@ In-transit encryption is TLS on every leg — no plaintext NFS, no unencrypted H
 - ISO 27001:2022 A.8.13 compliance requires at least one documented drill per tier per year
 - Drill failures trigger an incident ticket, not a retry loop
 
-### Recovery objectives (proposed 2026-11-01 — approve by merging)
+### Recovery objectives (approved 2026-11-01)
 
 Measured on 2026-10-31: every guest has exactly one restore point per night (NAS job, then the PBS job), so the recovery point objective (RPO) of every service is 24 hours. The owner's requirement is explicit: a lost day of business records is not acceptable. Objectives by class and the vendor-documented mechanism that reaches each:
 
@@ -112,16 +112,16 @@ The following policy thresholds must be set by @yboujraf before this ADR moves f
 | # | Decision | Options / reference | Status |
 |---|---|---|---|
 | 1 | **Off-site backup target** | **LOCKED 2026-08-30: Contabo S3**; **clarified 2026-10-20:** the PBS datastore is on Contabo directly (not on the on-site S3 with a mirror); Vault snapshots and the application buckets' mirror also go there | ✅ locked |
-| 2 | **PostgreSQL backup schedule** | **PROPOSED 2026-11-01:** pgBackRest continuous WAL archiving (`archive_timeout` 60 s) + daily differential + weekly full to a dedicated off-site bucket, encrypted client-side; 14-day point-in-time window (§Recovery objectives) | 🟡 proposed |
-| 3 | **Redis backup schedule** | **PROPOSED 2026-11-01:** persistence only — AOF `appendfsync everysec`; rebuildable class, no separate copy | 🟡 proposed |
+| 2 | **PostgreSQL backup schedule** | **LOCKED 2026-11-01:** pgBackRest continuous WAL archiving (`archive_timeout` 60 s) + daily differential + weekly full to a dedicated off-site bucket, encrypted client-side; 14-day point-in-time window (§Recovery objectives) | ✅ locked 2026-11-01 |
+| 3 | **Redis backup schedule** | **LOCKED 2026-11-01:** persistence only — AOF `appendfsync everysec`; rebuildable class, no separate copy | ✅ locked 2026-11-01 |
 | 4 | **Vault Raft snapshot schedule** | **LOCKED 2026-08-30: daily** raft snapshot → NFS + S3 + controller (`roles/vault_backup`) | ✅ locked |
-| 5 | **GitLab application backup schedule** | **PROPOSED 2026-11-01:** daily full `gitlab-backup` to its bucket (running since 2026-09) + incremental repository backups every 6 h after lab validation | 🟡 proposed |
+| 5 | **GitLab application backup schedule** | **LOCKED 2026-11-01:** daily full `gitlab-backup` to its bucket (running since 2026-09) + incremental repository backups every 6 h after lab validation | ✅ locked 2026-11-01 |
 | 6 | **Retention — hot (NAS)** | **LOCKED 2026-10-20: 7 daily + 4 weekly** (full archives, on site) | ✅ locked |
 | 7 | **Retention — cold (off-site)** | **LOCKED 2026-10-20: 14 daily + 8 weekly + 12 monthly** on the Contabo PBS datastore (deduplicated, encrypted client-side) | ✅ locked |
-| 8 | **Restore SLA (RTO) — prod** | **PROPOSED 2026-11-01:** ≤ 1 hour database and secret store, ≤ 4 hours other critical services, ≤ 24 hours non-critical | 🟡 proposed |
-| 9 | **Restore SLA (RTO) — non-prod** | **PROPOSED 2026-11-01:** best effort, no SLA | 🟡 proposed |
-| 10 | **Restore drill cadence** | **PROPOSED 2026-11-01:** monthly automated guest restore + quarterly PostgreSQL point-in-time restore, reports in `docs/runbooks/restore-drills/` | 🟡 proposed |
-| 11 | **Backup encryption KMS** | **PROPOSED 2026-11-01:** Vault KV escrow as implemented for the PBS client key; no Transit engine, no provider KMS | 🟡 proposed |
+| 8 | **Restore SLA (RTO) — prod** | **LOCKED 2026-11-01:** ≤ 1 hour database and secret store, ≤ 4 hours other critical services, ≤ 24 hours non-critical | ✅ locked 2026-11-01 |
+| 9 | **Restore SLA (RTO) — non-prod** | **LOCKED 2026-11-01:** best effort, no SLA | ✅ locked 2026-11-01 |
+| 10 | **Restore drill cadence** | **LOCKED 2026-11-01:** monthly automated guest restore + quarterly PostgreSQL point-in-time restore, reports in `docs/runbooks/restore-drills/` | ✅ locked 2026-11-01 |
+| 11 | **Backup encryption KMS** | **LOCKED 2026-11-01:** Vault KV escrow as implemented for the PBS client key; no Transit engine, no provider KMS | ✅ locked 2026-11-01 |
 
 ## Consequences
 

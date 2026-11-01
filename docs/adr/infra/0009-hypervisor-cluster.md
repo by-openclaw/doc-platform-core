@@ -1,6 +1,6 @@
 # infra/0009 — Hypervisor Cluster (compute platform)
 
-**Status:** Draft — proposal for approval (hardware refresh decision)
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-09-23
 **Deciders:** @yboujraf
 **Scope:** The physical compute platform: node class, cluster topology, storage tiers, the networks the cluster itself uses, the growth path from one node to three, and how the Kubernetes layer sits on top. Does not define per-zone network policy (`infra/0004`), backup policy (`infra/0008`) or any service.

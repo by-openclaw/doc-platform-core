@@ -1,6 +1,6 @@
 # services/0003 — NetBox CMDB
 
-**Status:** Draft (rewritten 2026-10-31 against the running platform — proposal, approve by merging)
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-04-14 (supersedes flat ADR-0009, 2026-03-31); rewritten 2026-10-31
 **Scope:** How NetBox works as the platform CMDB — what it models (physical, virtual, logical, services), the mandatory fields that are the contract with every other ADR, the closed role vocabulary, how data gets in (bootstrap import, our own collection library, plugins), who reads it (Ansible, Terraform, monitoring, the register), the lifecycle that lets hardware go in and out of the rack, and the build plan from the empty instance that exists today. Does **not** re-assert "NetBox is the source of truth" (`naming/0001-infra §1`) nor define hostnames (`naming/0001-infra §3–5`).
 **Related:** `naming/0001-infra`, `infra/0001-platform-stack`, `infra/0003-terraform-standard`, `infra/0004-network-architecture`, `infra/0005-environment-tiers`, `infra/0007-monitoring`, `infra/0008-backup-strategy`, `infra/0010-provisioning-ansible-only`, `security/0001-secret-storage`, `services/0004-database-strategy`

@@ -1,6 +1,6 @@
 # infra/0013 — Windows Guests: Authorized Applications, Profiles and Updates
 
-**Status:** Proposed
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-10-15 (proposed)
 **Scope:** What software a Windows guest of the platform carries beyond the image (`tpl-ws2025-std-gui-gold`, the Win11 Pro workstation template when it exists), who decides it, how it is installed, updated and removed, and what a developer profile adds.
 **Related:** `infra/0010-provisioning-ansible-only` (every install is a role), `security/0001` (secrets in Vault; keys per person), `identity/0004` (accounts), the Windows walk of 2026-10-14/15 (template-first, min footprint, CIS L1, egress through the platform proxy only).

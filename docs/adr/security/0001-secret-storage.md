@@ -1,6 +1,6 @@
 # security/0001 — Secret Storage
 
-**Status:** Draft
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-04-13 (supersedes flat ADR-0011, 2026-03-31 + flat ADR-0016, 2026-04-02)
 **Amended:** 2026-10-11 (approved by the owner) — people read in Vault what is meant for them (§People reading in Vault); the controller keeps only what opens Vault (§Operating model)
 **Amendment proposed:** 2026-10-17 — document classes, mandatory purpose metadata, the generated register (§Document classes, purpose and register). Not in force until the owner approves this PR.
