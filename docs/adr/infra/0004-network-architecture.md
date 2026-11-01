@@ -70,6 +70,11 @@ Dual-stack IPv4 + IPv6 on every segment. IPv6 uses ULA (fd00::/8) for internal a
 | 1200 | Storage | 10.1.20.0/24 | fd01:20::/64 | 10.1.20.1 |
 | 1300 | Media | 10.1.30.0/24 | fd01:30::/64 | 10.1.30.1 |
 | 1400 | CCTV | 10.1.40.0/24 | fd01:40::/64 | 10.1.40.1 |
+| 1310 | MEDIA-RED (ST 2110 path A + PTP, `infra/0015`) | 10.1.31.0/24 | fd01:31::/64 | 10.1.31.1 (control only) |
+| 1320 | MEDIA-BLUE (ST 2110 path B + PTP, `infra/0015`) | 10.1.33.0/24 | fd01:33::/64 | 10.1.33.1 (control only) |
+| 1330 | AUDIO (Dante, AES67, PTP, `infra/0015`) | 10.1.34.0/24 | fd01:34::/64 | 10.1.34.1 (control only) |
+| 1340 | NDI (`infra/0015`) | 10.1.35.0/24 | fd01:35::/64 | 10.1.35.1 |
+| 1350 | TS (MPEG-TS, SRT, `infra/0015`) | 10.1.36.0/24 | fd01:36::/64 | 10.1.36.1 |
 
 ### 4. Test VLAN assignment (2001–2999)
 
