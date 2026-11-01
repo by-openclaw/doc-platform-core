@@ -1,7 +1,7 @@
 # services/0004 — Database Strategy
 
 **Status:** Accepted (approved by merging on 2026-11-01)
-**Date:** 2026-04-14 (supersedes flat ADR-0018, 2026-04-02); amended 2026-09-29 — isolation is ownership + owner-only `CONNECT`, credentials at `db-pgsql` (the text now matches what the platform enforces) ; amended 2026-10-31 — §Capacity and sizing (proposed, approve by merging)
+**Date:** 2026-04-14 (supersedes flat ADR-0018, 2026-04-02); amended 2026-09-29 — isolation is ownership + owner-only `CONNECT`, credentials at `db-pgsql` (the text now matches what the platform enforces) ; amended 2026-10-31 — §Capacity and sizing (approved by merging 2026-11-01)
 **Scope:** Centralized PostgreSQL and Redis for platform services — who consumes them, how they are isolated, how credentials flow, and the HA roadmap. Does not define backup mechanics (see `infra/0008-backup-strategy`), exporter configuration (see `infra/0007-monitoring`), or specific VM names / IPs (those live in NetBox).
 **Related:** `security/0001-secret-storage`, `services/0003-netbox-cmdb`, `infra/0007-monitoring`, `infra/0008-backup-strategy`, `services/0002-email-infrastructure`
 
@@ -261,7 +261,7 @@ These are intentionally empirical — resolve at deployment time, not in this AD
 | Sentinel colocation | 3 dedicated Sentinel VMs **or** 1 dedicated + 2 colocated on Redis nodes |
 | Redis replica count | Minimum 1 replica (2 total Redis nodes) vs 2 replicas (3 total Redis nodes) — deferred until load testing |
 
-### Resolved at deployment (2026-10-04) — PROPOSED, approve by merging
+### Resolved at deployment (2026-10-04) — approved by merging 2026-11-01
 
 The cluster was deployed on 2026-10-04 (owner "go" of 2026-10-03, capacity checked: memory and disk are plentiful, CPU is the thin resource of the single host). Two rows follow the options above; three depart from them and need the owner's approval. Each departure is reversible without touching a consumer, because consumers only know the endpoint's name.
 
