@@ -1,7 +1,7 @@
 # services/0004 — Database Strategy
 
 **Status:** Draft
-**Date:** 2026-04-14 (supersedes flat ADR-0018, 2026-04-02); amended 2026-09-29 — isolation is ownership + owner-only `CONNECT`, credentials at `db-pgsql` (the text now matches what the platform enforces)
+**Date:** 2026-04-14 (supersedes flat ADR-0018, 2026-04-02); amended 2026-09-29 — isolation is ownership + owner-only `CONNECT`, credentials at `db-pgsql` (the text now matches what the platform enforces) ; amended 2026-10-31 — §Capacity and sizing (proposed, approve by merging)
 **Scope:** Centralized PostgreSQL and Redis for platform services — who consumes them, how they are isolated, how credentials flow, and the HA roadmap. Does not define backup mechanics (see `infra/0008-backup-strategy`), exporter configuration (see `infra/0007-monitoring`), or specific VM names / IPs (those live in NetBox).
 **Related:** `security/0001-secret-storage`, `services/0003-netbox-cmdb`, `infra/0007-monitoring`, `infra/0008-backup-strategy`, `services/0002-email-infrastructure`
 
@@ -270,7 +270,7 @@ The cluster was deployed on 2026-10-04 (owner "go" of 2026-10-03, capacity check
 | Redis replica count | 1 replica (2 Redis nodes) | as listed |
 | Sentinel colocation | 2 colocated on the Redis nodes, the third on the endpoint guest | as listed (the "dedicated" Sentinel shares the endpoint guest instead of having its own) |
 | Patroni DCS | `etcd`, 3 members **colocated on the three PostgreSQL guests** | **departs**: not a dedicated tier. Three more guests on a host whose CPU is the limit buy nothing: on one hypervisor a dedicated tier fails together with the database guests anyway. Revisit with the second host. |
-| PostgreSQL frontend | **TCP router** (HAProxy) on one endpoint guest: it asks each member's Patroni REST API which one leads and routes there. No pooling, no TLS termination — the client's TLS session and its login end on PostgreSQL. | **departs**: neither `pgbouncer` nor `pgpool-II`. A pooler in transaction mode is incompatible, without per-application work, with several consumers (prepared statements, session state); in session mode it adds an authentication layer and a TLS hop for no pooling gain; and neither follows Patroni by itself — a router is needed in both cases. Connections are not the constraint today (ceiling 200, alert at 80 %). A pooler can be placed behind the same endpoint name when a measured need appears. |
+| PostgreSQL frontend | **TCP router** (HAProxy) on one endpoint guest: it asks each member's Patroni REST API which one leads and routes there. No pooling, no TLS termination — the client's TLS session and its login end on PostgreSQL. | **departs**: neither `pgbouncer` nor `pgpool-II`. A pooler in transaction mode is incompatible, without per-application work, with several consumers (prepared statements, session state); in session mode it adds an authentication layer and a TLS hop for no pooling gain; and neither follows Patroni by itself — a router is needed in both cases. Connections are not the constraint today (ceiling 400 since 2026-10-04, alert at 80 %). A pooler can be placed behind the same endpoint name when a measured need appears. |
 | Redis client discovery (§Cluster architecture, not a deferred row) | Consumers connect to the **same endpoint guest**, which routes to the member that answers `role:master`; the Sentinels still decide who that is. | **departs** from "Sentinel-aware client". Nextcloud's PHP client has no Sentinel support, so one consumer needs the router in any case; one mechanism for all four consumers is simpler to operate than two. A consumer can move to Sentinel discovery later without any change on the cluster. |
 
 Also resolved, within the ADR's text:
@@ -279,6 +279,49 @@ Also resolved, within the ADR's text:
 - **Synchronous replication** is Patroni's `synchronous_mode` (it maintains `synchronous_standby_names`): one replica confirms every commit; with no replica available the leader keeps accepting writes rather than stopping the platform.
 - **Per-service Redis identity**: one ACL login per consumer (everything except administration commands). Database numbers stay the separation between consumers' keys — an ACL cannot restrict a login to a database number.
 - **Single endpoint guest**: stateless, restarts in seconds; while it is down consumers cannot reach the leader. A second endpoint with a floating address belongs with the second host.
+
+## Capacity and sizing (proposed 2026-10-31 — approve by merging)
+
+**Who decides a size: this ADR.** A member's vCPU, RAM, swap and disk, and the PostgreSQL memory and WAL parameters derived from them, change only by a PR here, applied through the Terraform guest definition (`svc-postgresql.tf`) and the `postgresql` role variables. No size is set by hand on a host.
+
+### Tier today (measured 2026-10-31)
+
+| Guest | vCPU | RAM | Swap | Disk | Holds |
+|---|---|---|---|---|---|
+| `lxc-pgsql-01` … `-03` | 2 | 4 GiB | 4 GiB (= RAM, swap standard for database members) | 30 GiB | 14 databases, 621 MB of data, 14 % of the disk used |
+| `lxc-pgpool-01` (endpoint) | 1 | 1 GiB | 512 MiB | 8 GiB | HAProxy router, stateless |
+| `lxc-redis-01` / `-02` | 1 | 1 GiB | 1 GiB (= RAM) | 8 GiB | Redis + Sentinel |
+
+### Sizing rule per PostgreSQL member
+
+Source: PostgreSQL 17 documentation, *Resource consumption* (`shared_buffers` "a reasonable starting value is 25 % of the memory" on a dedicated server) and *Write-ahead log*. The role today sets only `max_connections` and `max_slot_wal_keep_size`; every other value is the vendor default sized for a laptop.
+
+| Parameter | Rule | At 4 GiB | Live today |
+|---|---|---|---|
+| `shared_buffers` | 25 % of RAM | 1 GiB | 128 MB |
+| `effective_cache_size` | 75 % of RAM | 3 GiB | 4 GB |
+| `maintenance_work_mem` | RAM / 16, at most 2 GiB | 256 MiB | 64 MB |
+| `work_mem` | (RAM − shared_buffers) / (max_connections × 3), floor 4 MiB | 4 MiB | 4 MB |
+| `max_connections` | measured peak × 2; a backend costs about 5 MiB | 400 (since 2026-10-04) | 400 |
+| `max_wal_size` | 2 GiB, `checkpoint_completion_target` 0.9 | 2 GiB | 1 GB |
+| `max_slot_wal_keep_size` | 4 GiB — a dead member cannot fill the leader | 4 GiB | 4 GB |
+
+RAM check at 4 GiB: `shared_buffers` 1 GiB + 400 backends × 5 MiB (2 GiB) + OS, Patroni and etcd (0.5 GiB) = 3.5 GiB. The member is sized by its connection ceiling, not by its data: today's 621 MB fits in `shared_buffers` with room to spare.
+
+Disk rule: 2 × data + `max_wal_size` + `max_slot_wal_keep_size` + 5 GiB (server log, temp files, `pg_dump` staging). Today: 2 × 0.6 + 2 + 4 + 5 ≈ 12 GiB, so 30 GiB carries a tenfold data growth before the rule asks for more.
+
+### Growth triggers (raised by PR before the alert fires)
+
+| Trigger | Action |
+|---|---|
+| Backends above 80 % of `max_connections` (existing alert) | name the consumer from `log_connections`; fix its pool before raising the ceiling |
+| `shared_buffers` + backends × 5 MiB above 70 % of RAM | RAM +4 GiB on all three members (standbys first), recompute the table |
+| Disk above 60 % on any member (80 % warning and 90 % critical alerts exist) | disk +20 GiB on all three members |
+| Load above the vCPU count for 24 h, or CPU steal | +2 vCPU, after checking that no consumer runs away (host CPU is the thin resource) |
+
+Members are always sized identically: a standby must carry the leader's load after a failover, and `max_connections` on a standby may never be lower than the leader's (restart-required, standbys first).
+
+Implementation on approval: the seven parameters become `postgresql` role variables rendered into Patroni's cluster configuration; restart-required ones follow the standby-first order documented for `max_connections`.
 
 ## Revision triggers
 
@@ -296,6 +339,6 @@ Revise this ADR when:
 
 | Framework | Controls covered |
 |---|---|
-| ISO 27001:2022 | A.8.6 (capacity management — ⚠ partial, single instance is a PoC trade-off), A.8.13 (backup — delegated to `infra/0008`), A.8.27 (secure system architecture — per-service DB users with least-privilege grants, no schema sharing) |
+| ISO 27001:2022 | A.8.6 (capacity management — sizing rule and growth triggers in §Capacity and sizing; ⚠ single host until `infra/0009`), A.8.13 (backup — delegated to `infra/0008`), A.8.27 (secure system architecture — per-service DB users with least-privilege grants, no schema sharing) |
 | NIS2 | Art. 21(2)(c) (business continuity — ⚠ partial, single PostgreSQL is a known SPOF until Phase 2 Patroni HA) |
 | GDPR | Art. 32(1)(b) (integrity, confidentiality — per-service owner roles with owner-only `CONNECT` prevent cross-service data access) |
