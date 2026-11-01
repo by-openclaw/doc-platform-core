@@ -171,6 +171,8 @@ The following concerns are intentionally NOT in this ADR. Each scope owns its ow
 | `infra/0006-logging` | Loki + Promtail, S3 backend on Contabo, retention, no-PII rule |
 | `infra/0007-monitoring` | Prometheus + Grafana, `/metrics` scrape requirement, alert baseline |
 | `infra/0008-backup-strategy` | Per-service-class backup policy, Synology NAS + off-site, restore SLA |
+| `infra/0010-provisioning-ansible-only` | Ansible only: no shell, interpreter or helper program between the playbook and the host |
+| `infra/0011-resolver-high-availability` | Two AdGuard Home instances behind one VRRP address (keepalived); the firewall's Unbound second; acceptance test |
 
 #### `services/` (future refactor)
 
