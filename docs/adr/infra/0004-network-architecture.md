@@ -1,6 +1,6 @@
 # infra/0004 — Network Architecture
 
-**Status:** Draft
+**Status:** Draft — rows for shared, tenant, sync and transit VLANs added 2026-11-01 by `infra/0014` (proposal)
 **Date:** 2026-04-13 (supersedes flat ADR-0015 + flat ADR-0032, merging the architectural content of both)
 **Scope:** Network zones, VLAN registry, Proxmox SDN architecture, WireGuard VPN, dual-stack IPv4 + IPv6. Does not define OPNsense firewall rules, bridge/WAN operational state, or physical cabling.
 **Related:** `naming/0001-infra`, `naming/0003-firewall`, `infra/0005-environment-tiers`, `security/0004-certificate-strategy`, `services/0001-opnsense-provisioning` (future)
@@ -70,6 +70,10 @@ Dual-stack IPv4 + IPv6 on every segment. IPv6 uses ULA (fd00::/8) for internal a
 | 1200 | Storage | 10.1.20.0/24 | fd01:20::/64 | 10.1.20.1 |
 | 1300 | Media | 10.1.30.0/24 | fd01:30::/64 | 10.1.30.1 |
 | 1400 | CCTV | 10.1.40.0/24 | fd01:40::/64 | 10.1.40.1 |
+| 1050 | SHARED (tenant-consumable services, `infra/0014`) | 10.1.5.0/24 | fd01:5::/64 | 10.1.5.1 |
+| 1600–1690 | TENANT-n (one /24 per tenant, `infra/0014`; VLAN 16n0 ↔ 10.1.6n.0/24) | 10.1.60.0/24 … 10.1.69.0/24 | fd01:60::/64 … fd01:69::/64 | .1 |
+| 1900 | SYNC (firewall pair pfsync, `infra/0012` §4) | 10.1.90.0/24 | fd01:90::/64 | none (link-local use) |
+| 1951–1959 | TRANSIT-n (one per ISP handoff, ISP-addressed, `infra/0014`) | ISP block | ISP block | ISP |
 
 ### 4. Test VLAN assignment (2001–2999)
 
@@ -86,6 +90,9 @@ Test range uses `+1000` offset from prod and `10.11.x.x` / `fd11:x::/64` address
 | 2200 | Storage | 10.11.20.0/24 | fd11:20::/64 | 10.11.20.1 |
 | 2300 | Media | 10.11.30.0/24 | fd11:30::/64 | 10.11.30.1 |
 | 2400 | CCTV | 10.11.40.0/24 | fd11:40::/64 | 10.11.40.1 |
+| 2050 | SHARED | 10.11.5.0/24 | fd11:5::/64 | 10.11.5.1 |
+| 2600–2690 | TENANT-n | 10.11.60.0/24 … | fd11:60::/64 … | .1 |
+| 2900 | SYNC | 10.11.90.0/24 | fd11:90::/64 | none |
 
 The test range covers `dev`, `test`, `staging`, and `acc` env tiers. Higher tiers (`prod`, `drp`) use the production range. Env tier definitions are in `infra/0005-environment-tiers`.
 
