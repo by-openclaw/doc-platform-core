@@ -1,6 +1,6 @@
 # infra/0014 — Routing Domains, VIPs, Firewall Pair, IPAM and SDN
 
-**Status:** Draft (proposal — approve by merging)
+**Status:** Draft (proposal — the owner reviews and merges this one; the design is theirs to accept)
 **Date:** 2026-11-01
 **Scope:** The layer-3 design of the platform network: routing domains (VRF) and what may leak between them, virtual addresses (VIP) and who owns them, the firewall pair's place in the topology, the IP address management of record, and what Proxmox SDN is asked to do now and with the cluster. Builds on `infra/0004` (zones, VLAN registry, SDN zone naming — unchanged, two rows added) and `infra/0012` (placement, firewall pair, order of work). Not in scope: firewall rule content (`naming/0003`, the catalog), the switching hardware purchase (BOM), WireGuard/NetBird peers.
 **Related:** `infra/0004-network-architecture`, `infra/0009-hypervisor-cluster`, `infra/0011-resolver-high-availability`, `infra/0012-workload-placement-and-availability-classes`, `services/0003-netbox-cmdb`, `services/0001-opnsense`, `services/0008-opnsense-config-management`
