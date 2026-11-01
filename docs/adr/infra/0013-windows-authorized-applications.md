@@ -1,4 +1,4 @@
-# infra/0011 — Windows Guests: Authorized Applications, Profiles and Updates
+# infra/0013 — Windows Guests: Authorized Applications, Profiles and Updates
 
 **Status:** Proposed
 **Date:** 2026-10-15 (proposed)
