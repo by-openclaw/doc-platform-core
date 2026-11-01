@@ -1,6 +1,6 @@
 # services/0012 — Egress Proxy: Internet Access for Hosts and People, Authenticated, Listed, Logged
 
-**Status:** Proposed
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-10-15 (proposed)
 **Scope:** How anything inside the platform reaches the internet: hosts (updates, installers, agents) and people (an RDP or desktop session) — standing allow-lists for vendors, and **time-boxed slots requested through a portal** for everything else. Replaces the package cache standing in as a proxy for the Windows guests.
 **Related:** `infra/0011-windows-authorized-applications` (the vendor sources it allows), `security/0001` (credentials in Vault), `identity/0004` (people and groups), `services/0006-firewall-services` (the catalog that makes it the only way out), `infra/0006-logging`.

@@ -1,6 +1,6 @@
 # services/0004 — Database Strategy
 
-**Status:** Draft
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-04-14 (supersedes flat ADR-0018, 2026-04-02); amended 2026-09-29 — isolation is ownership + owner-only `CONNECT`, credentials at `db-pgsql` (the text now matches what the platform enforces) ; amended 2026-10-31 — §Capacity and sizing (proposed, approve by merging)
 **Scope:** Centralized PostgreSQL and Redis for platform services — who consumes them, how they are isolated, how credentials flow, and the HA roadmap. Does not define backup mechanics (see `infra/0008-backup-strategy`), exporter configuration (see `infra/0007-monitoring`), or specific VM names / IPs (those live in NetBox).
 **Related:** `security/0001-secret-storage`, `services/0003-netbox-cmdb`, `infra/0007-monitoring`, `infra/0008-backup-strategy`, `services/0002-email-infrastructure`
@@ -280,7 +280,7 @@ Also resolved, within the ADR's text:
 - **Per-service Redis identity**: one ACL login per consumer (everything except administration commands). Database numbers stay the separation between consumers' keys — an ACL cannot restrict a login to a database number.
 - **Single endpoint guest**: stateless, restarts in seconds; while it is down consumers cannot reach the leader. A second endpoint with a floating address belongs with the second host.
 
-## Capacity and sizing (proposed 2026-10-31 — approve by merging)
+## Capacity and sizing (approved 2026-11-01)
 
 **Who decides a size: this ADR.** A member's vCPU, RAM, swap and disk, and the PostgreSQL memory and WAL parameters derived from them, change only by a PR here, applied through the Terraform guest definition (`svc-postgresql.tf`) and the `postgresql` role variables. No size is set by hand on a host.
 

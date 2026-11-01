@@ -1,6 +1,6 @@
 # infra/0012 — Workload Placement and Availability Classes
 
-**Status:** Draft (proposal — approve by merging)
+**Status:** Accepted (approved by merging on 2026-11-01)
 **Date:** 2026-10-31
 **Scope:** Where a workload of the platform runs (virtual machine, LXC container, Kubernetes pod), how in-house software is packaged for it, and which services must be clustered before the platform can call itself a 24/7 DevOps infrastructure. Applies to the on-premise cloud the owner is preparing: several Proxmox nodes hosting the platform, many tenant instances (Odoo among them) and the in-house development targets. Not in scope: the node hardware and cluster mechanics (`infra/0009-hypervisor-cluster`), the database engine choices (`services/0004-database-strategy`), backups (`infra/0008-backup-strategy`).
 **Related:** `infra/0001-platform-stack` (Docker first, k3s "when load justifies it"), `infra/0009-hypervisor-cluster`, `infra/0011` resolver pair, `services/0001-opnsense`, `services/0003-netbox-cmdb` (§2 `guest_type`), `services/0004-database-strategy`, `services/0011-container-registry`, `security/0003-hardening`
